@@ -7,7 +7,7 @@ import { AuthProvider } from './context/AuthContext';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'Job Portal',
+  title: 'Udyog Jagat Portal',
   description: 'Find your dream job or the perfect candidate.',
 };
 
