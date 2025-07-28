@@ -5,10 +5,10 @@ import { Suspense } from 'react';
 import dynamic from 'next/dynamic'; // Import dynamic from next/dynamic
 
 // Dynamically import ResetPasswordContent with ssr: false
-// This ensures that ResetPasswordContent is only ever rendered on the client-side,
-// preventing useSearchParams from being called during server-side prerendering.
+// IMPORTANT: The component is now located in a subdirectory (_components)
+// to prevent Next.js from treating it as a standalone page route.
 const DynamicResetPasswordContent = dynamic(
-    () => import('./ResetPasswordContent/page'),
+    () => import('../components/ResetPasswordContent'), // Updated import path
     { ssr: false, loading: () => (
         <div className="flex flex-col items-center">
             <svg className="animate-spin text-indigo-600 h-12 w-12" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
