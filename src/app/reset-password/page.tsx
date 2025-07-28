@@ -1,4 +1,6 @@
 // app/reset-password/page.tsx
+'use client'; // This directive makes the entire page a Client Component
+
 import { Suspense } from 'react';
 import dynamic from 'next/dynamic'; // Import dynamic from next/dynamic
 
@@ -6,7 +8,7 @@ import dynamic from 'next/dynamic'; // Import dynamic from next/dynamic
 // This ensures that ResetPasswordContent is only ever rendered on the client-side,
 // preventing useSearchParams from being called during server-side prerendering.
 const DynamicResetPasswordContent = dynamic(
-    () => import('./ResetPasswordContent.tsx/page'),
+    () => import('./ResetPasswordContent/page'),
     { ssr: false, loading: () => (
         <div className="flex flex-col items-center">
             <svg className="animate-spin text-indigo-600 h-12 w-12" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
