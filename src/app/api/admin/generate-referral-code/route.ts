@@ -3,7 +3,7 @@ import dbConnect from "@/lib/dbConnect";
 import User, { IUser } from "@/models/User"; // Ensure IUser is imported for type safety
 import ReferralCodeModel, { IReferralCode } from "@/models/ReferralCode"; // Import ReferralCodeModel and its interface
 import jwt from "jsonwebtoken";
-import { DecodedToken } => "@/lib/authMiddleware"; // Assuming this is where DecodedToken is defined
+import { DecodedToken } from "@/lib/authMiddleware"; // Assuming this is where DecodedToken is defined
 import sendEmail from "@/lib/emailservice";
 import bcrypt from 'bcryptjs'; // Ensure bcryptjs is imported if used in User model's pre-save hook
 
