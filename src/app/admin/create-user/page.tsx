@@ -1,4 +1,3 @@
-// app/admin/create-user/page.tsx
 'use client';
 
 import { useState, FormEvent, useEffect } from 'react';
@@ -9,12 +8,17 @@ import Sidebar from '@/app/components/Sidebar'; // Import the Sidebar component
 import { motion, AnimatePresence } from 'framer-motion'; // Import motion and AnimatePresence
 import {
     FiMail, FiUser, FiBriefcase, FiLink, FiShield,
-    FiXCircle, FiCheckCircle, FiLoader, FiChevronLeft, FiMenu // Import FiMenu for hamburger
+    FiXCircle, FiCheckCircle, FiLoader, FiChevronLeft, FiMenu, FiBookOpen, FiMapPin, FiGlobe // Updated icons
 } from 'react-icons/fi'; // Import icons
 
 export default function CreateUserPage() {
     const [email, setEmail] = useState('');
     const [role, setRole] = useState<'job_poster' | 'job_seeker' | 'job_referrer' | 'admin'>('job_seeker');
+    // Updated: State variables for the fields
+    const [milanShakaBhaga, setMilanShakaBhaga] = useState(''); // Changed from milanShaka
+    const [valayaNagar, setValayaNagar] = useState('');
+    const [khandaBhaga, setKhandaBhaga] = useState(''); // Changed from khanda
+
     const [error, setError] = useState<string | null>(null);
     const [message, setMessage] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(false);
@@ -73,11 +77,43 @@ export default function CreateUserPage() {
             return;
         }
 
+        // Conditional validation for 'admin' and 'job_referrer' roles
+        if (role === 'admin' || role === 'job_referrer') {
+            if (!milanShakaBhaga.trim()) {
+                setError('Milan/Shaka/Bhaga is required for Admin and Referrer roles.');
+                setIsLoading(false);
+                return;
+            }
+            if (!valayaNagar.trim()) {
+                setError('Valaya/Nagar is required for Admin and Referrer roles.');
+                setIsLoading(false);
+                return;
+            }
+            if (!khandaBhaga.trim()) {
+                setError('Khanda/Bhaga is required for Admin and Referrer roles.');
+                setIsLoading(false);
+                return;
+            }
+        }
+
         try {
-            const payload = {
+            const payload: {
+                email: string;
+                role: string;
+                milanShakaBhaga?: string;
+                valayaNagar?: string;
+                khandaBhaga?: string;
+            } = {
                 email,
                 role,
             };
+
+            // Add fields to payload if they are provided OR if the role requires them (and they are not empty)
+            // This ensures optional fields for job_seeker are sent if filled,
+            // and mandatory fields for admin/referrer are sent if filled (already validated above).
+            if (milanShakaBhaga.trim()) payload.milanShakaBhaga = milanShakaBhaga.trim();
+            if (valayaNagar.trim()) payload.valayaNagar = valayaNagar.trim();
+            if (khandaBhaga.trim()) payload.khandaBhaga = khandaBhaga.trim();
 
             const response = await fetch('/api/admin/create-user', {
                 method: 'POST',
@@ -97,6 +133,10 @@ export default function CreateUserPage() {
             setMessage(data.message || 'User created successfully! A temporary password has been sent to their email.');
             setEmail('');
             setRole('job_seeker'); // Reset role to default
+            // Reset new fields
+            setMilanShakaBhaga('');
+            setValayaNagar('');
+            setKhandaBhaga('');
             console.log('User created:', data.user);
 
         } catch (err: any) {
@@ -151,6 +191,11 @@ export default function CreateUserPage() {
         { value: 'job_referrer', label: 'Referrer', icon: <FiLink className="h-8 w-8 text-[#1A3BAD]" /> }, // Darker blue
         { value: 'admin', label: 'Admin', icon: <FiShield className="h-8 w-8 text-red-500" /> }, // Red is fine
     ];
+
+    // These fields are required only for 'admin' and 'job_referrer'
+    const isRequiredForAdminOrReferrer = role === 'admin' || role === 'job_referrer';
+    // These fields are visible for 'admin', 'job_referrer', and 'job_seeker'
+    const areAdditionalFieldsVisible = role === 'admin' || role === 'job_referrer' || role === 'job_seeker';
 
     return (
         <div className="flex h-screen bg-gradient-to-br from-blue-50 to-[#E8EFFF] overflow-hidden font-inter">
@@ -253,6 +298,81 @@ export default function CreateUserPage() {
                                     ))}
                                 </div>
                             </motion.div>
+
+                            {/* Conditional Additional Details fields: visible for admin, referrer, and seeker */}
+                            {areAdditionalFieldsVisible && (
+                                <motion.div variants={itemVariants} className="space-y-6 pt-4 border-t border-gray-100">
+                                    <h3 className="text-lg font-semibold text-gray-800">
+                                        Additional Details {isRequiredForAdminOrReferrer ? '(Mandatory for Admin/Referrer)' : '(Optional for Job Seeker)'}
+                                    </h3>
+                                    
+                                    <motion.div variants={itemVariants}>
+                                        <label htmlFor="milanShakaBhaga" className="block text-sm font-semibold text-gray-700 mb-2">
+                                            Milan/Shaka/Bhaga
+                                        </label>
+                                        <div className="relative">
+                                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                                <FiBookOpen className="h-5 w-5 text-gray-400" />
+                                            </div>
+                                            <input
+                                                id="milanShakaBhaga"
+                                                name="milanShakaBhaga"
+                                                type="text"
+                                                required={isRequiredForAdminOrReferrer} // Conditionally required
+                                                className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-xl shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#4F39F6] focus:border-[#4F39F6] sm:text-base transition-all duration-200"
+                                                value={milanShakaBhaga}
+                                                onChange={(e) => setMilanShakaBhaga(e.target.value)}
+                                                disabled={isLoading}
+                                                placeholder="Enter Milan/Shaka/Bhaga"
+                                            />
+                                        </div>
+                                    </motion.div>
+
+                                    <motion.div variants={itemVariants}>
+                                        <label htmlFor="valayaNagar" className="block text-sm font-semibold text-gray-700 mb-2">
+                                            Valaya/Nagar
+                                        </label>
+                                        <div className="relative">
+                                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                                <FiMapPin className="h-5 w-5 text-gray-400" />
+                                            </div>
+                                            <input
+                                                id="valayaNagar"
+                                                name="valayaNagar"
+                                                type="text"
+                                                required={isRequiredForAdminOrReferrer} // Conditionally required
+                                                className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-xl shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#4F39F6] focus:border-[#4F39F6] sm:text-base transition-all duration-200"
+                                                value={valayaNagar}
+                                                onChange={(e) => setValayaNagar(e.target.value)}
+                                                disabled={isLoading}
+                                                placeholder="Enter Valaya/Nagar"
+                                            />
+                                        </div>
+                                    </motion.div>
+
+                                    <motion.div variants={itemVariants}>
+                                        <label htmlFor="khandaBhaga" className="block text-sm font-semibold text-gray-700 mb-2">
+                                            Khanda/Bhaga
+                                        </label>
+                                        <div className="relative">
+                                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                                <FiGlobe className="h-5 w-5 text-gray-400" />
+                                            </div>
+                                            <input
+                                                id="khandaBhaga"
+                                                name="khandaBhaga"
+                                                type="text"
+                                                required={isRequiredForAdminOrReferrer} // Conditionally required
+                                                className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-xl shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#4F39F6] focus:border-[#4F39F6] sm:text-base transition-all duration-200"
+                                                value={khandaBhaga}
+                                                onChange={(e) => setKhandaBhaga(e.target.value)}
+                                                disabled={isLoading}
+                                                placeholder="Enter Khanda/Bhaga"
+                                            />
+                                        </div>
+                                    </motion.div>
+                                </motion.div>
+                            )}
 
                             <motion.p variants={itemVariants} className="text-sm text-gray-500 text-center mt-4">
                                 A temporary password will be auto-generated and sent to the user's email.

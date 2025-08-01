@@ -6,6 +6,9 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/app/context/AuthContext';
 import Link from 'next/link';
 import Sidebar from '@/app/components/Sidebar'; // Assuming you have a Sidebar component
+import {
+  FiMenu, FiUser, FiMail, FiCheckCircle, FiXCircle, FiLoader, FiChevronLeft, FiTag
+} from 'react-icons/fi'; // Added FiCheckCircle, FiXCircle, FiTag for status icons
 
 interface UserDisplay {
   _id: string;
@@ -15,6 +18,7 @@ interface UserDisplay {
   firstLogin: boolean;
   isSuperAdmin: boolean;
   createdAt: string; // ISO date string
+  status: 'active' | 'inactive'; // Added status field
 }
 
 export default function MyCreatedUsersPage() {
@@ -27,11 +31,6 @@ export default function MyCreatedUsersPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [message, setMessage] = useState<string | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false); // State for mobile sidebar
-
-  // Delete confirmation states
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [deletingUserId, setDeletingUserId] = useState<string | null>(null);
-  const [deletingUserEmail, setDeletingUserEmail] = useState<string | null>(null);
 
   useEffect(() => {
     // Redirection logic for this specific page
@@ -125,67 +124,6 @@ export default function MyCreatedUsersPage() {
     }
   }, [authLoading, isAuthenticated, user, fetchMyCreatedUsers, searchQuery]);
 
-  // Handle Delete User Confirmation - Now allows deleting any user including admins
-  const handleDeleteClick = (userId: string, userEmail: string, userRole: string) => {
-    // You might want to add a more severe warning for admin deletion here,
-    // or even prevent an admin from deleting themselves.
-    setDeletingUserId(userId);
-    setDeletingUserEmail(userEmail);
-    setShowDeleteConfirm(true);
-  };
-
-  // Execute Delete User
-  const confirmDelete = async () => {
-    if (!deletingUserId || !token) {
-      setFetchError('Error: User ID or token missing for deletion.');
-      setShowDeleteConfirm(false);
-      return;
-    }
-
-    setFetchLoading(true);
-    setFetchError(null);
-    setMessage(null);
-
-    try {
-      const response = await fetch(`/api/admin/users/${deletingUserId}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to delete user');
-      }
-
-      // If the deleted user was the currently logged-in user, force logout.
-      if (deletingUserId === user?._id) {
-        setMessage('Your own admin account was deleted. Logging out...');
-        setTimeout(() => {
-          logout();
-          router.push('/login'); // Redirect to login after self-deletion
-        }, 1500);
-      } else {
-        setUsers(prevUsers => prevUsers.filter(u => u._id !== deletingUserId));
-        setMessage('User deleted successfully!');
-      }
-      console.log(`User ${deletingUserId} deleted successfully.`);
-    } catch (err: any) {
-      console.error('Error deleting user:', err);
-      setFetchError(err.message || 'An unexpected error occurred during deletion.');
-    } finally {
-      // Only close confirmation if not self-deleting (as that leads to logout)
-      if (deletingUserId !== user?._id) {
-        setFetchLoading(false);
-        setShowDeleteConfirm(false);
-        setDeletingUserId(null);
-        setDeletingUserEmail(null);
-      }
-    }
-  };
-
   if (authLoading || !isAuthenticated || !user || user.firstLogin || user.role !== 'admin') {
     return (
       <div className="flex h-screen bg-gray-50">
@@ -211,9 +149,7 @@ export default function MyCreatedUsersPage() {
             className="p-2 -ml-2 rounded-md text-gray-600 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-[#4F39F6]"
             aria-label="Toggle sidebar"
           >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-            </svg>
+            <FiMenu className="w-6 h-6" />
           </button>
           {/* Centered Title */}
           <h1 className="text-2xl font-extrabold bg-gradient-to-r from-blue-600 to-blue-800 bg-clip-text text-transparent absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2">
@@ -297,8 +233,8 @@ export default function MyCreatedUsersPage() {
                         <th scope="col" className="px-4 py-3 md:px-6 md:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
                         <th scope="col" className="px-4 py-3 md:px-6 md:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
                         <th scope="col" className="px-4 py-3 md:px-6 md:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
+                        <th scope="col" className="px-4 py-3 md:px-6 md:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th> {/* NEW: Status Header */}
                         <th scope="col" className="px-4 py-3 md:px-6 md:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created At</th>
-                        <th scope="col" className="px-4 py-3 md:px-6 md:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
@@ -327,17 +263,22 @@ export default function MyCreatedUsersPage() {
                               {u.role.replace('_', ' ')}
                             </span>
                           </td>
+                          {/* NEW: Status Display */}
+                          <td className="px-4 py-4 md:px-6 whitespace-nowrap text-sm text-gray-600">
+                            <div className="flex items-center space-x-2">
+                              {u.status === 'active' ? (
+                                <span className="text-green-600 font-semibold">
+                                  <FiCheckCircle className="inline-block mr-1" /> Active
+                                </span>
+                              ) : (
+                                <span className="text-red-600 font-semibold">
+                                  <FiXCircle className="inline-block mr-1" /> Inactive
+                                </span>
+                              )}
+                            </div>
+                          </td>
                           <td className="px-4 py-4 md:px-6 whitespace-nowrap text-sm text-gray-500">
                             {new Date(u.createdAt).toLocaleDateString()}
-                          </td>
-                          <td className="px-4 py-4 md:px-6 whitespace-nowrap text-sm font-medium">
-                            {/* Delete button now visible for all roles */}
-                            <button
-                                onClick={() => handleDeleteClick(u._id, u.email, u.role)}
-                                className="text-red-600 hover:text-red-900 transition-colors"
-                            >
-                                Delete
-                            </button>
                           </td>
                         </tr>
                       ))}
@@ -349,37 +290,6 @@ export default function MyCreatedUsersPage() {
           </div>
         </div>
       </div>
-
-      {showDeleteConfirm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-sm mx-auto transform transition-all scale-100 opacity-100">
-            <h3 className="text-xl font-bold text-gray-900 mb-4">Confirm Deletion</h3>
-            <p className="text-sm text-gray-700 mb-6">
-              Are you sure you want to delete user <span className="font-semibold">{deletingUserEmail}</span>?
-              {deletingUserId === user?._id && (
-                <span className="font-bold text-red-600 ml-1">You are about to delete your own account. This will log you out immediately.</span>
-              )}
-              <br/> This action cannot be undone.
-            </p>
-            <div className="flex justify-end space-x-3">
-              <button
-                onClick={() => setShowDeleteConfirm(false)}
-                className="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 transition-colors"
-                disabled={fetchLoading}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={confirmDelete}
-                className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                disabled={fetchLoading}
-              >
-                {fetchLoading ? 'Deleting...' : 'Delete'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

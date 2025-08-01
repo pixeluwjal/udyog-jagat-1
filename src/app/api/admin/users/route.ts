@@ -1,4 +1,3 @@
-// app/api/admin/users/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/lib/dbConnect';
 import User from '@/models/User';
@@ -54,11 +53,25 @@ export async function GET(request: NextRequest) {
   // 2. Extract Query Parameters
   const searchParams = request.nextUrl.searchParams;
   const searchQuery = searchParams.get('search');
-  const showAll = searchParams.get('all') === 'true';
-  const createdById = searchParams.get('createdBy'); // NEW: Get createdBy parameter
+  const createdById = searchParams.get('createdBy');
+  const statusFilter = searchParams.get('status'); // Get status filter
 
   // 3. Build Query Object for Mongoose
   const query: any = {};
+
+  // Apply status filter - FIXED: Using 'status' field instead of 'isActive'
+  if (statusFilter === 'active') {
+    query.status = 'active';
+    console.log('API: Applying status filter: Active users.');
+  } else if (statusFilter === 'inactive') {
+    query.status = 'inactive';
+    console.log('API: Applying status filter: Inactive users.');
+  } else {
+    // If no specific status filter is provided, fetch all users
+    // If you want to default to 'active' users, change this line:
+    // query.status = 'active';
+    console.log('API: No status filter provided. Fetching all users.');
+  }
 
   if (createdById) {
     // If a specific createdBy ID is requested
@@ -71,8 +84,10 @@ export async function GET(request: NextRequest) {
     console.log(`API: Applying createdBy filter: ${createdById}`);
   } else {
     // If no specific createdBy ID is requested, apply existing role logic
-    if (!decodedToken.isSuperAdmin || (decodedToken.isSuperAdmin && !showAll)) {
-      query.role = { $ne: 'admin' }; // Exclude admin users
+    // The 'all' parameter from the frontend will override this if present.
+    // Ensure that if 'all' is true, this role filter is NOT applied.
+    if (!decodedToken.isSuperAdmin && !request.nextUrl.searchParams.get('all')) {
+      query.role = { $ne: 'admin' }; // Exclude admin users unless 'all' is explicitly requested by a super admin
     }
   }
 

@@ -7,6 +7,11 @@ import { useRouter } from 'next/navigation';
 import Sidebar from '@/app/components/Sidebar';
 import Link from 'next/link';
 
+// Import icons for better aesthetics
+import {
+  FiBriefcase, FiMapPin, FiDollarSign, FiType, FiUsers, FiXCircle, FiCheckCircle, FiLoader, FiChevronLeft, FiMenu
+} from 'react-icons/fi';
+
 interface JobFormData {
   title: string;
   description: string;
@@ -14,6 +19,7 @@ interface JobFormData {
   salary: number | '';
   company: string;
   jobType: 'Full-time' | 'Part-time' | 'Contract' | 'Temporary' | 'Internship' | '';
+  numberOfOpenings: number | ''; // NEW: Add number of openings field
 }
 
 export default function NewJobPage() {
@@ -26,6 +32,7 @@ export default function NewJobPage() {
     salary: '',
     company: '',
     jobType: '',
+    numberOfOpenings: '', // Initialize new field
   });
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -61,7 +68,7 @@ export default function NewJobPage() {
     const { name, value } = e.target;
     setFormData((prevFormData) => ({
       ...prevFormData,
-      [name]: name === 'salary' ? (value === '' ? '' : Number(value)) : value,
+      [name]: (name === 'salary' || name === 'numberOfOpenings') ? (value === '' ? '' : Number(value)) : value,
     }));
   };
 
@@ -77,9 +84,18 @@ export default function NewJobPage() {
       return;
     }
 
+    // Validate all required fields, including the new 'numberOfOpenings'
     if (!formData.title || !formData.description || !formData.location ||
-      formData.salary === '' || !formData.company || !formData.jobType) {
-      setError('All required fields must be filled: Job Title, Description, Location, Salary, Company, and Job Type.');
+      formData.salary === '' || !formData.company || !formData.jobType ||
+      formData.numberOfOpenings === '') { // Added validation for numberOfOpenings
+      setError('All required fields must be filled: Job Title, Description, Location, Salary, Company, Job Type, and No. of Openings.');
+      setFormLoading(false);
+      return;
+    }
+
+    // Additional validation for numberOfOpenings
+    if (typeof formData.numberOfOpenings === 'number' && formData.numberOfOpenings <= 0) {
+      setError('Number of Openings must be a positive number.');
       setFormLoading(false);
       return;
     }
@@ -101,7 +117,8 @@ export default function NewJobPage() {
       }
 
       setSuccess('Job posted successfully!');
-      setFormData({ title: '', description: '', location: '', salary: '', company: '', jobType: '' });
+      // Reset form data after successful submission
+      setFormData({ title: '', description: '', location: '', salary: '', company: '', jobType: '', numberOfOpenings: '' });
       router.push('/poster/dashboard');
     } catch (err: unknown) {
       console.error('Error posting job:', err);
@@ -147,9 +164,7 @@ export default function NewJobPage() {
             className="p-2 rounded-md text-[#1938A8] focus:outline-none focus:ring-2 focus:ring-inset focus:ring-[#1938A8]"
             aria-label="Open sidebar"
           >
-            <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-            </svg>
+            <FiMenu className="h-6 w-6" />
           </button>
           {/* Centered Header Text */}
          <h1 className="text-2xl font-extrabold bg-gradient-to-r from-blue-700 to-blue-900 bg-clip-text text-transparent absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2">
@@ -171,9 +186,7 @@ export default function NewJobPage() {
               </div>
               <Link href="/poster/dashboard" passHref>
                 <button className="flex items-center px-4 py-2 bg-[#1938A8] text-white rounded-lg hover:bg-[#182E78] transition-colors shadow-md w-full md:w-auto justify-center">
-                  <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                  </svg>
+                  <FiChevronLeft className="w-5 h-5 mr-2" />
                   Back to Dashboard
                 </button>
               </Link>
@@ -183,9 +196,7 @@ export default function NewJobPage() {
               <div className="bg-red-700 border-l-4 border-red-900 p-4 mb-6 rounded-r-lg text-white">
                 <div className="flex">
                   <div className="flex-shrink-0">
-                    <svg className="h-5 w-5 text-red-200" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                    </svg>
+                    <FiXCircle className="h-5 w-5 text-red-200" />
                   </div>
                   <div className="ml-3">
                     <p className="text-sm">{error}</p>
@@ -198,9 +209,7 @@ export default function NewJobPage() {
               <div className="bg-green-700 border-l-4 border-green-900 p-4 mb-6 rounded-r-lg text-white">
                 <div className="flex">
                   <div className="flex-shrink-0">
-                    <svg className="h-5 w-5 text-green-200" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                    </svg>
+                    <FiCheckCircle className="h-5 w-5 text-green-200" />
                   </div>
                   <div className="ml-3">
                     <p className="text-sm">{success}</p>
@@ -214,9 +223,7 @@ export default function NewJobPage() {
               {/* Form Header */}
               <div className="bg-[#1938A8] px-6 py-4 border-b border-[#182E78]">
                 <h2 className="text-lg font-semibold text-white flex items-center">
-                  <svg className="w-5 h-5 text-blue-200 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                  </svg>
+                  <FiBriefcase className="w-5 h-5 text-blue-200 mr-2" />
                   Job Details
                 </h2>
               </div>
@@ -240,9 +247,7 @@ export default function NewJobPage() {
                       required
                     />
                     <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                      <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                      </svg>
+                      <FiBriefcase className="h-5 w-5 text-gray-400" />
                     </div>
                   </div>
                 </div>
@@ -264,9 +269,7 @@ export default function NewJobPage() {
                       required
                     />
                     <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                      <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m-1 4h1m8-10v12h4V7a2 2 0 00-2-2h-2z" />
-                      </svg>
+                      <FiUsers className="h-5 w-5 text-gray-400" />
                     </div>
                   </div>
                 </div>
@@ -308,10 +311,7 @@ export default function NewJobPage() {
                         required
                       />
                       <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                        <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                        </svg>
+                        <FiMapPin className="h-5 w-5 text-gray-400" />
                       </div>
                     </div>
                   </div>
@@ -342,11 +342,11 @@ export default function NewJobPage() {
                 {/* Salary Field */}
                 <div className="space-y-2">
                   <label htmlFor="salary" className="block text-sm font-medium text-gray-700">
-                    Salary (USD) <span className="text-red-500">*</span>
+                    Salary (INR) <span className="text-red-500">*</span> {/* Updated label */}
                   </label>
                   <div className="relative">
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <span className="text-gray-500">$</span>
+                      <span className="text-gray-500">₹</span> {/* Updated currency symbol */}
                     </div>
                     <input
                       type="number"
@@ -355,13 +355,36 @@ export default function NewJobPage() {
                       value={formData.salary}
                       onChange={handleInputChange}
                       className="block w-full pl-8 pr-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-[#1938A8] focus:border-[#1938A8] placeholder-gray-400 transition duration-200"
-                      placeholder="e.g. 85000"
+                      placeholder="e.g. 850000"
                       min="0"
                       required
                     />
                     <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
                       <span className="text-gray-500">per year</span>
                     </div>
+                  </div>
+                </div>
+
+                {/* NEW: Number of Openings Field */}
+                <div className="space-y-2">
+                  <label htmlFor="numberOfOpenings" className="block text-sm font-medium text-gray-700">
+                    No. of Openings for this position <span className="text-red-500">*</span>
+                  </label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <FiUsers className="h-5 w-5 text-gray-400" />
+                    </div>
+                    <input
+                      type="number"
+                      id="numberOfOpenings"
+                      name="numberOfOpenings"
+                      value={formData.numberOfOpenings}
+                      onChange={handleInputChange}
+                      className="block w-full pl-10 pr-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-[#1938A8] focus:border-[#1938A8] placeholder-gray-400 transition duration-200"
+                      placeholder="e.g. 5"
+                      min="1" // Ensure at least 1 opening
+                      required
+                    />
                   </div>
                 </div>
 
@@ -381,17 +404,12 @@ export default function NewJobPage() {
                   >
                     {formLoading ? (
                       <span className="flex items-center justify-center">
-                        <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
+                        <FiLoader className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" />
                         Posting Job...
                       </span>
                     ) : (
                       <span className="flex items-center justify-center">
-                        <svg className="-ml-1 mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                        </svg>
+                        <FiBriefcase className="-ml-1 mr-2 h-4 w-4" />
                         Post Job
                       </span>
                     )}

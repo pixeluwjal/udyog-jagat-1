@@ -20,10 +20,9 @@ const verifyToken = (req: Request) => {
 
     try {
         // Attempt to decode the token.
-        // **CRITICAL CHANGE HERE: Added 'id?: string;' to the type**
         const decoded = jwt.verify(token, JWT_SECRET) as { id?: string; userId?: string; _id?: string; email: string; username: string; role: string; iat: number; exp: number };
 
-        // **CRITICAL CHANGE HERE: Prioritize 'decoded.id'**
+        // Prioritize 'decoded.id'
         const userIdFromToken = decoded.id || decoded.userId || decoded._id;
 
         console.log('Server-side: Token decoded successfully.');
@@ -83,7 +82,8 @@ export async function PUT(req: Request) {
     try {
         const body = await req.json();
 
-        const allowedFields = ['username'];
+        // Updated: Include new fields in allowedFields
+        const allowedFields = ['username', 'milanShakaBhaga', 'valayaNagar', 'khandaBhaga'];
 
         const updateData: { [key: string]: any } = {};
         for (const field of allowedFields) {
@@ -102,6 +102,11 @@ export async function PUT(req: Request) {
         if (body.role) {
             return NextResponse.json({ error: "User role cannot be changed directly." }, { status: 400 });
         }
+
+        // Ensure that if a field is sent as an empty string, it's explicitly set to null or undefined
+        // to clear it in the database if your schema allows it. Mongoose will typically handle
+        // empty strings as empty strings, but if you want to remove the field, you'd use $unset.
+        // For now, we'll allow empty strings to be saved as empty strings.
 
         if (Object.keys(updateData).length === 0) {
             return NextResponse.json({ error: 'No valid fields provided for update.' }, { status: 400 });

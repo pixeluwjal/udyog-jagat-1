@@ -17,8 +17,8 @@ export async function POST(request: Request) {
         console.log(`API: Attempting login for email: ${email}`);
         console.log(`API: Provided password (raw - trimmed): '${password}'`);
 
-        // 1. Find user by email and explicitly select password
-        const user: (IUser & { password?: string }) | null = await User.findOne({ email }).select('+password');
+        // 1. Find user by email and explicitly select password and status
+        const user: (IUser & { password?: string }) | null = await User.findOne({ email }).select('+password +status');
         if (!user) {
             console.warn(`API: Login failed for email ${email}: User not found.`);
             return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
@@ -29,6 +29,13 @@ export async function POST(request: Request) {
         if (!isMatch) {
             console.warn(`API: Login failed for email ${email}: Incorrect password.`);
             return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
+        }
+
+        // NEW LOGIC: Prevent login if user status is 'inactive'
+        // If user.status is undefined (field not present), this check passes, allowing login.
+        if (user.status === 'inactive') {
+            console.warn(`API: Login failed for email ${email}: User account is inactive.`);
+            return NextResponse.json({ error: 'Your account is inactive. Please contact support.' }, { status: 403 });
         }
 
         // NEW LOGIC: Automatically find and update referral code based on the logged-in user's email
@@ -80,6 +87,7 @@ export async function POST(request: Request) {
                 firstLogin: user.firstLogin,
                 isSuperAdmin: user.isSuperAdmin,
                 onboardingStatus: user.onboardingStatus,
+                status: user.status || 'active', // Include status, default to 'active' if not present
             },
             process.env.JWT_SECRET,
             { expiresIn: '1d' } // Token expires in 1 day
@@ -97,8 +105,9 @@ export async function POST(request: Request) {
             onboardingStatus: user.onboardingStatus,
             createdAt: user.createdAt,
             updatedAt: user.updatedAt,
+            status: user.status || 'active', // Ensure status is included in the response, default if missing
         };
-        console.log(`API: Login successful for user: ${user.email}, firstLogin: ${user.firstLogin}, onboardingStatus: ${user.onboardingStatus}`);
+        console.log(`API: Login successful for user: ${user.email}, firstLogin: ${user.firstLogin}, onboardingStatus: ${user.onboardingStatus}, status: ${user.status}`);
 
         // 5. Return success response with token and user data
         return NextResponse.json(

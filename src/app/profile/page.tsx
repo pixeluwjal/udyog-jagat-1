@@ -14,7 +14,12 @@ import {
   FiXCircle,
   FiCheckCircle,
   FiLoader,
-  FiMenu, // Removed unnecessary icons
+  FiMenu,
+  FiLock,
+  FiBookOpen, // For Milan/Shaka/Bhaga
+  FiMapPin, // For Valaya/Nagar
+  FiGlobe, // For Khanda/Bhaga
+  FiActivity, // For Status
 } from "react-icons/fi";
 
 // Framer Motion Variants for animations
@@ -41,11 +46,20 @@ export default function ProfilePage() {
   const router = useRouter();
 
   const [isEditing, setIsEditing] = useState(false);
-  // Simplified formData to only include username and email
   const [formData, setFormData] = useState({
     username: "",
     email: "",
+    // Initialize new fields from currentUser, ensuring they are strings
+    // These fields are always part of the form data, even if empty, to allow editing.
+    milanShakaBhaga: "",
+    valayaNagar: "",
+    khandaBhaga: "",
   });
+  // State for password change fields
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmNewPassword, setConfirmNewPassword] = useState("");
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -56,22 +70,32 @@ export default function ProfilePage() {
       if (!isAuthenticated || !currentUser) {
         router.push("/login");
       } else {
-        // Initialize form data with current user data, only for username and email
+        // Initialize form data with current user data
         setFormData({
           username: currentUser.username || "",
           email: currentUser.email || "",
+          // Initialize new fields from currentUser, using empty string if not present
+          milanShakaBhaga: currentUser.milanShakaBhaga || "",
+          valayaNagar: currentUser.valayaNagar || "",
+          khandaBhaga: currentUser.khandaBhaga || "",
         });
       }
     }
   }, [authLoading, isAuthenticated, currentUser, router]);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    // Changed type to HTMLInputElement as textarea is removed
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleSave = async (e: FormEvent) => {
+  const handlePasswordChangeInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    if (name === "currentPassword") setCurrentPassword(value);
+    else if (name === "newPassword") setNewPassword(value);
+    else if (name === "confirmNewPassword") setConfirmNewPassword(value);
+  };
+
+  const handleSaveProfile = async (e: FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
@@ -84,14 +108,21 @@ export default function ProfilePage() {
     }
 
     try {
-      // Only send username for update, email is read-only and handled by backend
-      const payload = {
+      const payload: {
+        username: string;
+        milanShakaBhaga?: string;
+        valayaNagar?: string;
+        khandaBhaga?: string;
+      } = {
         username: formData.username,
-        // Do NOT send email in the payload if it's not meant to be updated
-        // The backend already has logic to prevent email changes.
-        // If you send it, ensure the backend explicitly ignores it.
-        // For clarity, we're only sending what the user can change.
       };
+
+      // Always include these fields from formData.
+      // If formData.field is an empty string, it will be sent as such.
+      // The backend should handle saving empty strings or unsetting fields based on your schema.
+      payload.milanShakaBhaga = formData.milanShakaBhaga;
+      payload.valayaNagar = formData.valayaNagar;
+      payload.khandaBhaga = formData.khandaBhaga;
 
       const response = await fetch("/api/profile", {
         method: "PUT",
@@ -99,7 +130,7 @@ export default function ProfilePage() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify(payload), // Send only the username
+        body: JSON.stringify(payload),
       });
 
       const data = await response.json();
@@ -121,6 +152,74 @@ export default function ProfilePage() {
       setLoading(false);
     }
   };
+
+  const handleChangePassword = async (e: FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
+    setMessage(null);
+
+    if (!token) {
+      setError("Authentication token missing. Please log in again.");
+      setLoading(false);
+      return;
+    }
+
+    if (!currentPassword || !newPassword || !confirmNewPassword) {
+      setError("All password fields are required.");
+      setLoading(false);
+      return;
+    }
+
+    if (newPassword !== confirmNewPassword) {
+      setError("New password and confirm password do not match.");
+      setLoading(false);
+      return;
+    }
+
+    if (newPassword.length < 6) { // Basic password length validation
+      setError("New password must be at least 6 characters long.");
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const response = await fetch("/api/profile/change-password", { // Assuming this API route exists
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ currentPassword, newPassword }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to change password.");
+      }
+
+      setMessage("Password changed successfully! You will be logged out to re-authenticate.");
+      // Clear password fields
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmNewPassword("");
+      // Force logout after password change for re-authentication with new password
+      setTimeout(() => {
+        logout();
+        router.push('/login');
+      }, 2000);
+
+    } catch (err: any) {
+      console.error("Password change error:", err);
+      setError(
+        err.message || "An unexpected error occurred during password change."
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
 
   if (authLoading || !isAuthenticated || !currentUser) {
     return (
@@ -145,6 +244,13 @@ export default function ProfilePage() {
     );
   }
 
+  // Determine if additional fields should be displayed based on user role
+  const shouldDisplayAdditionalFields =
+    currentUser.role === 'job_seeker' ||
+    currentUser.role === 'admin' ||
+    currentUser.role === 'job_referrer';
+
+
   return (
     <div className="flex h-screen bg-gradient-to-br from-blue-50 to-indigo-100 overflow-hidden font-inter">
       <Sidebar
@@ -162,6 +268,7 @@ export default function ProfilePage() {
             whileTap={{ scale: 0.95 }}
             onClick={() => setIsSidebarOpen(!isSidebarOpen)}
             className="p-2 rounded-md text-gray-600 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            aria-label="Toggle sidebar"
           >
             <FiMenu className="h-6 w-6" />
           </motion.button>
@@ -231,10 +338,8 @@ export default function ProfilePage() {
               )}
             </AnimatePresence>
 
-            <form onSubmit={handleSave} className="space-y-6">
+            <form onSubmit={handleSaveProfile} className="space-y-6">
               <div className="grid grid-cols-1 gap-6">
-                {" "}
-                {/* Simplified to 1 column */}
                 {/* Username */}
                 <div>
                   <label
@@ -273,7 +378,91 @@ export default function ProfilePage() {
                     className="block w-full px-4 py-3 border border-gray-300 rounded-xl shadow-sm bg-gray-50 cursor-not-allowed" // Always styled as read-only
                   />
                 </div>
+                {/* NEW: Status Display */}
+                <div>
+                  <label
+                    htmlFor="status"
+                    className="block text-sm font-semibold text-gray-700 mb-2"
+                  >
+                    <FiActivity className="inline-block mr-2 text-gray-500" /> Status
+                  </label>
+                  <input
+                    type="text"
+                    id="status"
+                    name="status"
+                    value={currentUser.status || 'N/A'} // Display current status
+                    readOnly={true} // Always read-only
+                    className="block w-full px-4 py-3 border border-gray-300 rounded-xl shadow-sm bg-gray-50 cursor-not-allowed"
+                  />
+                </div>
               </div>
+
+              {/* Conditional Additional Details fields */}
+              {shouldDisplayAdditionalFields && (
+                <div className="pt-6 border-t border-gray-100 mt-6 space-y-6">
+                  <h3 className="text-xl font-semibold text-gray-800">
+                    Additional Details
+                  </h3>
+
+                  {/* Milan/Shaka/Bhaga */}
+                  <div>
+                    <label htmlFor="milanShakaBhaga" className="block text-sm font-semibold text-gray-700 mb-2">
+                      <FiBookOpen className="inline-block mr-2 text-gray-500" /> Milan/Shaka/Bhaga
+                    </label>
+                    <input
+                      type="text"
+                      id="milanShakaBhaga"
+                      name="milanShakaBhaga"
+                      value={formData.milanShakaBhaga}
+                      onChange={handleChange}
+                      readOnly={!isEditing}
+                      className={`block w-full px-4 py-3 border border-gray-300 rounded-xl shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 ${
+                          !isEditing ? "bg-gray-50 cursor-not-allowed" : ""
+                      }`}
+                      placeholder="Enter Milan/Shaka/Bhaga"
+                    />
+                  </div>
+
+                  {/* Valaya/Nagar */}
+                  <div>
+                    <label htmlFor="valayaNagar" className="block text-sm font-semibold text-gray-700 mb-2">
+                      <FiMapPin className="inline-block mr-2 text-gray-500" /> Valaya/Nagar
+                    </label>
+                    <input
+                      type="text"
+                      id="valayaNagar"
+                      name="valayaNagar"
+                      value={formData.valayaNagar}
+                      onChange={handleChange}
+                      readOnly={!isEditing}
+                      className={`block w-full px-4 py-3 border border-gray-300 rounded-xl shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 ${
+                          !isEditing ? "bg-gray-50 cursor-not-allowed" : ""
+                      }`}
+                      placeholder="Enter Valaya/Nagar"
+                    />
+                  </div>
+
+                  {/* Khanda/Bhaga */}
+                  <div>
+                    <label htmlFor="khandaBhaga" className="block text-sm font-semibold text-gray-700 mb-2">
+                      <FiGlobe className="inline-block mr-2 text-gray-500" /> Khanda/Bhaga
+                    </label>
+                    <input
+                      type="text"
+                      id="khandaBhaga"
+                      name="khandaBhaga"
+                      value={formData.khandaBhaga}
+                      onChange={handleChange}
+                      readOnly={!isEditing}
+                      className={`block w-full px-4 py-3 border border-gray-300 rounded-xl shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 ${
+                          !isEditing ? "bg-gray-50 cursor-not-allowed" : ""
+                      }`}
+                      placeholder="Enter Khanda/Bhaga"
+                    />
+                  </div>
+                </div>
+              )}
+
 
               {isEditing && (
                 <motion.div
@@ -297,18 +486,104 @@ export default function ProfilePage() {
                     {loading ? (
                       <>
                         <FiLoader className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" />
-                        Saving...
+                        Saving Profile...
                       </>
                     ) : (
                       <>
                         <FiSave className="-ml-1 mr-3 h-5 w-5" />
-                        Save Changes
+                        Save Profile Changes
                       </>
                     )}
                   </motion.button>
                 </motion.div>
               )}
             </form>
+
+            {/* Change Password Section */}
+            <motion.div
+              initial="hidden"
+              animate="visible"
+              variants={fadeIn}
+              className="mt-10 bg-white rounded-3xl shadow-xl border border-gray-100 p-6 md:p-8 transform hover:shadow-2xl transition-all duration-300 ease-out"
+            >
+              <h2 className="text-2xl font-extrabold text-gray-800 bg-clip-text text-transparent bg-gradient-to-r from-red-600 to-red-800 mb-6">
+                Change Password
+              </h2>
+              <form onSubmit={handleChangePassword} className="space-y-6">
+                <div>
+                  <label htmlFor="currentPassword" className="block text-sm font-semibold text-gray-700 mb-2">
+                    <FiLock className="inline-block mr-2 text-gray-500" /> Current Password
+                  </label>
+                  <input
+                    type="password"
+                    id="currentPassword"
+                    name="currentPassword"
+                    value={currentPassword}
+                    onChange={handlePasswordChangeInput}
+                    className="block w-full px-4 py-3 border border-gray-300 rounded-xl shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200"
+                    placeholder="Enter your current password"
+                    required
+                    disabled={loading}
+                  />
+                </div>
+                <div>
+                  <label htmlFor="newPassword" className="block text-sm font-semibold text-gray-700 mb-2">
+                    <FiLock className="inline-block mr-2 text-gray-500" /> New Password
+                  </label>
+                  <input
+                    type="password"
+                    id="newPassword"
+                    name="newPassword"
+                    value={newPassword}
+                    onChange={handlePasswordChangeInput}
+                    className="block w-full px-4 py-3 border border-gray-300 rounded-xl shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200"
+                    placeholder="Enter new password (min 6 characters)"
+                    required
+                    disabled={loading}
+                  />
+                </div>
+                <div>
+                  <label htmlFor="confirmNewPassword" className="block text-sm font-semibold text-gray-700 mb-2">
+                    <FiLock className="inline-block mr-2 text-gray-500" /> Confirm New Password
+                  </label>
+                  <input
+                    type="password"
+                    id="confirmNewPassword"
+                    name="confirmNewPassword"
+                    value={confirmNewPassword}
+                    onChange={handlePasswordChangeInput}
+                    className="block w-full px-4 py-3 border border-gray-300 rounded-xl shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200"
+                    placeholder="Confirm your new password"
+                    required
+                    disabled={loading}
+                  />
+                </div>
+                <motion.button
+                  type="submit"
+                  disabled={loading}
+                  whileHover={{
+                    scale: 1.02,
+                    boxShadow: "0 10px 20px rgba(0, 0, 0, 0.15)",
+                  }}
+                  whileTap={{ scale: 0.98 }}
+                  className={`w-full flex justify-center items-center py-3 px-4 border border-transparent rounded-xl shadow-lg text-lg font-semibold text-white bg-gradient-to-r from-red-500 to-rose-600 hover:from-red-600 hover:to-rose-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-all duration-200 ${
+                    loading ? "opacity-70 cursor-not-allowed" : ""
+                  }`}
+                >
+                  {loading ? (
+                    <>
+                      <FiLoader className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" />
+                      Changing Password...
+                    </>
+                  ) : (
+                    <>
+                      <FiSave className="-ml-1 mr-3 h-5 w-5" />
+                      Change Password
+                    </>
+                  )}
+                </motion.button>
+              </form>
+            </motion.div>
           </motion.div>
         </div>
       </div>

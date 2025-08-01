@@ -1,4 +1,3 @@
-// app/api/admin/users/[id]/route.ts
 import { NextResponse } from 'next/server';
 import dbConnect from '@/lib/dbConnect'; // Assuming you have a dbConnect utility
 import UserModel from '@/models/User'; // Your Mongoose User model
@@ -47,8 +46,9 @@ export async function GET(request: Request, { params }: { params: { id: string }
     const { id } = params;
 
     try {
-        // Fetch the user, excluding the password field
-        const user = await UserModel.findById(id).select('-password');
+        // Fetch the user. Password will be excluded by schema's select: false.
+        // All other fields will be included by default.
+        const user = await UserModel.findById(id);
 
         if (!user) {
             return NextResponse.json({ error: 'User not found' }, { status: 404 });
@@ -79,24 +79,30 @@ export async function PUT(request: Request, { params }: { params: { id: string }
     try {
         // Find the user first to get their existing email, firstLogin, isSuperAdmin, onboardingStatus
         // as these are no longer sent from the client-side form for editing
-        const existingUser = await UserModel.findById(id).select('email firstLogin isSuperAdmin onboardingStatus role'); // Added 'role' to select
+        const existingUser = await UserModel.findById(id).select('email firstLogin isSuperAdmin onboardingStatus role');
         if (!existingUser) {
             return NextResponse.json({ error: 'User not found' }, { status: 404 });
         }
 
+        // NEW: Conditional validation for 'admin' and 'job_referrer' roles
+        if (updates.role === 'admin' || updates.role === 'job_referrer') {
+            if (!updates.milanShakaBhaga || !updates.valayaNagar || !updates.khandaBhaga) {
+                return NextResponse.json(
+                    { error: "Milan/Shaka/Bhaga, Valaya/Nagar, and Khanda/Bhaga are required for Admin and Referrer roles." },
+                    { status: 400 }
+                );
+            }
+        }
+
         // Prepare updates, explicitly listing only allowed editable fields
-        // Email is intentionally excluded as it's not editable via the form.
-        // If your API must receive email, ensure it's copied from existingUser.email
-        // but it won't be from the form's `updates` object.
         const allowedUpdates: any = {
             username: updates.username,
             role: updates.role,
-            // These fields are removed from the client form, so they are NOT updated here.
-            // Their values will remain as they are in the database.
-            // If you need to explicitly set them to existing values, you'd do:
-            // isSuperAdmin: existingUser.isSuperAdmin,
-            // firstLogin: existingUser.firstLogin,
-            // onboardingStatus: existingUser.onboardingStatus,
+            status: updates.status,
+            // NEW: Include the new fields from the updates payload
+            milanShakaBhaga: updates.milanShakaBhaga,
+            valayaNagar: updates.valayaNagar,
+            khandaBhaga: updates.khandaBhaga,
         };
 
         // Initialize $unset object
@@ -107,7 +113,7 @@ export async function PUT(request: Request, { params }: { params: { id: string }
         if (updates.role === 'job_seeker') {
             allowedUpdates.candidateDetails = updates.candidateDetails || {};
             if (allowedUpdates.candidateDetails.skills && typeof allowedUpdates.candidateDetails.skills === 'string') {
-                 allowedUpdates.candidateDetails.skills = allowedUpdates.candidateDetails.skills.split(',').map((s: string) => s.trim());
+                allowedUpdates.candidateDetails.skills = allowedUpdates.candidateDetails.skills.split(',').map((s: string) => s.trim());
             }
             // If role changes from job_poster, clear jobPosterDetails
             if (existingUser.role === 'job_poster') {
@@ -119,7 +125,7 @@ export async function PUT(request: Request, { params }: { params: { id: string }
             if (existingUser.role === 'job_seeker') {
                 unsetFields.candidateDetails = 1;
             }
-        } else { // Admin role or other role
+        } else { // Admin or Job Referrer role
             // Clear both if role changes from job_seeker or job_poster
             if (existingUser.role === 'job_seeker') {
                 unsetFields.candidateDetails = 1;
@@ -184,12 +190,6 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
         if (adminUser && adminUser.id === id) {
             return NextResponse.json({ error: 'Cannot delete your own admin account.' }, { status: 403 });
         }
-
-        // Logic to allow deleting other admin users:
-        // The previous line that unconditionally returned "Cannot delete an admin user via this endpoint."
-        // when `userToDelete.role === 'admin'` is now removed.
-        // This means if `userToDelete.role` is 'admin' AND it's not the currently logged-in admin's ID,
-        // the code will proceed to delete the user.
 
         const deletedUser = await UserModel.findByIdAndDelete(id);
 

@@ -1,11 +1,11 @@
-import { NextResponse } from 'next/server';
-import dbConnect from '@/lib/dbConnect';
-import User, { IUser } from '@/models/User';
-import ReferralCodeModel, { IReferralCode } from '@/models/ReferralCode';
-import jwt from 'jsonwebtoken';
-import { DecodedToken } from '@/lib/authMiddleware';
-import sendEmail from '@/lib/emailservice';
-import bcrypt from 'bcryptjs';
+import { NextResponse } from "next/server";
+import dbConnect from "@/lib/dbConnect";
+import User, { IUser } from "@/models/User"; // Ensure IUser is imported for type safety
+import ReferralCodeModel, { IReferralCode } from "@/models/ReferralCode"; // Import ReferralCodeModel and its interface
+import jwt from "jsonwebtoken";
+import { DecodedToken } => "@/lib/authMiddleware"; // Assuming this is where DecodedToken is defined
+import sendEmail from "@/lib/emailservice";
+import bcrypt from 'bcryptjs'; // Ensure bcryptjs is imported if used in User model's pre-save hook
 
 interface GenerateCodeRequest {
     candidateEmail: string;
@@ -94,6 +94,14 @@ export async function POST(request: Request) {
         const expiresAt = new Date();
         expiresAt.setDate(expiresAt.getDate() + 60);
 
+        // NEW: Fetch the admin's username from the database
+        const adminUser = await User.findById(decodedToken.id);
+        if (!adminUser) {
+            console.error(`API: Admin user with ID ${decodedToken.id} not found.`);
+            return NextResponse.json({ error: 'Generating admin user not found.' }, { status: 500 });
+        }
+        const generatedByAdminUsername = adminUser.username || adminUser.email; // Use username or fallback to email
+
         if (!user) {
             isNewUser = true;
             const username = candidateEmail.split('@')[0];
@@ -125,14 +133,15 @@ export async function POST(request: Request) {
             candidateEmail,
             expiresAt,
             generatedByAdminId: decodedToken.id,
+            generatedByAdminUsername: generatedByAdminUsername, // NEW: Assign the fetched admin username
             isUsed: false,
         });
         await newReferralCode.save();
         console.log(`API: Saved new referral code ${generatedCode} to ReferralCode collection.`);
 
         const loginUrl = `${process.env.NEXT_PUBLIC_BASE_URL}/login`;
-        const portalName = process.env.NEXT_PUBLIC_PORTAL_NAME || 'Job Portal'; // Use an env var for portal name
-        const teamName = process.env.EMAIL_FROM?.split('<')[0].trim() || 'Job Portal'; // Use env var for team name
+        const portalName = process.env.NEXT_PUBLIC_PORTAL_NAME || 'Udyog Jagat'; // Use an env var for portal name
+        const teamName = process.env.EMAIL_FROM?.split('<')[0].trim() || 'Udyog Jagat Team'; // Use env var for team name
 
         // Format date for email body: 26-Sep-2025
         const formattedExpiryDateForEmail = expiresAt.toLocaleDateString('en-GB', {
@@ -140,10 +149,10 @@ export async function POST(request: Request) {
             month: 'short',
             year: 'numeric'
         }).replace(/ /g, '-'); // Replace spaces with hyphens
-    const formattedExpiryDate = expiresAt.toDateString(); // e.g., "Fri Sep 26 2025"
-        const username = candidateEmail;
+        const formattedExpiryDate = expiresAt.toDateString(); // e.g., "Fri Sep 26 2025"
+        const username = candidateEmail; // Using candidate email as username for email content
         const emailSubject = 'Your Udyog Jagat Portal Access Code!';
-        const emailText = `Hello ${username},\n\nAn administrator has generated an exclusive access code for you to log in to Udyog Jagat Portal.\n\nYour Access Code: ${generatedCode}\n\nThis code is valid for 60 days from now (${formattedExpiryDate}) and one time use only.\n\nPlease use it to log in and complete your profile here: ${loginUrl}\n\n${isNewUser ? `Your temporary password is: ${temporaryPassword} (You will be prompted to change this on first login.)\n\n` : ''}We look forward to having you!\n\nUdyog Jagat Team`;
+        const emailText = `Hello ${username},\n\nAn administrator has generated an exclusive access code for you to log in to ${portalName} Portal.\n\nYour Access Code: ${generatedCode}\n\nThis code is valid for 60 days from now (${formattedExpiryDateForEmail}) and one time use only.\n\nPlease use it to log in and complete your profile here: ${loginUrl}\n\n${isNewUser ? `Your temporary password is: ${temporaryPassword} (You will be prompted to change this on first login.)\n\n` : ''}We look forward to having you!\n\n${teamName}`;
 
         const emailHtml = `
 <!DOCTYPE html>
@@ -178,6 +187,18 @@ export async function POST(request: Request) {
             color: #2563eb;
             text-align: center;
             margin: 20px 0;
+            background-color: #e0e7ff;
+            padding: 10px;
+            border-radius: 5px;
+        }
+        .button {
+            display: inline-block;
+            padding: 10px 20px;
+            background-color: #2563eb;
+            color: white;
+            text-decoration: none;
+            border-radius: 4px;
+            margin: 15px 0;
         }
         .footer {
             margin-top: 20px;
@@ -189,25 +210,26 @@ export async function POST(request: Request) {
 </head>
 <body>
     <div class="header">
-        <h1>Udyog Jagat Portal Access</h1>
+        <h1>${portalName} Portal Access</h1>
     </div>
     <div class="content">
         <p>Hello <strong>${username}</strong>,</p>
         
-        <p>An administrator has generated an exclusive access code for you to log in to Udyog Jagat Portal.</p>
+        <p>An administrator has generated an exclusive access code for you to log in to ${portalName} Portal.</p>
         
         <div class="code">${generatedCode}</div>
         
-        <p>This code is valid for 60 days from now (<strong>${formattedExpiryDate}</strong>) and one time use only.</p>
+        <p>This code is valid for 60 days from now (<strong>${formattedExpiryDateForEmail}</strong>) and is for one-time use only.</p>
         
-        <p>Please use it to <a href="${loginUrl}">log in</a> and complete your profile.</p>
+        <p>Please use it to <a href="${loginUrl}" class="button">log in</a> and complete your profile.</p>
         
         ${isNewUser ? `<p>Your temporary password is: <strong>${temporaryPassword}</strong> (You will be prompted to change this on first login.)</p>` : ''}
         
         <p>We look forward to having you!</p>
         
         <div class="footer">
-            <p>Udyog Jagat Team</p>
+            <p>${teamName}</p>
+            <p>This is an automated message, please do not reply directly to this email.</p>
         </div>
     </div>
 </body>
@@ -224,6 +246,7 @@ export async function POST(request: Request) {
             console.log('API: Referral code email sent successfully to:', candidateEmail);
         } catch (emailError: any) {
             console.error('API: Failed to send referral code email to %s:', candidateEmail, emailError);
+            // Don't fail the request if email fails, just log it
         }
 
         return NextResponse.json(
@@ -232,6 +255,7 @@ export async function POST(request: Request) {
                 code: generatedCode,
                 expiresAt,
                 isNewUser,
+                generatedByAdminUsername: generatedByAdminUsername, // NEW: Include in response
             },
             { status: 201 }
         );
@@ -246,4 +270,4 @@ export async function POST(request: Request) {
         }
         return NextResponse.json({ error: errorMessage }, { status: 500 });
     }
-} 
+}

@@ -1,11 +1,9 @@
-// app/admin/edit-user/[id]/page.tsx
 'use client';
-
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/app/context/AuthContext';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FiUser, FiMail, FiTag, FiSave, FiArrowLeft, FiHardDrive, FiMenu } from 'react-icons/fi';
+import { FiUser, FiMail, FiTag, FiSave, FiArrowLeft, FiHardDrive, FiMenu, FiActivity, FiXCircle, FiBookOpen, FiMapPin, FiGlobe } from 'react-icons/fi'; // Added new icons
 import Sidebar from '@/app/components/Sidebar';
 
 // Re-using the User interface from AuthContext for consistency
@@ -13,11 +11,15 @@ interface UserDisplay {
     _id: string;
     username: string;
     email: string;
-    role: 'job_seeker' | 'job_poster' | 'admin';
-    // Removed: firstLogin: boolean;
-    // Removed: isSuperAdmin: boolean;
-    // Removed: onboardingStatus: 'pending' | 'completed';
-    resumeGridFsId?: string; // Changed to string for display/handling
+    role: 'job_seeker' | 'job_poster' | 'admin' | 'job_referrer'; // Added 'job_referrer'
+    status: 'active' | 'inactive';
+
+    // NEW: Additional fields for Milan/Shaka/Bhaga, Valaya/Nagar, Khanda/Bhaga
+    milanShakaBhaga?: string;
+    valayaNagar?: string;
+    khandaBhaga?: string;
+
+    resumeGridFsId?: string;
     candidateDetails?: {
         fullName?: string;
         phone?: string;
@@ -27,6 +29,9 @@ interface UserDisplay {
     jobPosterDetails?: {
         companyName?: string;
         // ... other job poster specific fields
+    };
+    jobReferrerDetails?: { // Added for completeness, though fields are top-level
+        referralCode?: string;
     };
 }
 
@@ -76,19 +81,21 @@ export default function EditUserPage({ params }: { params: { id: string } }) {
             }
 
             // Ensure the fetched user data matches the `UserDisplay` interface
-            // by picking only the necessary fields
             const fetchedUser: UserDisplay = {
                 _id: data.user._id,
                 username: data.user.username,
                 email: data.user.email,
                 role: data.user.role,
-                // These fields are no longer expected or editable by this form:
-                // isSuperAdmin: data.user.isSuperAdmin,
-                // firstLogin: data.user.firstLogin,
-                // onboardingStatus: data.user.onboardingStatus,
+                status: (data.user.status === 'active' || data.user.status === 'inactive') ? data.user.status : 'active',
+                // NEW: Populate new fields from fetched data
+                milanShakaBhaga: data.user.milanShakaBhaga || '',
+                valayaNagar: data.user.valayaNagar || '',
+                khandaBhaga: data.user.khandaBhaga || '',
+                
                 resumeGridFsId: data.user.resumeGridFsId,
                 candidateDetails: data.user.candidateDetails,
                 jobPosterDetails: data.user.jobPosterDetails,
+                jobReferrerDetails: data.user.jobReferrerDetails, // Ensure this is also carried over if needed
             };
 
             setUserData(fetchedUser);
@@ -102,9 +109,6 @@ export default function EditUserPage({ params }: { params: { id: string } }) {
 
     useEffect(() => {
         if (!authLoading) {
-            // NOTE: The firstLogin and role-based redirects logic
-            // is still in AuthContext.tsx. This page assumes it's handled there
-            // and an admin has successfully reached here.
             if (!isAuthenticated || !currentUser || currentUser.role !== 'admin') {
                 router.push('/login'); // Redirect if not authenticated or not an admin
             } else {
@@ -114,12 +118,9 @@ export default function EditUserPage({ params }: { params: { id: string } }) {
     }, [authLoading, isAuthenticated, currentUser, router, fetchUserData]);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
-        const { name, value } = e.target; // Removed 'type' and 'checked' as checkboxes are removed
+        const { name, value } = e.target;
 
         if (!userData) return;
-
-        // Email field is locked, so no need to handle its change
-        // Removed: isSuperAdmin and firstLogin handling
 
         if (name.startsWith("candidateDetails.")) {
             const field = name.split('.')[1];
@@ -140,7 +141,8 @@ export default function EditUserPage({ params }: { params: { id: string } }) {
                 }
             }));
         } else {
-            setUserData({ ...userData, [name]: value });
+            // Handle top-level fields including the new ones
+            setUserData({ ...userData, [name]: value as any });
         }
     };
 
@@ -156,18 +158,32 @@ export default function EditUserPage({ params }: { params: { id: string } }) {
             return;
         }
 
-        // Prepare data to send, excluding the removed fields
+        // Conditional validation for 'admin' and 'job_referrer' roles
+        // These fields are always visible, but only required for specific roles
+        if (userData.role === 'admin' || userData.role === 'job_referrer') {
+            if (!userData.milanShakaBhaga?.trim() || !userData.valayaNagar?.trim() || !userData.khandaBhaga?.trim()) {
+                setError('Milan/Shaka/Bhaga, Valaya/Nagar, and Khanda/Bhaga are required for Admin and Referrer roles.');
+                setIsSaving(false);
+                return;
+            }
+        }
+
+
         const dataToSend = {
             username: userData.username,
-            // Email is not editable, so don't send it unless explicitly allowed by API for non-edits
-            // For now, we'll exclude it from the direct payload if not changed by user input.
-            // If your API expects it on every PUT, ensure it's included.
-            // For this setup, we assume the API handles it being absent or keeps existing.
-            // email: userData.email, // If API requires email to be sent back
             role: userData.role,
+            status: userData.status,
+            // NEW: Include the new fields in the payload ONLY if they are visible (i.e., not job_poster)
+            // Or if they have a value (for job_seeker)
+            ...(userData.role !== 'job_poster' && {
+                milanShakaBhaga: userData.milanShakaBhaga,
+                valayaNagar: userData.valayaNagar,
+                khandaBhaga: userData.khandaBhaga,
+            }),
+
             candidateDetails: userData.candidateDetails,
             jobPosterDetails: userData.jobPosterDetails,
-            // Removed: isSuperAdmin, firstLogin, onboardingStatus
+            // jobReferrerDetails: userData.jobReferrerDetails, // Not needed as fields are top-level
         };
 
         try {
@@ -177,7 +193,7 @@ export default function EditUserPage({ params }: { params: { id: string } }) {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${token}`
                 },
-                body: JSON.stringify(dataToSend) // Send only allowed data
+                body: JSON.stringify(dataToSend)
             });
 
             const data = await response.json();
@@ -187,7 +203,7 @@ export default function EditUserPage({ params }: { params: { id: string } }) {
             }
 
             setMessage('User updated successfully!');
-            // fetchUserData(); // Refresh data to show any server-side changes
+            fetchUserData(); // Refresh data to show any server-side changes
         } catch (err: any) {
             console.error('Error updating user:', err);
             setError(err.message || 'An unexpected error occurred during update.');
@@ -195,6 +211,11 @@ export default function EditUserPage({ params }: { params: { id: string } }) {
             setIsSaving(false);
         }
     };
+
+    const isRequiredForAdminOrReferrer = userData && (userData.role === 'admin' || userData.role === 'job_referrer');
+    // New variable to control visibility of additional fields section
+    const areAdditionalFieldsVisible = userData && (userData.role === 'admin' || userData.role === 'job_referrer' || userData.role === 'job_seeker');
+
 
     if (authLoading || loading) {
         return (
@@ -389,14 +410,98 @@ export default function EditUserPage({ params }: { params: { id: string } }) {
                                         >
                                             <option value="job_seeker">Job Seeker</option>
                                             <option value="job_poster">Job Poster</option>
+                                            <option value="job_referrer">Job Referrer</option> {/* Added job_referrer */}
                                             <option value="admin">Admin</option>
                                         </select>
                                     </div>
                                 </motion.div>
 
-                                {/* Removed: isSuperAdmin checkbox */}
-                                {/* Removed: firstLogin checkbox */}
-                                {/* Removed: Onboarding Status dropdown */}
+                                {/* Status - Updated Field */}
+                                <motion.div variants={fadeIn}>
+                                    <label htmlFor="status" className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                                    <div className="mt-1 relative rounded-md shadow-sm">
+                                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                            <FiActivity className="h-5 w-5 text-gray-400" aria-hidden="true" />
+                                        </div>
+                                        <select
+                                            name="status"
+                                            id="status"
+                                            value={userData.status}
+                                            onChange={handleChange}
+                                            className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm appearance-none transition-all duration-200"
+                                            required
+                                        >
+                                            <option value="active">Active</option>
+                                            <option value="inactive">Inactive</option>
+                                        </select>
+                                    </div>
+                                </motion.div>
+
+                                {/* Conditional Additional Details fields: visible for admin, referrer, and seeker */}
+                                {areAdditionalFieldsVisible && (
+                                    <div className="pt-6 border-t border-blue-100 mt-6 space-y-6">
+                                        <h3 className="text-xl font-semibold text-gray-800">
+                                            Additional Details {isRequiredForAdminOrReferrer ? '(Mandatory for Admin/Referrer)' : '(Optional for Job Seeker)'}
+                                        </h3>
+
+                                        <motion.div variants={fadeIn}>
+                                            <label htmlFor="milanShakaBhaga" className="block text-sm font-medium text-gray-700 mb-1">Milan/Shaka/Bhaga</label>
+                                            <div className="mt-1 relative rounded-md shadow-sm">
+                                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                                    <FiBookOpen className="h-5 w-5 text-gray-400" aria-hidden="true" />
+                                                </div>
+                                                <input
+                                                    type="text"
+                                                    name="milanShakaBhaga"
+                                                    id="milanShakaBhaga"
+                                                    value={userData.milanShakaBhaga || ''}
+                                                    onChange={handleChange}
+                                                    className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm transition-all duration-200"
+                                                    placeholder="Enter Milan/Shaka/Bhaga"
+                                                    required={isRequiredForAdminOrReferrer}
+                                                />
+                                            </div>
+                                        </motion.div>
+
+                                        <motion.div variants={fadeIn}>
+                                            <label htmlFor="valayaNagar" className="block text-sm font-medium text-gray-700 mb-1">Valaya/Nagar</label>
+                                            <div className="mt-1 relative rounded-md shadow-sm">
+                                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                                    <FiMapPin className="h-5 w-5 text-gray-400" aria-hidden="true" />
+                                                </div>
+                                                <input
+                                                    type="text"
+                                                    name="valayaNagar"
+                                                    id="valayaNagar"
+                                                    value={userData.valayaNagar || ''}
+                                                    onChange={handleChange}
+                                                    className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm transition-all duration-200"
+                                                    placeholder="Enter Valaya/Nagar"
+                                                    required={isRequiredForAdminOrReferrer}
+                                                />
+                                            </div>
+                                        </motion.div>
+
+                                        <motion.div variants={fadeIn}>
+                                            <label htmlFor="khandaBhaga" className="block text-sm font-medium text-gray-700 mb-1">Khanda/Bhaga</label>
+                                            <div className="mt-1 relative rounded-md shadow-sm">
+                                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                                    <FiGlobe className="h-5 w-5 text-gray-400" aria-hidden="true" />
+                                                </div>
+                                                <input
+                                                    type="text"
+                                                    name="khandaBhaga"
+                                                    id="khandaBhaga"
+                                                    value={userData.khandaBhaga || ''}
+                                                    onChange={handleChange}
+                                                    className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm transition-all duration-200"
+                                                    placeholder="Enter Khanda/Bhaga"
+                                                    required={isRequiredForAdminOrReferrer}
+                                                />
+                                            </div>
+                                        </motion.div>
+                                    </div>
+                                )}
 
                                 {/* Resume GridFS ID (Display only for Job Seeker) */}
                                 {userData.role === 'job_seeker' && userData.resumeGridFsId && (

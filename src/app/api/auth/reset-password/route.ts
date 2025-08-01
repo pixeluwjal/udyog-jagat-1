@@ -45,12 +45,9 @@ export async function POST(request: Request) {
             return NextResponse.json({ message: 'User not found for this token.' }, { status: 404 });
         }
 
-        // Hash the new password
-        const salt = await bcrypt.genSalt(10);
-        const hashedPassword = await bcrypt.hash(newPassword, salt);
 
         // Update user's password and reset firstLogin flag if applicable
-        user.password = hashedPassword;
+        user.password = newPassword;
         user.firstLogin = false; // Ensure firstLogin is false after password reset
         await user.save();
         console.log(`API: Password successfully reset for user ${user._id}.`);
