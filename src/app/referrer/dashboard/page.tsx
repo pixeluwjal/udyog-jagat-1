@@ -285,7 +285,7 @@ export default function ReferrerDashboardPage() {
                             Welcome, {currentUser.username || 'Referrer'}!
                         </h1>
                         <p className="text-gray-600 text-lg">
-                            Here's an overview of your generated access codes and referral activity.
+                            Here's an overview of your generated Referral codes and referral activity.
                         </p>
 
                         {/* Referral Statistics Section */}
@@ -326,7 +326,7 @@ export default function ReferrerDashboardPage() {
                         >
                             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
                                 <h2 className="text-2xl md:text-3xl font-extrabold text-gray-800 bg-clip-text text-transparent bg-gradient-to-r from-[#4F39F6] to-[#1A3BAD]">
-                                    Your Generated Access Codes
+                                    Your Generated Referral Codes
                                 </h2>
                                 <div className="relative w-full md:w-auto">
                                     <select
@@ -357,7 +357,7 @@ export default function ReferrerDashboardPage() {
                                 </div>
                             ) : generatedReferrals.length === 0 ? (
                                 <div className="text-center py-8 text-gray-500 text-lg">
-                                    No access codes found for the selected filter.
+                                    No Referral codes found for the selected filter.
                                 </div>
                             ) : (
                                 <motion.div

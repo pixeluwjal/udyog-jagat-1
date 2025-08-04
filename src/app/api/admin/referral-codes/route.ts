@@ -1,17 +1,20 @@
-// app/api/admin/referral-codes/route.ts
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/lib/dbConnect';
 import ReferralCodeModel from '@/models/ReferralCode';
-import User from '@/models/User'; // Import User model to populate
-import jwt from 'jsonwebtoken';
 import { headers } from 'next/headers';
+import jwt from 'jsonwebtoken';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret';
+const JWT_SECRET = process.env.JWT_SECRET;
 
+/**
+ * Verifies the JWT from the request headers and checks if the user is an admin.
+ * @param requestHeaders The headers object from the incoming request.
+ * @returns An object containing the decoded user payload or an error message.
+ */
 async function verifyAdmin(requestHeaders: Headers): Promise<{ user: any | null, error: string | null }> {
     const authorization = requestHeaders.get('authorization');
-    if (!authorization) {
-        return { user: null, error: 'Authorization header missing' };
+    if (!authorization?.startsWith('Bearer ')) {
+        return { user: null, error: 'Authorization header missing or invalid format' };
     }
 
     const token = authorization.split(' ')[1];
@@ -20,6 +23,9 @@ async function verifyAdmin(requestHeaders: Headers): Promise<{ user: any | null,
     }
 
     try {
+        if (!JWT_SECRET) {
+            throw new Error('JWT_SECRET environment variable is not defined.');
+        }
         const decoded: any = jwt.verify(token, JWT_SECRET);
         if (decoded.role !== 'admin') {
             return { user: null, error: 'Unauthorized: Not an admin' };
@@ -33,57 +39,63 @@ async function verifyAdmin(requestHeaders: Headers): Promise<{ user: any | null,
 
 export async function GET(request: Request) {
     await dbConnect();
+    console.log('\n--- API: /api/admin/referral-codes GET - Request received ---');
 
-    const { user: adminUser, error: authError } = await verifyAdmin(headers());
+    const { error: authError } = await verifyAdmin(headers());
     if (authError) {
         return NextResponse.json({ error: authError }, { status: 401 });
     }
 
     try {
-        // Parse URL parameters for status filter
         const { searchParams } = new URL(request.url);
-        const statusFilter = searchParams.get('status'); // 'all', 'used', 'expired', 'not_expired_unused'
-
-        const query: any = { generatedByAdminId: adminUser.id };
+        const statusFilter = searchParams.get('status');
+        const generatedByAdminIdFilter = searchParams.get('generatedByAdminId');
+        
+        const query: any = {};
         const now = new Date();
 
-        if (statusFilter === 'used') {
-            query.isUsed = true;
-        } else if (statusFilter === 'expired') {
-            query.expiresAt = { $lt: now }; // Less than current date
-            query.isUsed = false; // Only unused codes that are expired
-        } else if (statusFilter === 'not_expired_unused') {
-            query.expiresAt = { $gte: now }; // Greater than or equal to current date
-            query.isUsed = false;
+        if (generatedByAdminIdFilter && generatedByAdminIdFilter !== 'all') {
+            query.generatedByAdminId = generatedByAdminIdFilter;
         }
-        // If statusFilter is 'all' or null, no additional filters are applied
+
+        // CORRECTED: Apply status filter logic to the Mongoose query
+        if (statusFilter === 'used and valid') {
+            query.isUsed = true;
+            query.expiresAt = { $gte: now };
+        } else if (statusFilter === 'used and expired') {
+            query.isUsed = true;
+            query.expiresAt = { $lt: now };
+        } else if (statusFilter === 'unused and expired') {
+            query.isUsed = false;
+            query.expiresAt = { $lt: now };
+        } else if (statusFilter === 'unused and valid') {
+            query.isUsed = false;
+            query.expiresAt = { $gte: now };
+        }
 
         const referralCodes = await ReferralCodeModel.find(query)
             .populate({
                 path: 'generatedByAdminId',
-                select: 'username' // Only select the username of the admin
+                select: 'username'
             })
             .sort({ createdAt: -1 })
             .lean();
 
-        // Map and clean up populated data for the client
         const transformedCodes = referralCodes.map(code => {
             const referrerUsername = (code.generatedByAdminId as any)?.username || 'Unknown Admin';
             const isExpired = new Date(code.expiresAt) < now;
             let status = '';
 
             if (code.isUsed) {
-                status = 'Already Used';
-            } else if (isExpired) {
-                status = 'Unused and Expired';
+                status = isExpired ? 'used and expired' : 'used and valid';
             } else {
-                status = 'Unused and Not Expired';
+                status = isExpired ? 'unused and expired' : 'unused and valid';
             }
 
             return {
                 ...code,
-                generatedByAdminUsername: referrerUsername, // Add this new field
-                status: status // Add the calculated status
+                generatedByAdminUsername: referrerUsername,
+                status: status
             };
         });
 

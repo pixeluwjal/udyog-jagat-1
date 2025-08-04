@@ -1,14 +1,17 @@
 import { NextResponse } from "next/server";
 import dbConnect from "@/lib/dbConnect";
-import User, { IUser } from "@/models/User"; // Ensure IUser is imported for type safety
-import ReferralCodeModel, { IReferralCode } from "@/models/ReferralCode"; // Import ReferralCodeModel and its interface
+import User, { IUser } from "@/models/User";
+import ReferralCodeModel, { IReferralCode } from "@/models/ReferralCode";
 import jwt from "jsonwebtoken";
-import { DecodedToken } from "@/lib/authMiddleware"; // Assuming this is where DecodedToken is defined
+import { DecodedToken } from "@/lib/authMiddleware";
 import sendEmail from "@/lib/emailservice";
-import bcrypt from 'bcryptjs'; // Ensure bcryptjs is imported if used in User model's pre-save hook
+import bcrypt from 'bcryptjs';
 
+// Define the interface for the incoming request body
 interface GenerateCodeRequest {
     candidateEmail: string;
+    durationValue: number;
+    durationUnit: 'minutes' | 'hours' | 'days';
 }
 
 async function generateUniqueCode(length: number = 8): Promise<string> {
@@ -79,11 +82,17 @@ export async function POST(request: Request) {
     }
 
     try {
-        const { candidateEmail }: GenerateCodeRequest = await request.json();
+        // Updated to destructure new fields
+        const { candidateEmail, durationValue, durationUnit }: GenerateCodeRequest = await request.json();
         console.log(`API: Admin attempting to generate referral code for: ${candidateEmail}`);
 
         if (!candidateEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(candidateEmail)) {
             return NextResponse.json({ error: 'Valid candidate email is required.' }, { status: 400 });
+        }
+
+        // Add validation for new duration fields
+        if (durationValue <= 0 || !['minutes', 'hours', 'days'].includes(durationUnit)) {
+             return NextResponse.json({ error: 'Valid duration value and unit are required.' }, { status: 400 });
         }
 
         let user = await User.findOne({ email: candidateEmail });
@@ -91,16 +100,27 @@ export async function POST(request: Request) {
         let isNewUser = false;
         let temporaryPassword = '';
 
+        // Calculate expiresAt date based on new duration fields
         const expiresAt = new Date();
-        expiresAt.setDate(expiresAt.getDate() + 60);
+        switch (durationUnit) {
+            case 'minutes':
+                expiresAt.setMinutes(expiresAt.getMinutes() + durationValue);
+                break;
+            case 'hours':
+                expiresAt.setHours(expiresAt.getHours() + durationValue);
+                break;
+            case 'days':
+            default:
+                expiresAt.setDate(expiresAt.getDate() + durationValue);
+                break;
+        }
 
-        // NEW: Fetch the admin's username from the database
         const adminUser = await User.findById(decodedToken.id);
         if (!adminUser) {
             console.error(`API: Admin user with ID ${decodedToken.id} not found.`);
             return NextResponse.json({ error: 'Generating admin user not found.' }, { status: 500 });
         }
-        const generatedByAdminUsername = adminUser.username || adminUser.email; // Use username or fallback to email
+        const generatedByAdminUsername = adminUser.username || adminUser.email;
 
         if (!user) {
             isNewUser = true;
@@ -133,26 +153,29 @@ export async function POST(request: Request) {
             candidateEmail,
             expiresAt,
             generatedByAdminId: decodedToken.id,
-            generatedByAdminUsername: generatedByAdminUsername, // NEW: Assign the fetched admin username
+            generatedByAdminUsername: generatedByAdminUsername,
             isUsed: false,
         });
         await newReferralCode.save();
         console.log(`API: Saved new referral code ${generatedCode} to ReferralCode collection.`);
 
         const loginUrl = `${process.env.NEXT_PUBLIC_BASE_URL}/login`;
-        const portalName = process.env.NEXT_PUBLIC_PORTAL_NAME || 'Udyog Jagat'; // Use an env var for portal name
-        const teamName = process.env.EMAIL_FROM?.split('<')[0].trim() || 'Udyog Jagat Team'; // Use env var for team name
+        const portalName = process.env.NEXT_PUBLIC_PORTAL_NAME || 'Udyog Jagat';
+        const teamName = process.env.EMAIL_FROM?.split('<')[0].trim() || 'Udyog Jagat Team';
 
         // Format date for email body: 26-Sep-2025
         const formattedExpiryDateForEmail = expiresAt.toLocaleDateString('en-GB', {
             day: '2-digit',
             month: 'short',
             year: 'numeric'
-        }).replace(/ /g, '-'); // Replace spaces with hyphens
-        const formattedExpiryDate = expiresAt.toDateString(); // e.g., "Fri Sep 26 2025"
-        const username = candidateEmail; // Using candidate email as username for email content
+        }).replace(/ /g, '-');
+        const formattedExpiryDate = expiresAt.toDateString();
+        const username = candidateEmail;
         const emailSubject = 'Your Udyog Jagat Portal Access Code!';
-        const emailText = `Hello ${username},\n\nAn administrator has generated an exclusive access code for you to log in to ${portalName} Portal.\n\nYour Access Code: ${generatedCode}\n\nThis code is valid for 60 days from now (${formattedExpiryDateForEmail}) and one time use only.\n\nPlease use it to log in and complete your profile here: ${loginUrl}\n\n${isNewUser ? `Your temporary password is: ${temporaryPassword} (You will be prompted to change this on first login.)\n\n` : ''}We look forward to having you!\n\n${teamName}`;
+
+        // Construct a human-readable duration for the email
+        const durationText = `${durationValue} ${durationUnit}`;
+        const emailText = `Hello ${username},\n\nAn administrator has generated an exclusive access code for you to log in to ${portalName} Portal.\n\nYour Access Code: ${generatedCode}\n\nThis code is valid for ${durationText} from now and is for one-time use only.\n\nPlease use it to log in and complete your profile here: ${loginUrl}\n\n${isNewUser ? `Your temporary password is: ${temporaryPassword} (You will be prompted to change this on first login.)\n\n` : ''}We look forward to having you!\n\n${teamName}`;
 
         const emailHtml = `
 <!DOCTYPE html>
@@ -219,7 +242,7 @@ export async function POST(request: Request) {
         
         <div class="code">${generatedCode}</div>
         
-        <p>This code is valid for 60 days from now (<strong>${formattedExpiryDateForEmail}</strong>) and is for one-time use only.</p>
+        <p>This code is valid for <strong>${durationText}</strong> from now and is for one-time use only.</p>
         
         <p>Please use it to <a href="${loginUrl}" class="button">log in</a> and complete your profile.</p>
         
@@ -255,7 +278,7 @@ export async function POST(request: Request) {
                 code: generatedCode,
                 expiresAt,
                 isNewUser,
-                generatedByAdminUsername: generatedByAdminUsername, // NEW: Include in response
+                generatedByAdminUsername: generatedByAdminUsername,
             },
             { status: 201 }
         );

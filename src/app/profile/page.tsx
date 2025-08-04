@@ -1,4 +1,3 @@
-// app/profile/page.tsx
 "use client";
 
 import { useState, useEffect, FormEvent } from "react";
@@ -16,13 +15,18 @@ import {
   FiLoader,
   FiMenu,
   FiLock,
-  FiBookOpen, // For Milan/Shaka/Bhaga
-  FiMapPin, // For Valaya/Nagar
-  FiGlobe, // For Khanda/Bhaga
-  FiActivity, // For Status
+  FiBookOpen,
+  FiMapPin,
+  FiGlobe,
+  FiActivity,
+  FiTag,
+  FiArrowLeft
 } from "react-icons/fi";
 
-// Framer Motion Variants for animations
+// Brand colors
+const primaryBlue = "#165BF8";
+const darkBlue = "#1C3991";
+
 const fadeIn = {
   hidden: { opacity: 0, y: 20 },
   visible: { opacity: 1, y: 0, transition: { duration: 0.5, ease: "easeOut" } },
@@ -49,13 +53,10 @@ export default function ProfilePage() {
   const [formData, setFormData] = useState({
     username: "",
     email: "",
-    // Initialize new fields from currentUser, ensuring they are strings
-    // These fields are always part of the form data, even if empty, to allow editing.
-    milanShakaBhaga: "",
+    milanShaka: "",
     valayaNagar: "",
     khandaBhaga: "",
   });
-  // State for password change fields
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmNewPassword, setConfirmNewPassword] = useState("");
@@ -63,19 +64,17 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false); // State for mobile sidebar
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   useEffect(() => {
     if (!authLoading) {
       if (!isAuthenticated || !currentUser) {
         router.push("/login");
       } else {
-        // Initialize form data with current user data
         setFormData({
           username: currentUser.username || "",
           email: currentUser.email || "",
-          // Initialize new fields from currentUser, using empty string if not present
-          milanShakaBhaga: currentUser.milanShakaBhaga || "",
+          milanShaka: currentUser.milanShakaBhaga || "",
           valayaNagar: currentUser.valayaNagar || "",
           khandaBhaga: currentUser.khandaBhaga || "",
         });
@@ -117,10 +116,7 @@ export default function ProfilePage() {
         username: formData.username,
       };
 
-      // Always include these fields from formData.
-      // If formData.field is an empty string, it will be sent as such.
-      // The backend should handle saving empty strings or unsetting fields based on your schema.
-      payload.milanShakaBhaga = formData.milanShakaBhaga;
+      payload.milanShakaBhaga = formData.milanShaka;
       payload.valayaNagar = formData.valayaNagar;
       payload.khandaBhaga = formData.khandaBhaga;
 
@@ -139,15 +135,11 @@ export default function ProfilePage() {
         throw new Error(data.error || "Failed to update profile.");
       }
 
-      // Update user in AuthContext with the new data from the response
       updateUser(data.user);
       setMessage("Profile updated successfully!");
-      setIsEditing(false); // Exit editing mode
+      setIsEditing(false);
     } catch (err: any) {
-      console.error("Profile update error:", err);
-      setError(
-        err.message || "An unexpected error occurred during profile update."
-      );
+      setError(err.message || "An unexpected error occurred during profile update.");
     } finally {
       setLoading(false);
     }
@@ -177,14 +169,14 @@ export default function ProfilePage() {
       return;
     }
 
-    if (newPassword.length < 6) { // Basic password length validation
+    if (newPassword.length < 6) {
       setError("New password must be at least 6 characters long.");
       setLoading(false);
       return;
     }
 
     try {
-      const response = await fetch("/api/profile/change-password", { // Assuming this API route exists
+      const response = await fetch("/api/profile/change-password", {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -200,30 +192,24 @@ export default function ProfilePage() {
       }
 
       setMessage("Password changed successfully! You will be logged out to re-authenticate.");
-      // Clear password fields
       setCurrentPassword("");
       setNewPassword("");
       setConfirmNewPassword("");
-      // Force logout after password change for re-authentication with new password
       setTimeout(() => {
         logout();
         router.push('/login');
       }, 2000);
 
     } catch (err: any) {
-      console.error("Password change error:", err);
-      setError(
-        err.message || "An unexpected error occurred during password change."
-      );
+      setError(err.message || "An unexpected error occurred during password change.");
     } finally {
       setLoading(false);
     }
   };
 
-
   if (authLoading || !isAuthenticated || !currentUser) {
     return (
-      <div className="flex h-screen bg-gradient-to-br from-blue-50 to-indigo-100 justify-center items-center">
+      <div className="flex h-screen bg-gradient-to-br from-[#f6f9ff] to-[#eef2ff] justify-center items-center">
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -232,11 +218,11 @@ export default function ProfilePage() {
         >
           <motion.div
             animate={pulseEffect}
-            className="rounded-full p-3 bg-indigo-200"
+            className="rounded-full p-4 bg-[#165BF8]/10 shadow-inner"
           >
-            <FiLoader className="text-indigo-600 h-10 w-10" />
+            <FiLoader className="text-[#165BF8] h-12 w-12 animate-spin" />
           </motion.div>
-          <p className="mt-4 text-lg font-medium text-gray-700">
+          <p className="mt-6 text-lg font-medium text-[#1C3991]">
             Loading profile...
           </p>
         </motion.div>
@@ -244,15 +230,13 @@ export default function ProfilePage() {
     );
   }
 
-  // Determine if additional fields should be displayed based on user role
   const shouldDisplayAdditionalFields =
     currentUser.role === 'job_seeker' ||
     currentUser.role === 'admin' ||
     currentUser.role === 'job_referrer';
 
-
   return (
-    <div className="flex h-screen bg-gradient-to-br from-blue-50 to-indigo-100 overflow-hidden font-inter">
+    <div className="flex h-screen bg-gradient-to-br from-[#f6f9ff] to-[#eef2ff] overflow-hidden font-inter">
       <Sidebar
         userRole={currentUser.role}
         onLogout={logout}
@@ -267,15 +251,15 @@ export default function ProfilePage() {
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
             onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-            className="p-2 rounded-md text-gray-600 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            className="p-2 rounded-md text-gray-600 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-[#165BF8]"
             aria-label="Toggle sidebar"
           >
             <FiMenu className="h-6 w-6" />
           </motion.button>
-          <h1 className="text-2xl font-extrabold bg-gradient-to-r from-blue-600 to-blue-800 bg-clip-text text-transparent absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2">
+          <h1 className="text-2xl font-extrabold bg-gradient-to-r from-[#165BF8] to-[#1C3991] bg-clip-text text-transparent absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2">
             My Profile
           </h1>
-          <div className="w-6 h-6"></div> {/* Placeholder for alignment */}
+          <div className="w-6 h-6"></div>
         </div>
 
         <div className="flex-1 overflow-y-auto p-4 md:p-8">
@@ -283,20 +267,20 @@ export default function ProfilePage() {
             initial="hidden"
             animate="visible"
             variants={fadeIn}
-            className="max-w-3xl mx-auto bg-white rounded-3xl shadow-xl border border-gray-100 p-6 md:p-8 transform hover:shadow-2xl transition-all duration-300 ease-out"
+            className="max-w-3xl mx-auto bg-white rounded-3xl shadow-xl border border-[#165BF8]/10 p-6 md:p-8"
           >
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-              <h1 className="text-3xl font-extrabold text-gray-800 bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 to-purple-700">
+              <h1 className="text-3xl font-extrabold text-gray-800 bg-clip-text text-transparent bg-gradient-to-r from-[#165BF8] to-[#1C3991]">
                 My Profile
               </h1>
               <motion.button
                 whileHover={{
                   scale: 1.05,
-                  boxShadow: "0 4px 15px rgba(99, 102, 241, 0.3)",
+                  boxShadow: `0 4px 15px #165BF830`,
                 }}
                 whileTap={{ scale: 0.95 }}
                 onClick={() => setIsEditing(!isEditing)}
-                className="flex items-center px-4 py-2 bg-indigo-100 text-indigo-700 rounded-lg hover:bg-indigo-200 transition-colors text-sm font-medium shadow-sm"
+                className="flex items-center px-4 py-2 bg-[#165BF8]/10 text-[#1C3991] rounded-lg hover:bg-[#165BF8]/20 transition-colors text-sm font-medium shadow-sm"
               >
                 {isEditing ? (
                   <>
@@ -332,22 +316,21 @@ export default function ProfilePage() {
                   className="p-3 bg-green-100 border-l-4 border-green-500 rounded-r-lg shadow-sm text-sm text-green-700 font-medium flex items-center mb-4"
                   role="alert"
                 >
-                  <FiCheckCircle className="h-5 w-5 text-green-500 mr-2" />{" "}
+                  <FiCheckCircle className="h-5 w-5 text-green-500 mr-2" />
                   {message}
                 </motion.div>
               )}
             </AnimatePresence>
 
             <form onSubmit={handleSaveProfile} className="space-y-6">
-              <div className="grid grid-cols-1 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {/* Username */}
                 <div>
                   <label
                     htmlFor="username"
-                    className="block text-sm font-semibold text-gray-700 mb-2"
+                    className="block text-sm font-semibold text-[#1C3991] mb-2"
                   >
-                    <FiUser className="inline-block mr-2 text-gray-500" />{" "}
-                    Username
+                    <FiUser className="inline-block mr-2 text-[#165BF8]" /> Username
                   </label>
                   <input
                     type="text"
@@ -355,9 +338,9 @@ export default function ProfilePage() {
                     name="username"
                     value={formData.username}
                     onChange={handleChange}
-                    readOnly={!isEditing} // Editable when in editing mode
-                    className={`block w-full px-4 py-3 border border-gray-300 rounded-xl shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 ${
-                      !isEditing ? "bg-gray-50 cursor-not-allowed" : ""
+                    readOnly={!isEditing}
+                    className={`block w-full px-4 py-3 border border-[#165BF8]/20 rounded-xl shadow-sm placeholder-[#165BF8]/50 focus:outline-none focus:ring-2 focus:ring-[#165BF8]/30 focus:border-[#165BF8] transition-all duration-200 text-[#1C3991] ${
+                      !isEditing ? "bg-gray-100 cursor-not-allowed" : "bg-white"
                     }`}
                   />
                 </div>
@@ -365,68 +348,63 @@ export default function ProfilePage() {
                 <div>
                   <label
                     htmlFor="email"
-                    className="block text-sm font-semibold text-gray-700 mb-2"
+                    className="block text-sm font-semibold text-[#1C3991] mb-2"
                   >
-                    <FiMail className="inline-block mr-2 text-gray-500" /> Email
+                    <FiMail className="inline-block mr-2 text-[#165BF8]" /> Email
                   </label>
                   <input
                     type="email"
                     id="email"
                     name="email"
                     value={formData.email}
-                    readOnly={true} // Always read-only
-                    className="block w-full px-4 py-3 border border-gray-300 rounded-xl shadow-sm bg-gray-50 cursor-not-allowed" // Always styled as read-only
+                    readOnly={true}
+                    className="block w-full px-4 py-3 border border-gray-300 rounded-xl shadow-sm bg-gray-100 cursor-not-allowed text-[#1C3991] transition-all duration-200"
                   />
                 </div>
-                {/* NEW: Status Display */}
+                {/* Role - Read-Only */}
                 <div>
                   <label
-                    htmlFor="status"
-                    className="block text-sm font-semibold text-gray-700 mb-2"
+                    htmlFor="role"
+                    className="block text-sm font-semibold text-[#1C3991] mb-2"
                   >
-                    <FiActivity className="inline-block mr-2 text-gray-500" /> Status
+                    <FiTag className="inline-block mr-2 text-[#165BF8]" /> Role
                   </label>
                   <input
                     type="text"
-                    id="status"
-                    name="status"
-                    value={currentUser.status || 'N/A'} // Display current status
-                    readOnly={true} // Always read-only
-                    className="block w-full px-4 py-3 border border-gray-300 rounded-xl shadow-sm bg-gray-50 cursor-not-allowed"
+                    id="role"
+                    name="role"
+                    value={currentUser.role.replace('_', ' ')}
+                    readOnly={true}
+                    className="block w-full px-4 py-3 border border-gray-300 rounded-xl shadow-sm bg-gray-100 cursor-not-allowed text-[#1C3991] capitalize transition-all duration-200"
                   />
                 </div>
               </div>
 
-              {/* Conditional Additional Details fields */}
               {shouldDisplayAdditionalFields && (
-                <div className="pt-6 border-t border-gray-100 mt-6 space-y-6">
-                  <h3 className="text-xl font-semibold text-gray-800">
+                <div className="pt-6 border-t border-[#165BF8]/10 mt-6 space-y-6">
+                  <h3 className="text-xl font-semibold text-[#1C3991]">
                     Additional Details
                   </h3>
-
-                  {/* Milan/Shaka/Bhaga */}
                   <div>
-                    <label htmlFor="milanShakaBhaga" className="block text-sm font-semibold text-gray-700 mb-2">
-                      <FiBookOpen className="inline-block mr-2 text-gray-500" /> Milan/Shaka/Bhaga
+                    <label htmlFor="milanShaka" className="block text-sm font-semibold text-[#1C3991] mb-2">
+                      <FiBookOpen className="inline-block mr-2 text-[#165BF8]" /> Milan/Shaka
                     </label>
                     <input
                       type="text"
-                      id="milanShakaBhaga"
-                      name="milanShakaBhaga"
-                      value={formData.milanShakaBhaga}
+                      id="milanShaka"
+                      name="milanShaka"
+                      value={formData.milanShaka}
                       onChange={handleChange}
                       readOnly={!isEditing}
-                      className={`block w-full px-4 py-3 border border-gray-300 rounded-xl shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 ${
-                          !isEditing ? "bg-gray-50 cursor-not-allowed" : ""
+                      className={`block w-full px-4 py-3 border border-[#165BF8]/20 rounded-xl shadow-sm placeholder-[#165BF8]/50 focus:outline-none focus:ring-2 focus:ring-[#165BF8]/30 focus:border-[#165BF8] transition-all duration-200 text-[#1C3991] ${
+                        !isEditing ? "bg-gray-100 cursor-not-allowed" : "bg-white"
                       }`}
-                      placeholder="Enter Milan/Shaka/Bhaga"
+                      placeholder="Enter Milan/Shaka"
                     />
                   </div>
-
-                  {/* Valaya/Nagar */}
                   <div>
-                    <label htmlFor="valayaNagar" className="block text-sm font-semibold text-gray-700 mb-2">
-                      <FiMapPin className="inline-block mr-2 text-gray-500" /> Valaya/Nagar
+                    <label htmlFor="valayaNagar" className="block text-sm font-semibold text-[#1C3991] mb-2">
+                      <FiMapPin className="inline-block mr-2 text-[#165BF8]" /> Valaya/Nagar
                     </label>
                     <input
                       type="text"
@@ -435,17 +413,15 @@ export default function ProfilePage() {
                       value={formData.valayaNagar}
                       onChange={handleChange}
                       readOnly={!isEditing}
-                      className={`block w-full px-4 py-3 border border-gray-300 rounded-xl shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 ${
-                          !isEditing ? "bg-gray-50 cursor-not-allowed" : ""
+                      className={`block w-full px-4 py-3 border border-[#165BF8]/20 rounded-xl shadow-sm placeholder-[#165BF8]/50 focus:outline-none focus:ring-2 focus:ring-[#165BF8]/30 focus:border-[#165BF8] transition-all duration-200 text-[#1C3991] ${
+                        !isEditing ? "bg-gray-100 cursor-not-allowed" : "bg-white"
                       }`}
                       placeholder="Enter Valaya/Nagar"
                     />
                   </div>
-
-                  {/* Khanda/Bhaga */}
                   <div>
-                    <label htmlFor="khandaBhaga" className="block text-sm font-semibold text-gray-700 mb-2">
-                      <FiGlobe className="inline-block mr-2 text-gray-500" /> Khanda/Bhaga
+                    <label htmlFor="khandaBhaga" className="block text-sm font-semibold text-[#1C3991] mb-2">
+                      <FiGlobe className="inline-block mr-2 text-[#165BF8]" /> Khanda/Bhaga
                     </label>
                     <input
                       type="text"
@@ -454,8 +430,8 @@ export default function ProfilePage() {
                       value={formData.khandaBhaga}
                       onChange={handleChange}
                       readOnly={!isEditing}
-                      className={`block w-full px-4 py-3 border border-gray-300 rounded-xl shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 ${
-                          !isEditing ? "bg-gray-50 cursor-not-allowed" : ""
+                      className={`block w-full px-4 py-3 border border-[#165BF8]/20 rounded-xl shadow-sm placeholder-[#165BF8]/50 focus:outline-none focus:ring-2 focus:ring-[#165BF8]/30 focus:border-[#165BF8] transition-all duration-200 text-[#1C3991] ${
+                        !isEditing ? "bg-gray-100 cursor-not-allowed" : "bg-white"
                       }`}
                       placeholder="Enter Khanda/Bhaga"
                     />
@@ -463,13 +439,13 @@ export default function ProfilePage() {
                 </div>
               )}
 
-
               {isEditing && (
                 <motion.div
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: 10 }}
                   transition={{ duration: 0.3 }}
+                  className="mt-6"
                 >
                   <motion.button
                     type="submit"
@@ -499,12 +475,11 @@ export default function ProfilePage() {
               )}
             </form>
 
-            {/* Change Password Section */}
             <motion.div
               initial="hidden"
               animate="visible"
               variants={fadeIn}
-              className="mt-10 bg-white rounded-3xl shadow-xl border border-gray-100 p-6 md:p-8 transform hover:shadow-2xl transition-all duration-300 ease-out"
+              className="mt-10 bg-white rounded-3xl shadow-xl border border-gray-100 p-6 md:p-8"
             >
               <h2 className="text-2xl font-extrabold text-gray-800 bg-clip-text text-transparent bg-gradient-to-r from-red-600 to-red-800 mb-6">
                 Change Password

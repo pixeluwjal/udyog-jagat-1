@@ -1,8 +1,7 @@
-// app/api/auth/login/route.ts
 import { NextResponse } from 'next/server';
 import dbConnect from '@/lib/dbConnect';
 import User, { IUser } from '@/models/User';
-import ReferralCodeModel, { IReferralCode } from '@/models/ReferralCode'; // Import ReferralCode model
+import ReferralCodeModel, { IReferralCode } from '@/models/ReferralCode';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 
@@ -11,14 +10,14 @@ export async function POST(request: Request) {
     console.log('\n--- API: /api/auth/login - Request received ---');
 
     try {
+        // The request body now only needs email and password
         const { email, password: rawPassword } = await request.json();
         const password = rawPassword ? String(rawPassword).trim() : '';
 
         console.log(`API: Attempting login for email: ${email}`);
-        console.log(`API: Provided password (raw - trimmed): '${password}'`);
 
-        // 1. Find user by email and explicitly select password and status
-        const user: (IUser & { password?: string }) | null = await User.findOne({ email }).select('+password +status');
+        // 1. Find user by email and explicitly select password, status, and firstLogin
+        const user: (IUser & { password?: string }) | null = await User.findOne({ email }).select('+password +status +firstLogin +role');
         if (!user) {
             console.warn(`API: Login failed for email ${email}: User not found.`);
             return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
@@ -31,48 +30,63 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
         }
 
-        // NEW LOGIC: Prevent login if user status is 'inactive'
-        // If user.status is undefined (field not present), this check passes, allowing login.
+        // Check if user account is inactive
         if (user.status === 'inactive') {
             console.warn(`API: Login failed for email ${email}: User account is inactive.`);
             return NextResponse.json({ error: 'Your account is inactive. Please contact support.' }, { status: 403 });
         }
 
-        // NEW LOGIC: Automatically find and update referral code based on the logged-in user's email
-        try {
-            const now = new Date();
-            // Find an unused, unexpired referral code specifically generated for this candidate email
-            // We'll find one and update it. If multiple exist, the first one found will be used.
-            // You might want to sort by createdAt to update the oldest one first, but findOne is simpler.
-            const referralCodeDoc: IReferralCode | null = await ReferralCodeModel.findOne({
-                candidateEmail: email,
-                isUsed: false, // Must be unused
-                expiresAt: { $gte: now } // Must not be expired
-            });
+        const now = new Date();
 
-            if (referralCodeDoc) {
-                // Mark the referral code as used by this user
-                referralCodeDoc.isUsed = true;
-                referralCodeDoc.usedBy = user._id; // Link to the user who used it
-                referralCodeDoc.usedAt = now;
-                await referralCodeDoc.save();
-                console.log(`API: Referral code ${referralCodeDoc.code} for user ${user.email} marked as used.`);
+        // --- CORRECTED LOGIC: Check referral code only for 'job_seeker' role ---
+        if (user.role === 'job_seeker') {
+            if (user.firstLogin) {
+                console.log(`API: User ${email} is a first-time job seeker. Automatically validating referral code...`);
 
-                // Optional: If using the code implies onboarding completion, update user status
-                // if (user.onboardingStatus === 'pending') {
-                //     user.onboardingStatus = 'completed';
-                //     await user.save();
-                //     console.log(`API: User ${user.email} onboarding status updated to 'completed' after code usage.`);
-                // }
+                // Find an unused, unexpired referral code for this specific candidate email
+                const codeDocument: IReferralCode | null = await ReferralCodeModel.findOne({
+                    candidateEmail: email,
+                    isUsed: false,
+                    expiresAt: { $gte: now },
+                });
+                
+                // If a valid code is not found, block the login
+                if (!codeDocument) {
+                    console.warn(`API: First-time login blocked for ${email}: No valid, unused referral code found.`);
+                    return NextResponse.json({ error: 'A valid referral code is required for your first login.' }, { status: 400 });
+                }
+
+                // If a valid code is found, mark it as used and update user's firstLogin status
+                codeDocument.isUsed = true;
+                codeDocument.usedBy = user._id; // Link to the user who used it
+                codeDocument.usedAt = now;
+                await codeDocument.save();
+                
+                // CRITICAL FIX: Keep user.firstLogin = true. It will be set to false after password change.
+                await user.save();
+                
+                console.log(`API: First-time login for ${user.email} successful. Referral code ${codeDocument.code} marked as used.`);
             } else {
-                console.log(`API: No valid, unused, unexpired referral code found for ${user.email}.`);
+                // This is a returning user. Check the validity of their original referral code.
+                console.log(`API: User ${email} is a returning job seeker. Checking their linked referral code for expiration...`);
+
+                const codeDocument: IReferralCode | null = await ReferralCodeModel.findOne({ usedBy: user._id });
+
+                if (codeDocument) {
+                    if (codeDocument.expiresAt < now) {
+                        console.warn(`API: Login failed for ${email}: Linked referral code ${codeDocument.code} has expired.`);
+                        return NextResponse.json({ error: 'Your referral code has expired, and access is now revoked.' }, { status: 400 });
+                    }
+                    console.log(`API: User's linked referral code ${codeDocument.code} is still valid. Login proceeding.`);
+                } else {
+                    console.log(`API: User ${email} is a job seeker without a linked referral code. Login proceeding.`);
+                }
             }
-        } catch (referralUpdateError) {
-            console.error(`API: Error updating referral code for user ${user.email}:`, referralUpdateError);
-            // Do not block login due to referral code update failure, but log it.
+        } else {
+            console.log(`API: User ${email} is not a job seeker (Role: ${user.role}). Bypassing referral code check.`);
         }
 
-        // 3. Generate JWT Token (rest of your existing logic)
+        // 3. Generate JWT Token
         if (!process.env.JWT_SECRET) {
             console.error('API: JWT_SECRET is not defined in environment variables. Server configuration error.');
             return NextResponse.json({ error: 'Server configuration error.' }, { status: 500 });

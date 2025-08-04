@@ -22,7 +22,15 @@ import {
     FiSend,
     FiTag,
     FiMenu,
+    FiRefreshCw,
+    FiUsers,
+    FiZap,
+    FiChevronDown, // <-- The missing import has been added here
 } from 'react-icons/fi';
+
+// Brand colors from the Admin page
+const primaryBlue = "#165BF8";
+const darkBlue = "#1C3991";
 
 // Define an interface for the Referral Code object
 interface ReferralCode {
@@ -39,28 +47,46 @@ interface ReferralCode {
 // Framer Motion Variants for animations
 const fadeIn = {
     hidden: { opacity: 0, y: 20 },
-    visible: { opacity: 1, y: 0, transition: { duration: 0.5, ease: "easeOut" } },
-};
-
-const itemFadeIn = {
-    hidden: { opacity: 0, scale: 0.95 },
-    visible: {
-        opacity: 1,
-        scale: 1,
-        transition: { duration: 0.3, ease: "easeOut" },
+    visible: { 
+        opacity: 1, 
+        y: 0, 
+        transition: { 
+            duration: 0.5, 
+            ease: [0.16, 1, 0.3, 1],
+            delay: 0.1
+        } 
     },
 };
 
-const pulseEffect = {
-    scale: [1, 1.05, 1],
-    opacity: [1, 0.7, 1],
-    transition: { duration: 0.8, repeat: Infinity, ease: "easeInOut" },
+const cardAnimation = {
+    hidden: { opacity: 0, y: 20, scale: 0.98 },
+    visible: {
+        opacity: 1,
+        y: 0,
+        scale: 1,
+        transition: { 
+            duration: 0.6, 
+            ease: [0.16, 1, 0.3, 1],
+            staggerChildren: 0.1
+        }
+    }
 };
+
+const pulseEffect = {
+    scale: [1, 1.03, 1],
+    opacity: [0.8, 1, 0.8],
+    transition: { 
+        duration: 1.2, 
+        repeat: Infinity, 
+        ease: "easeInOut" 
+    }
+};
+
 
 export default function GenerateReferralPage() {
     const [email, setEmail] = useState('');
     const [generatedCode, setGeneratedCode] = useState<string | null>(null);
-    const [expiresAt, setExpiresAt] = useState<string | null>(null); // This is formatted date
+    const [expiresAt, setExpiresAt] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [message, setMessage] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
@@ -70,19 +96,21 @@ export default function GenerateReferralPage() {
     const [referralsError, setReferralsError] = useState<string | null>(null);
     const [copySuccess, setCopySuccess] = useState<string | null>(null);
     const [filterStatus, setFilterStatus] = useState<string>("all");
-    const [isSidebarOpen, setIsSidebarOpen] = useState(false); // State for sidebar visibility
+    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
     const { user: currentUser, loading: authLoading, isAuthenticated, token, logout } = useAuth();
     const router = useRouter();
 
-    // Helper function to format date to DD/MM/YYYY
+    // Helper function to format date to DD/MM/YYYY HH:MM
     const formatDate = (isoString: string): string => {
         if (!isoString) return "";
         const date = new Date(isoString);
         const day = String(date.getDate()).padStart(2, "0");
-        const month = String(date.getMonth() + 1).padStart(2, "0"); // Months are 0-indexed
+        const month = String(date.getMonth() + 1).padStart(2, "0");
         const year = date.getFullYear();
-        return `${day}/${month}/${year}`;
+        const hours = String(date.getHours()).padStart(2, '0');
+        const minutes = String(date.getMinutes()).padStart(2, '0');
+        return `${day}/${month}/${year} ${hours}:${minutes}`;
     };
 
     const fetchReferralCodes = useCallback(async () => {
@@ -96,8 +124,13 @@ export default function GenerateReferralPage() {
         }
 
         try {
-            // IMPORTANT: Changed API endpoint to referrer-specific one
-            const response = await fetch(`/api/referrer/referral-codes?status=${filterStatus}`, {
+            const params = new URLSearchParams();
+            if (filterStatus !== 'all') {
+                params.append('status', filterStatus);
+            }
+
+            // IMPORTANT: Keep the referrer-specific API endpoint
+            const response = await fetch(`/api/referrer/referral-codes?${params.toString()}`, {
                 headers: {
                     Authorization: `Bearer ${token}`,
                 },
@@ -174,7 +207,7 @@ export default function GenerateReferralPage() {
         }
 
         try {
-            // IMPORTANT: Changed API endpoint to a referrer-specific one.
+            // IMPORTANT: Keep the referrer-specific API endpoint
             const response = await fetch('/api/referrer/generate-referral-code', {
                 method: 'POST',
                 headers: {
@@ -192,12 +225,11 @@ export default function GenerateReferralPage() {
 
             setMessage(data.message || 'Referral code generated successfully!');
             setGeneratedCode(data.code);
-            setExpiresAt(formatDate(data.expiresAt)); // Use the new format
-            setEmail(''); // Clear email field after success
+            setExpiresAt(data.expiresAt);
+            setEmail('');
             console.log('Referral Code Generated:', data);
 
             fetchReferralCodes(); // Refresh the list after generating a new code
-
         } catch (err: any) {
             console.error('Generate referral code error:', err);
             setError(err.message || 'An unexpected error occurred.');
@@ -212,13 +244,10 @@ export default function GenerateReferralPage() {
                 setCopySuccess("Code copied to clipboard!");
                 setTimeout(() => setCopySuccess(null), 2000);
             })
-            .catch((err) => {
-                console.error("Failed to copy text: ", err);
-                // Fallback for older browsers
+            .catch(() => {
                 const el = document.createElement("textarea");
                 el.value = code;
                 document.body.appendChild(el);
-                el.select();
                 document.execCommand("copy");
                 document.body.removeChild(el);
                 setCopySuccess("Code copied (fallback)!");
@@ -228,20 +257,19 @@ export default function GenerateReferralPage() {
 
     if (authLoading || !isAuthenticated || !currentUser || currentUser.firstLogin || currentUser.role !== 'job_referrer') {
         return (
-            <div className="flex h-screen bg-gradient-to-br from-blue-50 to-indigo-100 justify-center items-center">
+            <div className="flex h-screen bg-gradient-to-br from-[#f6f9ff] to-[#eef2ff] justify-center items-center">
                 <motion.div
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
                     className="flex flex-col items-center"
                 >
                     <motion.div
                         animate={pulseEffect}
-                        className="rounded-full p-3 bg-indigo-200"
+                        className="rounded-full p-4 bg-[#165BF8]/10 shadow-inner"
                     >
-                        <FiLoader className="text-indigo-600 h-10 w-10" />
+                        <FiLoader className="text-[#165BF8] h-12 w-12 animate-spin" />
                     </motion.div>
-                    <p className="mt-4 text-lg font-medium text-gray-700">
+                    <p className="mt-6 text-lg font-medium text-[#1C3991]">
                         Loading referrer panel...
                     </p>
                 </motion.div>
@@ -250,8 +278,7 @@ export default function GenerateReferralPage() {
     }
 
     return (
-        <div className="flex h-screen bg-gradient-to-br from-blue-50 to-indigo-100 overflow-hidden font-inter">
-            {/* Sidebar for larger screens, and conditionally rendered for mobile */}
+        <div className="flex h-screen bg-gradient-to-br from-[#f6f9ff] to-[#eef2ff] overflow-hidden">
             <Sidebar
                 userRole={currentUser.role}
                 onLogout={logout}
@@ -260,76 +287,98 @@ export default function GenerateReferralPage() {
             />
 
             <div className="flex-1 flex flex-col overflow-y-auto">
-                {/* Mobile header */}
-                <div className="md:hidden bg-white/95 backdrop-blur-md shadow-lg p-4 flex justify-between items-center z-10 sticky top-0">
+                {/* Mobile Header */}
+                <div className="md:hidden bg-white/95 backdrop-blur-md shadow-sm p-4 flex justify-between items-center z-10 sticky top-0">
                     <motion.button
                         whileHover={{ scale: 1.05 }}
                         whileTap={{ scale: 0.95 }}
                         onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-                        className="p-2 rounded-md text-gray-600 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        className="p-2 rounded-lg text-[#165BF8] hover:bg-[#165BF8]/10 focus:outline-none"
                     >
                         <FiMenu className="h-6 w-6" />
                     </motion.button>
-                    <h1 className="text-2xl font-extrabold bg-gradient-to-r from-[#4F39F6] to-[#1A3BAD] bg-clip-text text-transparent absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2">
-                        Generate Referral
+                    <h1 className="text-2xl font-bold bg-gradient-to-r from-[#165BF8] to-[#1C3991] bg-clip-text text-transparent">
+                        Referral Manager
                     </h1>
-                    {/* Placeholder for alignment if needed, or remove if not necessary */}
                     <div className="w-6 h-6"></div>
                 </div>
 
                 <div className="flex-1 overflow-y-auto p-4 md:p-8">
-                    <div className="max-w-4xl mx-auto space-y-10">
-                        {/* Generate Code Section */}
+                    <div className="max-w-6xl mx-auto space-y-8">
+                        {/* Page Header */}
                         <motion.div
                             initial="hidden"
                             animate="visible"
                             variants={fadeIn}
-                            className="bg-white rounded-3xl shadow-xl border border-gray-100 p-6 md:p-8 transform hover:shadow-2xl transition-all duration-300 ease-out"
+                            className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4"
                         >
-                            <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-                                <h2 className="text-2xl md:text-3xl font-extrabold text-gray-800 bg-clip-text text-transparent bg-gradient-to-r from-[#4F39F6] to-[#1A3BAD]">
-                                    Generate Access Code
-                                </h2>
-                                <Link href="/referrer/dashboard" passHref>
-                                    <motion.button
-                                        whileHover={{
-                                            scale: 1.05,
-                                            boxShadow: "0 4px 15px rgba(99, 102, 241, 0.3)",
-                                        }}
-                                        whileTap={{ scale: 0.95 }}
-                                        className="flex items-center px-4 py-2 bg-indigo-100 text-indigo-700 rounded-lg hover:bg-indigo-200 transition-colors text-sm font-medium shadow-sm"
-                                    >
-                                        <FiChevronLeft className="mr-2 w-5 h-5" /> Back to Dashboard
-                                    </motion.button>
-                                </Link>
+                            <div>
+                                <h1 className="text-3xl md:text-4xl font-bold text-[#1C3991] leading-tight">
+                                    <span className="bg-gradient-to-r from-[#165BF8] to-[#1C3991] bg-clip-text text-transparent">
+                                        Referral Code Manager
+                                    </span>
+                                </h1>
+                                <p className="text-[#165BF8] mt-2">
+                                    Generate and manage your candidate referral codes
+                                </p>
                             </div>
+                            <Link href="/referrer/dashboard" passHref>
+                                <motion.button
+                                    whileHover={{ scale: 1.02, boxShadow: `0 4px 15px ${primaryBlue}30` }}
+                                    whileTap={{ scale: 0.98 }}
+                                    className="flex items-center px-5 py-2.5 bg-white text-[#165BF8] rounded-xl hover:bg-[#165BF8]/10 transition-all text-sm font-medium shadow-sm border border-[#165BF8]/20"
+                                >
+                                    <FiChevronLeft className="mr-2 w-5 h-5" /> Dashboard
+                                </motion.button>
+                            </Link>
+                        </motion.div>
 
+                        {/* Generate Code Section */}
+                        <motion.div
+                            initial="hidden"
+                            animate="visible"
+                            variants={cardAnimation}
+                            className="bg-white rounded-2xl shadow-lg border border-[#165BF8]/10 p-6 md:p-8"
+                        >
+                            <div className="flex justify-between items-center mb-6">
+                                <h2 className="text-2xl font-bold text-[#1C3991] flex items-center gap-3">
+                                    <div className="p-2 rounded-lg bg-[#165BF8]/10 text-[#165BF8]">
+                                        <FiCode className="h-6 w-6" />
+                                    </div>
+                                    Generate New Code
+                                </h2>
+                                <button 
+                                    onClick={fetchReferralCodes}
+                                    className="p-2 rounded-lg bg-[#165BF8]/10 text-[#165BF8] hover:bg-[#165BF8]/20 transition-colors"
+                                    title="Refresh codes"
+                                >
+                                    <FiRefreshCw className={`h-5 w-5 ${loadingReferrals ? 'animate-spin' : ''}`} />
+                                </button>
+                            </div>
+                            
                             <form className="space-y-6" onSubmit={handleSubmit}>
                                 <div>
-                                    <label
-                                        htmlFor="email"
-                                        className="block text-sm font-semibold text-gray-700 mb-2"
-                                    >
+                                    <label className="block text-sm font-medium text-[#1C3991] mb-2">
                                         Candidate Email
                                     </label>
                                     <div className="relative">
                                         <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                            <FiMail className="h-5 w-5 text-gray-400" />
+                                            <FiMail className="h-5 w-5 text-[#165BF8]/70" />
                                         </div>
                                         <input
-                                            id="email"
-                                            name="email"
                                             type="email"
                                             autoComplete="off"
                                             required
-                                            className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-xl shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 sm:text-base transition-all duration-200"
+                                            className="block w-full pl-10 pr-4 py-3 border border-[#165BF8]/20 rounded-xl shadow-sm placeholder-[#165BF8]/50 focus:outline-none focus:ring-2 focus:ring-[#165BF8]/30 focus:border-[#165BF8] text-[#1C3991] bg-white transition-all duration-200"
                                             value={email}
                                             onChange={(e) => setEmail(e.target.value)}
-                                            disabled={loading}
-                                            placeholder="Enter candidate email here"
+                                            placeholder="candidate@example.com"
                                         />
                                     </div>
                                 </div>
+
+                                {/* Note: The referrer role does not get to specify the referral code duration.
+                                    This functionality is kept server-side for their role, so we only include the email input. */}
 
                                 <AnimatePresence>
                                     {error && (
@@ -337,11 +386,9 @@ export default function GenerateReferralPage() {
                                             initial={{ opacity: 0, y: -10 }}
                                             animate={{ opacity: 1, y: 0 }}
                                             exit={{ opacity: 0, y: -10 }}
-                                            transition={{ duration: 0.3 }}
-                                            className="p-3 bg-red-100 border-l-4 border-red-500 rounded-r-lg shadow-sm text-sm text-red-700 font-medium flex items-center"
-                                            role="alert"
+                                            className="p-3 bg-red-50 border-l-4 border-red-400 rounded-lg text-sm text-red-700 font-medium flex items-center"
                                         >
-                                            <FiXCircle className="h-5 w-5 text-red-500 mr-2" />{" "}
+                                            <FiXCircle className="h-5 w-5 text-red-500 mr-2" />
                                             {error}
                                         </motion.div>
                                     )}
@@ -350,11 +397,9 @@ export default function GenerateReferralPage() {
                                             initial={{ opacity: 0, y: -10 }}
                                             animate={{ opacity: 1, y: 0 }}
                                             exit={{ opacity: 0, y: -10 }}
-                                            transition={{ duration: 0.3 }}
-                                            className="p-3 bg-green-100 border-l-4 border-green-500 rounded-r-lg shadow-sm text-sm text-green-700 font-medium flex items-center"
-                                            role="alert"
+                                            className="p-3 bg-green-50 border-l-4 border-green-400 rounded-lg text-sm text-green-700 font-medium flex items-center"
                                         >
-                                            <FiCheckCircle className="h-5 w-5 text-green-500 mr-2" />{" "}
+                                            <FiCheckCircle className="h-5 w-5 text-green-500 mr-2" />
                                             {message}
                                         </motion.div>
                                     )}
@@ -366,56 +411,36 @@ export default function GenerateReferralPage() {
                                             initial={{ opacity: 0, scale: 0.95 }}
                                             animate={{ opacity: 1, scale: 1 }}
                                             exit={{ opacity: 0, scale: 0.95 }}
-                                            transition={{ duration: 0.4, ease: "easeOut" }}
-                                            className="bg-indigo-50 border border-indigo-200 text-indigo-800 p-5 rounded-xl shadow-md flex flex-col md:flex-row items-center justify-between gap-4"
+                                            className="bg-gradient-to-r from-[#165BF8]/5 to-[#1C3991]/5 border border-[#165BF8]/20 text-[#1C3991] p-5 rounded-xl shadow-inner flex flex-col md:flex-row items-center justify-between gap-4"
                                         >
                                             <div className="flex items-center flex-grow">
-                                                <FiCode className="h-8 w-8 text-indigo-500 mr-4 shrink-0" />
+                                                <div className="bg-[#165BF8]/10 p-2 rounded-lg mr-4">
+                                                    <FiCode className="h-6 w-6 text-[#165BF8]" />
+                                                </div>
                                                 <div className="flex-grow">
-                                                    <p className="text-sm text-indigo-600 font-medium mb-1">
-                                                        Generated Access Code:
+                                                    <p className="text-sm text-[#165BF8] font-medium mb-1">
+                                                        Generated Referral Code:
                                                     </p>
-                                                    <code className="font-mono text-xl md:text-2xl break-all text-indigo-800 bg-indigo-100 px-3 py-1 rounded-md inline-block">
+                                                    <code className="font-mono text-xl md:text-2xl break-all text-[#1C3991] bg-[#165BF8]/5 p-3 rounded-lg border border-[#165BF8]/10 inline-block">
                                                         {generatedCode}
                                                     </code>
                                                 </div>
                                             </div>
-                                            <div className="flex flex-col items-center md:items-end space-y-2 md:space-y-0 md:ml-4">
+                                            <div className="flex flex-col items-center md:items-end space-y-2">
                                                 <motion.button
                                                     type="button"
                                                     onClick={() => handleCopyCode(generatedCode)}
-                                                    whileHover={{
-                                                        scale: 1.05,
-                                                        backgroundColor: "#c7d2fe",
-                                                    }}
+                                                    whileHover={{ scale: 1.05 }}
                                                     whileTap={{ scale: 0.95 }}
-                                                    className="flex items-center px-4 py-2 bg-indigo-200 rounded-full text-indigo-700 hover:bg-indigo-300 transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 text-sm font-medium shadow-sm"
-                                                    title="Copy code to clipboard"
+                                                    className="flex items-center px-4 py-2 bg-[#165BF8] rounded-xl text-white hover:bg-[#1a65ff] transition-colors focus:outline-none focus:ring-2 focus:ring-[#165BF8]/30 focus:ring-offset-2 text-sm font-medium shadow-md"
                                                 >
                                                     <FiCopy className="w-4 h-4 mr-2" /> Copy Code
                                                 </motion.button>
-                                                <p className="text-xs text-indigo-600 mt-2 flex items-center">
-                                                    <FiCalendar className="mr-1" /> Expires:{" "}
-                                                    <span className="font-semibold ml-1">
-                                                        {expiresAt}
-                                                    </span>
+                                                <p className="text-xs text-[#165BF8] flex items-center">
+                                                    <FiCalendar className="mr-1.5" /> 
+                                                    <span className="font-semibold">Expires: {expiresAt}</span>
                                                 </p>
                                             </div>
-                                        </motion.div>
-                                    )}
-                                </AnimatePresence>
-
-                                <AnimatePresence>
-                                    {copySuccess && (
-                                        <motion.div
-                                            initial={{ opacity: 0, y: 20 }}
-                                            animate={{ opacity: 1, y: 0 }}
-                                            exit={{ opacity: 0, y: 20 }}
-                                            transition={{ duration: 0.3 }}
-                                            className="fixed bottom-4 left-1/2 -translate-x-1/2 p-3 bg-green-600 text-white rounded-lg shadow-xl text-sm flex items-center space-x-2 z-50"
-                                        >
-                                            <FiClipboard className="w-5 h-5" />
-                                            <span>{copySuccess}</span>
                                         </motion.div>
                                     )}
                                 </AnimatePresence>
@@ -424,14 +449,16 @@ export default function GenerateReferralPage() {
                                     <motion.button
                                         type="submit"
                                         disabled={loading}
-                                        whileHover={{
-                                            scale: 1.02,
-                                            boxShadow: "0 10px 20px rgba(0, 0, 0, 0.15)",
-                                        }}
+                                        whileHover={{ scale: 1.02 }}
                                         whileTap={{ scale: 0.98 }}
-                                        className={`w-full flex justify-center items-center py-3 px-4 border border-transparent rounded-xl shadow-lg text-lg font-semibold text-white bg-gradient-to-r from-[#4F39F6] to-[#1A3BAD] hover:from-indigo-700 hover:to-purple-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all duration-200 ${
-                                            loading ? "opacity-70 cursor-not-allowed" : ""
-                                        }`}
+                                        className={`
+                                            w-full flex justify-center items-center py-3.5 px-4 rounded-xl shadow-md text-lg font-semibold text-white
+                                            bg-gradient-to-r from-[#165BF8] to-[#1C3991]
+                                            hover:from-[#1a65ff] hover:to-[#2242a8]
+                                            focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#165BF8]/50
+                                            transition-all duration-200
+                                            ${loading ? "opacity-80 cursor-not-allowed" : ""}
+                                        `}
                                     >
                                         {loading ? (
                                             <>
@@ -448,48 +475,66 @@ export default function GenerateReferralPage() {
                                 </div>
                             </form>
                         </motion.div>
-                        
-                        {/* Existing Referral Codes Section */}
+
+                        {/* All Generated Referral Codes Section */}
                         <motion.div
                             initial="hidden"
                             animate="visible"
                             variants={fadeIn}
-                            className="bg-white rounded-3xl shadow-xl border border-gray-100 p-6 md:p-8 transform hover:shadow-2xl transition-all duration-300 ease-out"
+                            transition={{ delay: 0.2 }}
+                            className="bg-white rounded-2xl shadow-lg border border-[#165BF8]/10 p-6 md:p-8"
                         >
                             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-                                <h2 className="text-2xl md:text-3xl font-extrabold text-gray-800 bg-clip-text text-transparent bg-gradient-to-r from-[#4F39F6] to-[#1A3BAD]">
-                                    Your Generated Access Codes
+                                <h2 className="text-2xl font-bold text-[#1C3991] flex items-center gap-3">
+                                    <div className="p-2 rounded-lg bg-[#165BF8]/10 text-[#165BF8]">
+                                        <FiUsers className="h-6 w-6" />
+                                    </div>
+                                    Your Generated Referral Codes
                                 </h2>
+                                
+                                {/* Status Filter */}
                                 <div className="relative w-full md:w-auto">
+                                    <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-[#165BF8]">
+                                        <FiFilter className="h-5 w-5" />
+                                    </div>
                                     <select
                                         value={filterStatus}
                                         onChange={(e) => setFilterStatus(e.target.value)}
-                                        className="block appearance-none w-full bg-white border border-gray-300 text-gray-700 py-2 px-4 pr-10 rounded-lg leading-tight focus:outline-none focus:bg-white focus:border-blue-500 transition-colors shadow-sm cursor-pointer"
+                                        className="block appearance-none w-full bg-white border border-[#165BF8]/20 text-[#1C3991] py-3 px-4 pl-10 pr-8 rounded-xl leading-tight focus:outline-none focus:ring-2 focus:ring-[#165BF8]/30 focus:border-[#165BF8] transition-all shadow-sm cursor-pointer hover:border-[#165BF8]/30"
                                     >
                                         <option value="all">All Statuses</option>
-                                        <option value="used">Already Used</option>
-                                        <option value="expired">Unused & Expired</option>
-                                        <option value="not_expired_unused">Unused & Valid</option>
+                                        <option value="used and valid">Used and Valid</option>
+                                        <option value="used and expired">Used and Expired</option>
+                                        <option value="unused and expired">Unused and Expired</option>
+                                        <option value="unused and valid">Unused and Valid</option>
                                     </select>
-                                    <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">
-                                        <FiFilter className="h-5 w-5" />
+                                    <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-[#165BF8]">
+                                        <FiChevronDown className="h-5 w-5" />
                                     </div>
                                 </div>
                             </div>
 
                             {loadingReferrals ? (
-                                <div className="flex justify-center items-center py-8">
-                                    <FiLoader className="animate-spin text-blue-500 h-8 w-8" />
-                                    <p className="ml-3 text-gray-600 text-lg">Loading codes...</p>
+                                <div className="flex justify-center items-center py-12">
+                                    <motion.div
+                                        animate={pulseEffect}
+                                        className="p-3 bg-[#165BF8]/10 rounded-full"
+                                    >
+                                        <FiLoader className="animate-spin text-[#165BF8] h-8 w-8" />
+                                    </motion.div>
                                 </div>
                             ) : referralsError ? (
-                                <div className="p-4 bg-red-100 border-l-4 border-red-500 text-red-700 rounded-lg shadow-sm flex items-center">
+                                <div className="p-4 bg-red-50 border-l-4 border-red-400 text-red-700 rounded-lg flex items-center">
                                     <FiXCircle className="h-5 w-5 text-red-500 mr-2" />
-                                    <span>Error loading codes: {referralsError}</span>
+                                    <span>{referralsError}</span>
                                 </div>
                             ) : generatedReferrals.length === 0 ? (
-                                <div className="text-center py-8 text-gray-500 text-lg">
-                                    No access codes found for the selected filter.
+                                <div className="text-center py-12">
+                                    <div className="mx-auto w-24 h-24 bg-[#165BF8]/5 rounded-full flex items-center justify-center mb-4">
+                                        <FiCode className="h-10 w-10 text-[#165BF8]/70" />
+                                    </div>
+                                    <h3 className="text-lg font-medium text-[#1C3991]">No referral codes found</h3>
+                                    <p className="text-[#165BF8] mt-1">Generate your first referral code above</p>
                                 </div>
                             ) : (
                                 <motion.div
@@ -497,79 +542,91 @@ export default function GenerateReferralPage() {
                                     animate="visible"
                                     variants={{
                                         visible: {
-                                            transition: { staggerChildren: 0.08 },
+                                            transition: { staggerChildren: 0.1 },
                                         },
                                     }}
-                                    className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6"
+                                    className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5"
                                 >
                                     {generatedReferrals.map((referral) => (
                                         <motion.div
                                             key={referral._id}
-                                            variants={itemFadeIn}
-                                            className="bg-white border border-gray-200 rounded-xl shadow-md p-6 flex flex-col justify-between hover:shadow-lg transition-all duration-200 ease-out transform hover:-translate-y-1 hover:border-blue-300"
+                                            variants={cardAnimation}
+                                            whileHover={{ y: -5, boxShadow: "0 10px 25px -5px rgba(22, 91, 248, 0.1)" }}
+                                            className="bg-white border border-[#165BF8]/10 rounded-xl shadow-sm p-5 flex flex-col hover:shadow-md transition-all duration-200 hover:border-[#165BF8]/20 relative overflow-hidden group"
                                         >
-                                            <div className="flex-grow">
-                                                <div className="flex items-center justify-between mb-3">
+                                            {/* Glow effect */}
+                                            <div className="absolute inset-0 bg-gradient-to-br from-[#165BF8]/5 to-[#1C3991]/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"></div>
+                                            
+                                            <div className="flex-grow relative z-10">
+                                                <div className="flex items-center justify-between mb-4">
                                                     <div className="flex items-center">
-                                                        <FiCode className="text-blue-600 mr-3 h-7 w-7" />
-                                                        <h3 className="font-extrabold text-xl text-gray-800">
-                                                            Code:
-                                                        </h3>
+                                                        <div className="bg-[#165BF8]/10 p-2 rounded-lg mr-3">
+                                                            <FiCode className="text-[#165BF8] h-5 w-5" />
+                                                        </div>
+                                                        <h3 className="font-bold text-[#1C3991]">Referral Code</h3>
                                                     </div>
                                                     <button
                                                         onClick={() => handleCopyCode(referral.code)}
-                                                        className="p-2 rounded-full text-gray-500 bg-gray-50 hover:bg-gray-200 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-400"
+                                                        className="p-1.5 rounded-lg text-[#165BF8] bg-[#165BF8]/10 hover:bg-[#165BF8]/20 transition-colors"
                                                         title="Copy code"
                                                     >
-                                                        <FiCopy className="w-5 h-5" />
+                                                        <FiCopy className="w-4 h-4" />
                                                     </button>
                                                 </div>
-                                                <code className="font-mono text-xl text-blue-800 break-all bg-blue-50 p-3 rounded-lg border border-blue-100 block mb-4 font-semibold select-all">
+                                                
+                                                <code className="font-mono text-lg text-[#1C3991] break-all bg-[#165BF8]/5 p-3 rounded-lg border border-[#165BF8]/10 block mb-5 font-semibold">
                                                     {referral.code}
                                                 </code>
-                                                <div className="space-y-2 text-gray-700 text-sm">
-                                                    <p className="flex items-center">
-                                                        <FiMail className="mr-2 text-gray-500 text-base" />{" "}
-                                                        For:{" "}
-                                                        <span className="font-medium ml-1 text-gray-900">
-                                                            {referral.candidateEmail}
-                                                        </span>
-                                                    </p>
-                                                    <p className="flex items-center">
-                                                        <FiUser className="mr-2 text-gray-500 text-base" />{" "}
-                                                        Referrer:{" "}
-                                                        <span className="font-medium ml-1 text-gray-900">
-                                                            {referral.generatedByAdminUsername}
-                                                        </span>
-                                                    </p>
-                                                    <p className="flex items-center">
-                                                        <FiCalendar className="mr-2 text-gray-500 text-base" />{" "}
-                                                        Expires:{" "}
-                                                        <span className="font-medium ml-1">
-                                                            {formatDate(referral.expiresAt)}
-                                                        </span>
-                                                    </p>
-                                                    <p className="flex items-center text-xs text-gray-500 pt-2">
-                                                        Generated:{" "}
-                                                        <span className="font-medium ml-1">
-                                                            {formatDate(referral.createdAt)}
-                                                        </span>
-                                                    </p>
+                                                
+                                                <div className="space-y-3 text-sm">
+                                                    <div className="flex gap-3">
+                                                        <FiMail className="h-5 w-5 text-[#165BF8] shrink-0 mt-0.5" />
+                                                        <div>
+                                                            <p className="text-[#165BF8] font-medium">Candidate</p>
+                                                            <p className="text-[#1C3991] font-medium break-words">
+                                                                {referral.candidateEmail}
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                    
+                                                    <div className="flex gap-3">
+                                                        <FiUser className="h-5 w-5 text-[#165BF8] shrink-0 mt-0.5" />
+                                                        <div>
+                                                            <p className="text-[#165BF8] font-medium">Referrer</p>
+                                                            <p className="text-[#1C3991] font-medium">
+                                                                {referral.generatedByAdminUsername}
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                    
+                                                    <div className="flex gap-3">
+                                                        <FiCalendar className="h-5 w-5 text-[#165BF8] shrink-0 mt-0.5" />
+                                                        <div>
+                                                            <p className="text-[#165BF8] font-medium">Expires</p>
+                                                            <p className="text-[#1C3991] font-medium">
+                                                                {formatDate(referral.expiresAt)}
+                                                            </p>
+                                                        </div>
+                                                    </div>
                                                 </div>
                                             </div>
-                                            <div
-                                                className={`mt-5 px-4 py-1.5 text-sm font-bold rounded-full text-center tracking-wide flex items-center justify-center gap-2
-                                              ${
-                                                referral.status ===
-                                                "Already Used"
-                                                  ? "bg-green-100 text-green-800 border border-green-200"
-                                                  : referral.status ===
-                                                    "Unused and Expired"
-                                                  ? "bg-red-100 text-red-800 border border-red-200"
-                                                  : "bg-orange-100 text-orange-800 border border-orange-200"
-                                              }`}
+                                            
+                                            {/* Dynamic status display */}
+                                            <div className={`mt-4 px-3 py-1.5 text-xs font-bold rounded-full inline-flex items-center self-start
+                                                ${
+                                                    referral.status === "used and valid"
+                                                    ? "bg-green-100 text-green-800"
+                                                    : referral.status === "unused and expired"
+                                                    ? "bg-red-100 text-red-800"
+                                                    : referral.status === "unused and valid"
+                                                    ? "bg-amber-100 text-amber-800"
+                                                    : referral.status === "used and expired"
+                                                    ? "bg-gray-100 text-gray-800"
+                                                    : "bg-gray-100 text-gray-800" // Fallback
+                                                }`}
                                             >
-                                                <FiTag className="h-4 w-4" /> Status: {referral.status}
+                                                <FiTag className="mr-2 h-3 w-3" />
+                                                {referral.status}
                                             </div>
                                         </motion.div>
                                     ))}
@@ -579,6 +636,21 @@ export default function GenerateReferralPage() {
                     </div>
                 </div>
             </div>
+
+            {/* Copy Success Notification */}
+            <AnimatePresence>
+                {copySuccess && (
+                    <motion.div
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: 20 }}
+                        className="fixed bottom-6 left-1/2 transform -translate-x-1/2 bg-[#165BF8] text-white px-4 py-2.5 rounded-lg shadow-xl flex items-center space-x-2 z-50"
+                    >
+                        <FiClipboard className="w-5 h-5" />
+                        <span>{copySuccess}</span>
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </div>
     );
 }

@@ -375,44 +375,46 @@ export default function JobSeekerDashboardPage() {
                                 ) : (
                                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                                         {recentApplications.map((app) => (
-                                            <div key={app._id} className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 flex flex-col justify-between hover:shadow-md transition-shadow duration-200">
+                                            <div key={app._id} className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 flex flex-col justify-between hover:shadow-lg transition-shadow duration-200">
                                                 <div>
-                                                    <div className="flex items-start gap-3 mb-2">
-                                                        {app.job.companyLogo ? (
-                                                            <img src={app.job.companyLogo} alt={app.job.company} className="h-10 w-10 rounded-full object-contain flex-shrink-0" />
-                                                        ) : (
-                                                            <div className="h-10 w-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold text-lg flex-shrink-0">
-                                                                {app.job.company?.charAt(0) || 'J'}
+                                                    <div className="flex flex-col items-start gap-2 mb-4">
+                                                        {/* Removed the circular company initial placeholder */}
+                                                        {app.job.companyLogo && (
+                                                            <img src={app.job.companyLogo} alt={app.job.company} className="h-10 w-10 object-contain mb-2" />
+                                                        )}
+                                                        <h3 className="text-xl font-bold text-gray-900 leading-tight">{app.job.title}</h3>
+                                                        <p className="text-sm font-medium text-gray-600">{app.job.company}</p>
+                                                    </div>
+                                                    <div className="space-y-2 mb-4">
+                                                        <div className="flex items-center text-sm text-gray-500">
+                                                            <FiMapPin className="mr-2 text-indigo-500" size={16} />
+                                                            <span>{app.job.location}</span>
+                                                        </div>
+                                                        <div className="flex items-center text-sm text-gray-500">
+                                                            <FiBriefcase className="mr-2 text-indigo-500" size={16} />
+                                                            <span>{app.job.jobType || 'Full-time'}</span>
+                                                        </div>
+                                                        {app.job.numberOfOpenings !== undefined && app.job.numberOfOpenings > 0 && (
+                                                            <div className="flex items-center text-sm text-gray-500">
+                                                                <FiUsers className="mr-2 text-indigo-500" size={16} />
+                                                                <span>{app.job.numberOfOpenings} Openings</span>
                                                             </div>
                                                         )}
-                                                        <div>
-                                                            <h3 className="text-lg font-semibold text-gray-900 leading-tight">{app.job.title}</h3>
-                                                            <p className="text-sm text-gray-600">{app.job.company || 'N/A'}</p>
+                                                        <div className="flex items-center text-sm text-gray-500">
+                                                            <FiCalendar className="mr-2 text-indigo-500" size={16} />
+                                                            <span>Applied On: {new Date(app.appliedAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
                                                         </div>
+                                                        <p className="text-lg text-gray-800 font-bold mt-2">
+                                                            ₹{app.job.salary.toLocaleString('en-IN')} / year
+                                                        </p>
                                                     </div>
-
-                                                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-gray-500 mb-2">
-                                                        <span className="flex items-center"><FiMapPin className="mr-1" size={14} />{app.job.location}</span>
-                                                        <span className="flex items-center"><FiBriefcase className="mr-1" size={14} />{app.job.jobType || 'Full-time'}</span>
-                                                        {app.job.numberOfOpenings !== undefined && app.job.numberOfOpenings > 0 && (
-                                                            <span className="flex items-center"><FiUsers className="mr-1" size={14} />{app.job.numberOfOpenings} Openings</span>
-                                                        )}
-                                                    </div>
-
-                                                    <p className="text-md text-gray-800 font-bold mb-2">
-                                                        ₹{app.job.salary.toLocaleString('en-IN')} / year
-                                                    </p>
-                                                    <div className="flex items-center text-sm text-gray-600 mb-2">
-                                                        <FiCalendar className="w-4 h-4 mr-1 text-gray-500" />
-                                                        <span className="font-medium">Applied On:</span> {new Date(app.appliedAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
-                                                    </div>
-                                                    <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full capitalize ${getStatusClasses(app.status)}`}>
+                                                    <span className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full capitalize ${getStatusClasses(app.status)}`}>
                                                         {app.status.charAt(0).toUpperCase() + app.status.slice(1)}
                                                     </span>
                                                 </div>
-                                                <div className="mt-4">
+                                                <div className="mt-6">
                                                     <Link href={`/seeker/job/${app.job._id}`} passHref>
-                                                        <button className={`w-full text-[${jobSeekerTheme.primaryColor}] hover:text-[${jobSeekerTheme.darkPrimaryColor}] font-medium py-2 px-4 border border-[${jobSeekerTheme.primaryColor}20] rounded-md transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[${jobSeekerTheme.primaryColor}]`}>
+                                                        <button className={`w-full text-white bg-[${jobSeekerTheme.primaryColor}] hover:bg-[${jobSeekerTheme.darkPrimaryColor}] font-medium py-2.5 px-4 rounded-lg transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[${jobSeekerTheme.primaryColor}]`}>
                                                             View Job Details
                                                         </button>
                                                     </Link>

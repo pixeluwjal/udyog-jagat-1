@@ -1,12 +1,28 @@
-// app/poster/dashboard/page.tsx
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/app/context/AuthContext';
 import Link from 'next/link';
-import Sidebar from '@/app/components/Sidebar'; // Corrected import path for Sidebar
-import { FiBriefcase, FiMapPin, FiDollarSign, FiEdit, FiUsers, FiMenu, FiXCircle } from 'react-icons/fi'; // Added FiUsers for openings and FiEdit for edit button
+import Sidebar from '@/app/components/Sidebar';
+import { FiBriefcase, FiMapPin, FiDollarSign, FiEdit, FiUsers, FiMenu, FiXCircle, FiActivity, FiClock, FiPlus, FiZap, FiLoader } from 'react-icons/fi';
+import { motion, AnimatePresence } from 'framer-motion';
+
+// Brand colors
+const primaryBlue = "#165BF8";
+const darkBlue = "#1C3991";
+
+// Type definition for a user in the display list
+interface UserDisplay {
+  _id: string;
+  username?: string;
+  email: string;
+  role: string;
+  firstLogin: boolean;
+  isSuperAdmin: boolean;
+  status: 'active' | 'inactive';
+  createdAt: string;
+}
 
 // Updated Interface for displaying job data - now includes all fields
 interface JobDisplay {
@@ -16,26 +32,64 @@ interface JobDisplay {
   location: string;
   salary: number;
   status: 'active' | 'inactive' | 'closed';
-  numberOfOpenings: number; // Added: No. of Openings
-  company: string; // Added: Company Name
-  jobType: 'Full-time' | 'Part-time' | 'Contract' | 'Temporary' | 'Internship'; // Added: Job Type
-  skills?: string[]; // Added: Skills
-  companyLogo?: string; // Added: Company Logo
+  numberOfOpenings: number;
+  company: string;
+  jobType: 'Full-time' | 'Part-time' | 'Contract' | 'Temporary' | 'Internship';
+  skills?: string[];
+  companyLogo?: string;
   postedBy: string;
   createdAt: string;
-  updatedAt: string; // Added: For completeness, though not always displayed
+  updatedAt: string;
 }
+
+// Framer Motion animation variants
+const fadeIn = {
+  hidden: { opacity: 0, y: 20 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: {
+      duration: 0.5,
+      ease: [0.16, 1, 0.3, 1],
+      delay: 0.1,
+    },
+  },
+};
+
+const cardAnimation = {
+  hidden: { opacity: 0, y: 20, scale: 0.98 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    scale: 1,
+    transition: {
+      duration: 0.6,
+      ease: [0.16, 1, 0.3, 1],
+      staggerChildren: 0.1
+    }
+  }
+};
+
+const pulseEffect = {
+  scale: [1, 1.03, 1],
+  opacity: [0.8, 1, 0.8],
+  transition: {
+    duration: 1.2,
+    repeat: Infinity,
+    ease: "easeInOut",
+  },
+};
 
 export default function PosterDashboardPage() {
   const { user, loading: authLoading, isAuthenticated, logout, token } = useAuth();
   const router = useRouter();
 
   const [recentJobs, setRecentJobs] = useState<JobDisplay[]>([]);
+  const [applicationsCount, setApplicationsCount] = useState<number>(0); // NEW: State for total applications
   const [dataLoading, setDataLoading] = useState(true);
   const [dataError, setDataError] = useState<string | null>(null);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false); // State for mobile sidebar
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
-  // Redirection Logic remains the same
   useEffect(() => {
     if (authLoading) return;
 
@@ -71,7 +125,6 @@ export default function PosterDashboardPage() {
         throw new Error('Authentication token or user ID not available.');
       }
 
-      // Fetch recent jobs posted by the current user
       const response = await fetch(
         `/api/jobs?postedBy=${user._id}&limit=5&sortBy=createdAt&sortOrder=desc`,
         {
@@ -102,16 +155,38 @@ export default function PosterDashboardPage() {
     }
   }, [token, user]);
 
+  const fetchApplicationsCount = useCallback(async () => {
+    try {
+        if (!token || !user?._id) {
+            throw new Error('Authentication token or user ID not available.');
+        }
+
+        const response = await fetch(`/api/applications/count?postedBy=${user._id}`, {
+            headers: {
+                Authorization: `Bearer ${token}`,
+            },
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to fetch application count');
+        }
+
+        const data = await response.json();
+        setApplicationsCount(data.count);
+
+    } catch (err) {
+        console.error('Error fetching application count:', err);
+        setApplicationsCount(0);
+    }
+  }, [token, user]);
+
   useEffect(() => {
     if (!authLoading && isAuthenticated && user && user.role === 'job_poster') {
       setDataLoading(true);
       fetchRecentJobs();
+      fetchApplicationsCount();
     }
-  }, [authLoading, isAuthenticated, user, fetchRecentJobs]);
-
-  const toggleSidebar = () => {
-    setIsSidebarOpen(!isSidebarOpen);
-  };
+  }, [authLoading, isAuthenticated, user, fetchRecentJobs, fetchApplicationsCount]);
 
   if (
     authLoading ||
@@ -121,33 +196,44 @@ export default function PosterDashboardPage() {
     user.role !== 'job_poster'
   ) {
     return (
-      <div className="flex h-screen bg-gray-50">
-        <div className="m-auto flex flex-col items-center justify-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-700"></div>
-          <p className="mt-4 text-gray-700">Loading dashboard...</p>
-        </div>
+      <div className="flex h-screen bg-gradient-to-br from-[#f6f9ff] to-[#eef2ff] justify-center items-center">
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="flex flex-col items-center"
+        >
+          <motion.div
+            animate={pulseEffect}
+            className="rounded-full p-4 bg-[#165BF8]/10 shadow-inner"
+          >
+            <FiLoader className="text-[#165BF8] h-12 w-12 animate-spin" />
+          </motion.div>
+          <p className="mt-6 text-lg font-medium text-[#1C3991]">
+            Loading dashboard...
+          </p>
+        </motion.div>
       </div>
     );
   }
 
   return (
-    <div className="flex h-screen bg-gradient-to-br from-blue-50 to-indigo-100 overflow-hidden font-sans">
-      {/* Sidebar - Conditionally render for mobile or use Tailwind's hidden/block */}
-      <Sidebar userRole={user.role} onLogout={logout} isOpen={isSidebarOpen} toggleSidebar={toggleSidebar} />
+    <div className="flex h-screen bg-gradient-to-br from-[#f6f9ff] to-[#eef2ff] overflow-hidden font-inter">
+      <Sidebar userRole={user.role} onLogout={logout} isOpen={isSidebarOpen} setIsOpen={setIsSidebarOpen} />
 
       <div className="flex-1 flex flex-col overflow-y-auto">
         {/* Mobile Header (visible only on small screens) */}
-        <div className="md:hidden bg-white shadow-sm p-4 flex items-center justify-between relative">
+        <div className="md:hidden bg-white/95 backdrop-blur-md shadow-sm p-4 flex items-center justify-between z-10 sticky top-0">
           {/* Hamburger Icon */}
-          <button
-            onClick={toggleSidebar}
-            className="p-2 -ml-2 rounded-md text-gray-600 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-700"
-            aria-label="Toggle sidebar"
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={() => setIsSidebarOpen(true)}
+            className="p-2 -ml-2 rounded-lg text-[#165BF8] hover:bg-[#165BF8]/10 focus:outline-none"
           >
             <FiMenu className="w-6 h-6" />
-          </button>
+          </motion.button>
           {/* Centered Title */}
-          <h1 className="text-2xl font-extrabold bg-gradient-to-r from-blue-700 to-blue-900 bg-clip-text text-transparent absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2">
+          <h1 className="text-2xl font-bold bg-gradient-to-r from-[#165BF8] to-[#1C3991] bg-clip-text text-transparent">
             Job Poster Panel
           </h1>
           {/* Empty div for spacing on the right to balance the hamburger */}
@@ -155,157 +241,128 @@ export default function PosterDashboardPage() {
         </div>
 
         <main className="flex-1 overflow-y-auto p-4 md:p-8">
-          <div className="max-w-7xl mx-auto space-y-6">
+          <div className="max-w-6xl mx-auto space-y-8">
             {/* Header Section */}
-            <div className="flex flex-col space-y-4 md:space-y-0 md:flex-row md:items-center md:justify-between mb-6">
+            <motion.div
+              initial="hidden"
+              animate="visible"
+              variants={fadeIn}
+              className="flex flex-col space-y-4 md:space-y-0 md:flex-row md:items-center md:justify-between mb-6"
+            >
               <div>
-                <h1 className="text-3xl md:text-4xl font-extrabold text-blue-900">
-                  Welcome back, {user.username}!
+                <h1 className="text-3xl md:text-4xl font-bold text-[#1C3991] leading-tight">
+                  <span className="bg-gradient-to-r from-[#165BF8] to-[#1C3991] bg-clip-text text-transparent">
+                    Welcome back, {user.username || 'Job Poster'}!
+                  </span>
                 </h1>
-                <p className="text-blue-700 text-lg">Your Job Posting Dashboard</p>
+                <p className="text-[#165BF8] mt-2">
+                  Your Job Posting Dashboard
+                </p>
               </div>
 
-              <Link href="/poster/new-job" passHref>
-                <button className="flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-blue-100 bg-blue-800 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all duration-200">
-                  <FiBriefcase className="-ml-1 mr-2 h-5 w-5" />
-                  Post New Job
-                </button>
-              </Link>
-            </div>
+              <div className="flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-4 w-full md:w-auto">
+                <Link href="/poster/new-job" passHref>
+                  <motion.button
+                    whileHover={{ scale: 1.02, boxShadow: `0 8px 16px ${primaryBlue}20` }}
+                    whileTap={{ scale: 0.98 }}
+                    className="flex items-center px-6 py-3 bg-[#165BF8] text-white rounded-xl font-semibold shadow-md transition-all duration-300 w-full justify-center"
+                  >
+                    <FiBriefcase className="w-5 h-5 mr-3" />
+                    <span>Post New Job</span>
+                  </motion.button>
+                </Link>
+                <Link href="/poster/posted-jobs" passHref>
+                  <motion.button
+                    whileHover={{ scale: 1.02, boxShadow: `0 8px 16px ${darkBlue}20` }}
+                    whileTap={{ scale: 0.98 }}
+                    className="flex items-center px-6 py-3 bg-white text-[#1C3991] rounded-xl font-semibold shadow-md transition-all duration-300 w-full justify-center border border-[#165BF8]/20"
+                  >
+                    <FiBriefcase className="w-5 h-5 mr-3 text-[#165BF8]" />
+                    <span>View All Jobs</span>
+                  </motion.button>
+                </Link>
+              </div>
+            </motion.div>
 
             {/* Stats Cards */}
-            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 mb-8">
-              {/* Recent Posted Jobs Card */}
-              <div className="bg-white overflow-hidden rounded-xl shadow-md border border-gray-100">
-                <div className="p-5">
-                  <div className="flex items-center">
-                    <div className="flex-shrink-0 bg-blue-800 rounded-full p-3 shadow-lg">
-                      <FiBriefcase className="h-6 w-6 text-white" />
-                    </div>
-                    <div className="ml-5 w-0 flex-1">
-                      <dl>
-                        <dt className="text-sm font-medium text-gray-500 truncate">
-                          Recent Posted Jobs
-                        </dt>
-                        <dd>
-                          <div className="text-3xl font-extrabold text-gray-900">
-                            {recentJobs.length}
-                          </div>
-                        </dd>
-                      </dl>
-                    </div>
+            <motion.div
+              initial="hidden"
+              animate="visible"
+              variants={cardAnimation}
+              className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6"
+            >
+              {/* Total Posted Jobs Card */}
+              <motion.div
+                variants={fadeIn}
+                whileHover={{ y: -5, boxShadow: `0 10px 25px -5px ${primaryBlue}1A` }}
+                className="bg-white p-6 rounded-2xl shadow-sm border border-[#165BF8]/10 flex flex-col justify-between transition-all duration-300"
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-gray-500 text-sm font-medium">Total Posted Jobs</p>
+                    <h3 className="text-3xl font-bold mt-1 text-[#1C3991]">{recentJobs.length}</h3>
                   </div>
-                  <div className="mt-4 text-sm text-gray-500">
-                    Showing your {recentJobs.length} most recent job postings.
+                  <div className="p-4 rounded-full bg-[#165BF8]/10 text-[#165BF8]">
+                    <FiBriefcase className="w-7 h-7" />
                   </div>
                 </div>
-              </div>
-
-              {/* Total Applications Card (Placeholder) */}
-              <div className="bg-white overflow-hidden rounded-xl shadow-md border border-gray-100">
-                <div className="p-5">
-                  <div className="flex items-center">
-                    <div className="flex-shrink-0 bg-blue-600 rounded-full p-3 shadow-lg">
-                      <svg
-                        className="h-6 w-6 text-white"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                        xmlns="http://www.w3.org/2000/svg"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
-                        />
-                      </svg>
-                    </div>
-                    <div className="ml-5 w-0 flex-1">
-                      <dl>
-                        <dt className="text-sm font-medium text-gray-500 truncate">
-                          Total Applications
-                        </dt>
-                        <dd>
-                          <div className="text-3xl font-extrabold text-gray-900">
-                            N/A {/* This would be dynamic with application data */}
-                          </div>
-                        </dd>
-                      </dl>
-                    </div>
-                  </div>
-                  <div className="mt-4 text-sm text-gray-500">
-                    View all applications on the{' '}
-                    <Link
-                      href="/poster/applications"
-                      className="text-blue-700 hover:text-blue-900 font-medium transition-colors"
-                    >
-                      Applications page
-                    </Link>
-                    .
-                  </div>
-                </div>
-              </div>
+              </motion.div>
 
               {/* Active Jobs Card */}
-              <div className="bg-white overflow-hidden rounded-xl shadow-md border border-gray-100">
-                <div className="p-5">
-                  <div className="flex items-center">
-                    <div className="flex-shrink-0 bg-blue-700 rounded-full p-3 shadow-lg">
-                      <svg
-                        className="h-6 w-6 text-white"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                        xmlns="http://www.w3.org/2000/svg"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                        />
-                      </svg>
-                    </div>
-                    <div className="ml-5 w-0 flex-1">
-                      <dl>
-                        <dt className="text-sm font-medium text-gray-500 truncate">
-                          Active Jobs
-                        </dt>
-                        <dd>
-                          <div className="text-3xl font-extrabold text-gray-900">
-                            {
-                              recentJobs.filter(
-                                (job) => job.status === 'active'
-                              ).length
-                            }
-                          </div>
-                        </dd>
-                      </dl>
-                    </div>
+              <motion.div
+                variants={fadeIn}
+                whileHover={{ y: -5, boxShadow: `0 10px 25px -5px ${primaryBlue}1A` }}
+                className="bg-white p-6 rounded-2xl shadow-sm border border-[#165BF8]/10 flex flex-col justify-between transition-all duration-300"
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-gray-500 text-sm font-medium">Active Jobs</p>
+                    <h3 className="text-3xl font-bold mt-1 text-[#1C3991]">{
+                        recentJobs.filter((job) => job.status === 'active').length
+                      }
+                    </h3>
                   </div>
-                  <div className="mt-4 text-sm text-gray-500">
-                    Jobs currently open for applications.
+                  <div className="p-4 rounded-full bg-green-100/30 text-green-600">
+                    <FiActivity className="w-7 h-7" />
                   </div>
                 </div>
-              </div>
-            </div>
+              </motion.div>
+
+              {/* Total Applications Card (Placeholder) */}
+              <motion.div
+                variants={fadeIn}
+                whileHover={{ y: -5, boxShadow: `0 10px 25px -5px ${primaryBlue}1A` }}
+                className="bg-white p-6 rounded-2xl shadow-sm border border-[#165BF8]/10 flex flex-col justify-between transition-all duration-300"
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-gray-500 text-sm font-medium">Total Applications</p>
+                    <h3 className="text-3xl font-bold mt-1 text-[#1C3991]">
+                        {applicationsCount}
+                    </h3>
+                  </div>
+                  <div className="p-4 rounded-full bg-indigo-100/30 text-indigo-600">
+                    <FiUsers className="w-7 h-7" />
+                  </div>
+                </div>
+              </motion.div>
+            </motion.div>
 
             {/* Recent Jobs Section */}
-            <div className="bg-white shadow rounded-xl overflow-hidden border border-gray-100">
-              <div className="px-6 py-5 border-b border-gray-200 flex flex-col sm:flex-row sm:items-center sm:justify-between">
+            <div className="bg-white rounded-2xl shadow-lg overflow-hidden border border-[#165BF8]/10">
+              <div className="px-6 py-5 border-b border-[#165BF8]/10 flex flex-col sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex-1">
-                  <h2 className="text-xl font-semibold text-blue-900">
+                  <h2 className="text-xl font-semibold text-[#1C3991]">
                     Your Recent Job Listings
                   </h2>
-                  <p className="mt-1 text-sm text-gray-500">
+                  <p className="mt-1 text-sm text-[#165BF8]">
                     A quick overview of your latest job postings.
                   </p>
                 </div>
                 <div className="mt-4 sm:mt-0">
                   <Link href="/poster/posted-jobs" passHref>
-                    <button className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-blue-100 bg-blue-800 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all duration-200">
-                      <FiBriefcase className="-ml-1 mr-2 h-5 w-5" />
+                    <button className="flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-blue-100 bg-[#165BF8] hover:bg-[#1a65ff] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#165BF8]/50 transition-all duration-200">
+                      <FiBriefcase className="w-5 h-5 mr-2" />
                       View All Jobs
                     </button>
                   </Link>
@@ -327,35 +384,28 @@ export default function PosterDashboardPage() {
 
               {dataLoading ? (
                 <div className="flex justify-center items-center py-12">
-                  <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-blue-700"></div>
-                  <span className="ml-4 text-blue-700">Loading jobs...</span>
+                  <motion.div
+                    animate={pulseEffect}
+                    className="p-3 bg-[#165BF8]/10 rounded-full"
+                  >
+                    <FiLoader className="text-[#165BF8] h-10 w-10 animate-spin" />
+                  </motion.div>
                 </div>
               ) : recentJobs.length === 0 ? (
                 <div className="text-center py-12">
-                  <svg
-                    className="mx-auto h-12 w-12 text-blue-500"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                    xmlns="http://www.w3.org/2000/svg"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                    />
-                  </svg>
-                  <h3 className="mt-2 text-lg font-medium text-blue-900">
+                  <div className="mx-auto w-24 h-24 bg-[#165BF8]/5 rounded-full flex items-center justify-center mb-4">
+                    <FiBriefcase className="h-10 w-10 text-[#165BF8]/70" />
+                  </div>
+                  <h3 className="mt-2 text-lg font-medium text-[#1C3991]">
                     No jobs posted yet
                   </h3>
-                  <p className="mt-1 text-sm text-blue-700">
+                  <p className="mt-1 text-sm text-[#165BF8]">
                     Get started by posting your first job.
                   </p>
                   <div className="mt-6">
                     <Link href="/poster/new-job" passHref>
-                      <button className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-blue-100 bg-blue-800 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all duration-200">
-                        <FiBriefcase className="-ml-1 mr-2 h-5 w-5" />
+                      <button className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-blue-100 bg-[#165BF8] hover:bg-[#1a65ff] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#165BF8]/50 transition-all duration-200">
+                        <FiPlus className="w-5 h-5 mr-2" />
                         Post New Job
                       </button>
                     </Link>
@@ -364,14 +414,18 @@ export default function PosterDashboardPage() {
               ) : (
                 <div className="px-6 py-4 grid grid-cols-1 gap-6">
                   {recentJobs.map((job) => (
-                    <div
+                    <motion.div
                       key={job._id}
-                      className="bg-white border border-gray-200 rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow duration-200"
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.3 }}
+                      whileHover={{ y: -3, boxShadow: `0 8px 16px ${primaryBlue}15` }}
+                      className="bg-white border border-[#165BF8]/10 rounded-xl overflow-hidden shadow-sm transition-all duration-200"
                     >
                       <div className="p-6">
                         <div className="flex items-start justify-between">
                           <div className="flex-1">
-                            <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                            <h3 className="text-xl font-semibold text-[#1C3991] mb-2">
                               {job.title}
                             </h3>
                             <p className="text-gray-600 line-clamp-2 mb-4">
@@ -380,49 +434,36 @@ export default function PosterDashboardPage() {
 
                             <div className="flex flex-wrap gap-4 mb-4">
                               <div className="flex items-center text-sm text-gray-600">
-                                <FiMapPin className="flex-shrink-0 mr-1.5 h-5 w-5 text-gray-400" />
+                                <FiMapPin className="flex-shrink-0 mr-1.5 h-5 w-5 text-[#165BF8]/70" />
                                 {job.location}
                               </div>
 
                               <div className="flex items-center text-sm text-gray-600">
-                                ₹{job.salary.toLocaleString('en-IN')} {/* Display in INR */}
+                                ₹{job.salary.toLocaleString('en-IN')}
                               </div>
 
                               <div className="flex items-center text-sm text-gray-600">
-                                <FiUsers className="flex-shrink-0 mr-1.5 h-5 w-5 text-gray-400" />
+                                <FiUsers className="flex-shrink-0 mr-1.5 h-5 w-5 text-[#165BF8]/70" />
                                 Openings: {job.numberOfOpenings}
                               </div>
 
                               <div className="flex items-center text-sm text-gray-600">
-                                <svg
-                                  className="flex-shrink-0 mr-1.5 h-5 w-5 text-gray-400"
-                                  fill="none"
-                                  stroke="currentColor"
-                                  viewBox="0 0 24 24"
-                                  xmlns="http://www.w3.org/2000/svg"
-                                >
-                                  <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    strokeWidth={2}
-                                    d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-                                  />
-                                </svg>
+                                <FiClock className="flex-shrink-0 mr-1.5 h-5 w-5 text-[#165BF8]/70" />
                                 Posted{' '}
-                                {new Date(job.createdAt).toLocaleDateString()}
+                                {new Date(job.createdAt).toLocaleDateString('en-GB')}
                               </div>
                             </div>
                           </div>
 
                           <span
                             className={`ml-4 inline-flex items-center px-3 py-1 rounded-full text-sm font-medium 
-                              ${
-                                job.status === 'active'
-                                  ? 'bg-green-100 text-green-800'
-                                  : job.status === 'closed'
-                                  ? 'bg-red-100 text-red-800'
-                                  : 'bg-gray-100 text-gray-800'
-                              }`}
+                            ${
+                              job.status === 'active'
+                                ? 'bg-green-100/30 text-green-800'
+                                : job.status === 'closed'
+                                ? 'bg-red-100/30 text-red-800'
+                                : 'bg-gray-100/30 text-gray-800'
+                            }`}
                           >
                             {(job.status || 'inactive')
                               .charAt(0)
@@ -433,14 +474,14 @@ export default function PosterDashboardPage() {
 
                         <div className="mt-6 flex justify-end space-x-3">
                           <Link href={`/poster/jobs/${job._id}/edit`} passHref>
-                            <button className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-blue-100 bg-blue-800 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all duration-200">
-                              <FiEdit className="-ml-1 mr-2 h-5 w-5" />
+                            <button className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-blue-100 bg-[#165BF8] hover:bg-[#1a65ff] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#165BF8]/50 transition-all duration-200">
+                              <FiEdit className="w-5 h-5 mr-2" />
                               Edit
                             </button>
                           </Link>
                         </div>
                       </div>
-                    </div>
+                    </motion.div>
                   ))}
                 </div>
               )}

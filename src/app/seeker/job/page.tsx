@@ -253,7 +253,7 @@ export default function JobsPage() {
         setMessage(null); // Clear previous messages
         setError(null); // Clear previous errors
         try {
-            const response = await fetch('/api/saved-jobs', {
+            const response = await fetch('/api/seeker/saved-jobs', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
