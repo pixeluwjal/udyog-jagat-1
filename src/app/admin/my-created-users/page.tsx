@@ -195,7 +195,7 @@ export default function MyCreatedUsersPage() {
 
   return (
     <div className="flex h-screen bg-gradient-to-br from-[#f6f9ff] to-[#eef2ff] overflow-hidden">
-      <Sidebar userRole={user.role} onLogout={logout} isOpen={isSidebarOpen} setIsOpen={setIsSidebarOpen} />
+      <Sidebar userRole={user.role} onLogout={logout} isOpen={isSidebarOpen} setIsOpen={setIsSidebarOpen} userEmail={user?.email}/>
 
       <div className="flex-1 flex flex-col overflow-y-auto">
         {/* Mobile Header */}

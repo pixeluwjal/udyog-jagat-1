@@ -199,7 +199,7 @@ export default function CreateUserPage() {
 
   return (
     <div className="flex h-screen bg-gradient-to-br from-[#f6f9ff] to-[#eef2ff] overflow-hidden font-inter">
-      <Sidebar userRole={currentUser.role} onLogout={logout} isOpen={mobileSidebarOpen} setIsOpen={setMobileSidebarOpen} />
+      <Sidebar userRole={currentUser.role} onLogout={logout} isOpen={mobileSidebarOpen} setIsOpen={setMobileSidebarOpen} userEmail={currentUser?.email} />
 
       <div className="flex-1 flex flex-col overflow-y-auto">
         {/* Mobile header with hamburger icon */}

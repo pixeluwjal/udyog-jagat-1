@@ -242,6 +242,7 @@ export default function ProfilePage() {
         onLogout={logout}
         isOpen={isSidebarOpen}
         setIsOpen={setIsSidebarOpen}
+        userEmail= {currentUser.email}
       />
 
       <div className="flex-1 flex flex-col overflow-y-auto">
