@@ -1,8 +1,7 @@
-// app/api/jobs/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/lib/dbConnect';
-import Job from '@/models/Job'; // Assuming this path is correct for your Job model
-import { authMiddleware } from '@/lib/authMiddleware'; // Corrected import path
+import Job from '@/models/Job';
+import { authMiddleware } from '@/lib/authMiddleware';
 import mongoose from 'mongoose';
 
 // GET /api/jobs
@@ -24,24 +23,22 @@ export async function GET(request: NextRequest) {
     const skip = (page - 1) * limit;
 
     const searchTerm = searchParams.get('search') || '';
-    const locationFilter = searchParams.get('location') || ''; // Not used in frontend yet, but kept
-    const minSalary = parseInt(searchParams.get('minSalary') || '0', 10); // Not used in frontend yet, but kept
-    const excludeJobId = searchParams.get('excludeJobId'); // Not used in frontend yet, but kept
+    const locationFilter = searchParams.get('location') || '';
+    const minSalary = parseInt(searchParams.get('minSalary') || '', 10);
+    const maxSalary = parseInt(searchParams.get('maxSalary') || '', 10);
 
-    // NEW: Get filter parameters for status and openings from frontend
+    const excludeJobId = searchParams.get('excludeJobId');
     const statusFilter = searchParams.get('status');
-    const jobTypeFilter = searchParams.get('jobType'); // Not used in frontend yet, but kept
-    const skillsFilter = searchParams.get('skills'); // Not used in frontend yet, but kept
-    const minOpenings = parseInt(searchParams.get('minOpenings') || '', 10); // Parse as number, default to NaN if empty
-    const maxOpenings = parseInt(searchParams.get('maxOpenings') || '', 10); // Parse as number, default to NaN if empty
-
+    const jobTypeFilter = searchParams.get('jobType');
+    const skillsFilter = searchParams.get('skills');
+    const minOpenings = parseInt(searchParams.get('minOpenings') || '', 10);
+    const maxOpenings = parseInt(searchParams.get('maxOpenings') || '', 10);
 
     let query: any = {};
 
     // Role-based filtering
     if (user.role === 'job_poster') {
         query.postedBy = new mongoose.Types.ObjectId(user.id);
-        // Job posters can filter their own jobs by status
         if (statusFilter && ['active', 'inactive', 'closed'].includes(statusFilter)) {
             query.status = statusFilter;
         }
@@ -51,31 +48,42 @@ export async function GET(request: NextRequest) {
         if (adminPostedBy && mongoose.isValidObjectId(adminPostedBy)) {
             query.postedBy = new mongoose.Types.ObjectId(adminPostedBy);
         }
-        // Admins can filter by any status
         if (statusFilter && ['active', 'inactive', 'closed'].includes(statusFilter)) {
             query.status = statusFilter;
         }
         console.log(`API: Admin viewing jobs.`);
     } else if (user.role === 'job_seeker') {
-        // Job seekers currently see all jobs regardless of status, unless a specific status filter is applied.
-        // If you want them to only see 'active' jobs by default, uncomment the line below.
-        // query.status = 'active';
+        // CORRECTED: Job seekers always see only active jobs by default
+        query.status = 'active'; 
+        // A job seeker can further filter by status if they want, e.g. for "applied jobs"
+        if (statusFilter && ['active', 'inactive', 'closed'].includes(statusFilter)) {
+             query.status = statusFilter;
+        }
         console.log(`API: Job Seeker viewing jobs.`);
     } else {
         console.warn(`API: Unauthorized role '${user.role}' attempting to view jobs.`);
         return NextResponse.json({ message: 'Forbidden: Insufficient role to view jobs.' }, { status: 403 });
     }
 
-    // Apply general search/filter terms (these apply to all roles that reach here)
+    // Apply general search/filter terms
     if (searchTerm) {
         query.title = { $regex: searchTerm, $options: 'i' };
     }
     if (locationFilter) {
         query.location = { $regex: locationFilter, $options: 'i'};
     }
-    if (minSalary) {
-        query.salary = { $gte: minSalary };
+
+    // CORRECTED: Apply numerical salary range filter
+    if (!isNaN(minSalary) || !isNaN(maxSalary)) {
+        query.salary = {};
+        if (!isNaN(minSalary)) {
+            query.salary.$gte = minSalary;
+        }
+        if (!isNaN(maxSalary)) {
+            query.salary.$lte = maxSalary;
+        }
     }
+
     if (excludeJobId && mongoose.isValidObjectId(excludeJobId)) {
         query._id = { $ne: new mongoose.Types.ObjectId(excludeJobId) };
     }
@@ -87,31 +95,25 @@ export async function GET(request: NextRequest) {
         query.skills = { $in: skillsArray };
     }
 
-    // NEW: Apply numberOfOpenings filters
-    if (!isNaN(minOpenings) && minOpenings >= 0) { // Check if it's a valid number and non-negative
+    if (!isNaN(minOpenings) && minOpenings >= 0) {
         query.numberOfOpenings = { ...query.numberOfOpenings, $gte: minOpenings };
     }
-    if (!isNaN(maxOpenings) && maxOpenings >= 0) { // Check if it's a valid number and non-negative
+    if (!isNaN(maxOpenings) && maxOpenings >= 0) {
         query.numberOfOpenings = { ...query.numberOfOpenings, $lte: maxOpenings };
     }
 
-
-    // --- DIAGNOSTIC LOGGING START ---
     console.log('API: Final job query being executed:', JSON.stringify(query, null, 2));
-    // --- DIAGNOSTIC LOGGING END ---
 
     try {
         const totalJobs = await Job.countDocuments(query);
         const jobs = await Job.find(query)
-            .sort({ createdAt: -1 }) // Already sorted by recent first
+            .sort({ createdAt: -1 })
             .skip(skip)
             .limit(limit)
             .lean();
 
-        // --- DIAGNOSTIC LOGGING START ---
         console.log(`API: Found ${totalJobs} total jobs matching query.`);
         console.log(`API: Returning ${jobs.length} jobs for page ${page}.`);
-        // --- DIAGNOSTIC LOGGING END ---
 
         return NextResponse.json({ jobs, totalJobs, page, limit }, { status: 200 });
     } catch (error) {
@@ -133,11 +135,9 @@ export async function POST(request: NextRequest) {
     const { id: jobPosterId, email: jobPosterEmail } = authResult.user;
 
     try {
-        // Destructure numberOfOpenings from the request body
         const { title, description, location, salary, company, jobType, skills, companyLogo, numberOfOpenings } = await request.json();
 
-        // Validate all required fields, including numberOfOpenings
-        if (!title || !description || !location || !salary || !company || !jobType || numberOfOpenings === undefined || numberOfOpenings === null || numberOfOpenings <= 0) {
+        if (!title || !description || !location || !company || !jobType || numberOfOpenings === undefined || numberOfOpenings === null || numberOfOpenings <= 0) {
             return NextResponse.json({ error: 'All required fields must be provided, and Number of Openings must be a positive number.' }, { status: 400 });
         }
 
@@ -150,9 +150,9 @@ export async function POST(request: NextRequest) {
             jobType,
             skills: skills || [],
             companyLogo: companyLogo || null,
-            numberOfOpenings, // Store the number of openings
+            numberOfOpenings,
             postedBy: new mongoose.Types.ObjectId(jobPosterId),
-            status: 'active', // Default status for a new job post
+            status: 'active',
         });
 
         await newJob.save();
@@ -163,7 +163,6 @@ export async function POST(request: NextRequest) {
         );
     } catch (error) {
         console.error('API: Create job error:', error);
-        // More specific error handling for Mongoose validation errors
         if (error instanceof mongoose.Error.ValidationError) {
             const errors = Object.keys(error.errors).map(key => error.errors[key].message);
             return NextResponse.json({ error: 'Validation failed', details: errors }, { status: 400 });

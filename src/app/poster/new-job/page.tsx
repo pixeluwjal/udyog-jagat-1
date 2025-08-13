@@ -9,7 +9,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 // Import icons for better aesthetics
 import {
-  FiBriefcase, FiMapPin, FiDollarSign, FiType, FiUsers, FiXCircle, FiCheckCircle, FiLoader, FiChevronLeft, FiMenu, FiClock, FiSearch, FiChevronDown
+  FiBriefcase, FiMapPin, FiType, FiUsers, FiXCircle, FiCheckCircle, FiLoader, FiChevronLeft, FiMenu, FiClock, FiSearch, FiChevronDown
 } from 'react-icons/fi';
 
 // Brand colors
@@ -20,7 +20,7 @@ interface JobFormData {
   title: string;
   description: string;
   location: string;
-  salary: number | '';
+  salary: string; // Changed to string to handle ranges
   company: string;
   jobType: 'Full-time' | 'Part-time' | 'Contract' | 'Temporary' | 'Internship' | '';
   numberOfOpenings: number | '';
@@ -28,26 +28,35 @@ interface JobFormData {
 
 const fadeIn = {
   hidden: { opacity: 0, y: 20 },
-  visible: { 
-    opacity: 1, 
-    y: 0, 
-    transition: { 
-      duration: 0.5, 
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: {
+      duration: 0.5,
       ease: [0.16, 1, 0.3, 1],
       delay: 0.1
-    } 
+    }
   },
 };
 
 const pulseEffect = {
   scale: [1, 1.03, 1],
   opacity: [0.8, 1, 0.8],
-  transition: { 
-    duration: 1.2, 
-    repeat: Infinity, 
-    ease: "easeInOut" 
+  transition: {
+    duration: 1.2,
+    repeat: Infinity,
+    ease: "easeInOut"
   }
 };
+
+const salaryRanges = [
+  '0-5 LPA',
+  '5-10 LPA',
+  '10-20 LPA',
+  '20-30 LPA',
+  '30-50 LPA',
+  '50+ LPA',
+];
 
 export default function NewJobPage() {
   const { user, loading: authLoading, isAuthenticated, logout, token } = useAuth();
@@ -118,7 +127,7 @@ export default function NewJobPage() {
     const { name, value } = e.target;
     setFormData((prevFormData) => ({
       ...prevFormData,
-      [name]: (name === 'salary' || name === 'numberOfOpenings') ? (value === '' ? '' : Number(value)) : value,
+      [name]: (name === 'numberOfOpenings') ? (value === '' ? '' : Number(value)) : value,
     }));
 
     // Handle location suggestions based on fetched data
@@ -155,9 +164,9 @@ export default function NewJobPage() {
     }
 
     if (!formData.title || !formData.description || !formData.location ||
-      formData.salary === '' || !formData.company || !formData.jobType ||
+      !formData.company || !formData.jobType ||
       formData.numberOfOpenings === '') {
-      setError('All required fields must be filled: Job Title, Description, Location, Salary, Company, Job Type, and No. of Openings.');
+      setError('All required fields must be filled: Job Title, Description, Location, Company, Job Type, and No. of Openings.');
       setFormLoading(false);
       return;
     }
@@ -449,26 +458,29 @@ export default function NewJobPage() {
 
                 {/* Salary and Number of Openings - Side by Side on Desktop */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* Salary Field */}
+                  {/* Salary Field - Now a dropdown for ranges */}
                   <div className="space-y-2">
                     <label htmlFor="salary" className="block text-sm font-medium text-[#1C3991]">
-                      Salary (INR) <span className="text-red-500">*</span>
+                      Salary (Optional)
                     </label>
                     <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <span className="text-[#1C3991]">₹</span>
-                      </div>
-                      <input
-                        type="number"
+                      <select
                         id="salary"
                         name="salary"
                         value={formData.salary}
                         onChange={handleInputChange}
-                        className="block w-full pl-8 pr-4 py-3 rounded-xl border border-[#165BF8]/20 focus:ring-2 focus:ring-[#165BF8]/30 focus:border-[#165BF8] placeholder-gray-400 transition duration-200 shadow-sm"
-                        placeholder="e.g. 850000"
-                        min="0"
-                        required
-                      />
+                        className="block w-full px-4 py-3 rounded-xl border border-[#165BF8]/20 focus:ring-2 focus:ring-[#165BF8]/30 focus:border-[#165BF8] placeholder-gray-400 transition duration-200 shadow-sm appearance-none pr-10"
+                      >
+                        <option value="">Select a Salary Range</option>
+                        {salaryRanges.map(range => (
+                          <option key={range} value={range}>
+                            {range}
+                          </option>
+                        ))}
+                      </select>
+                      <div className="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none">
+                        <FiChevronDown className="h-5 w-5 text-[#165BF8]/70" />
+                      </div>
                     </div>
                   </div>
 

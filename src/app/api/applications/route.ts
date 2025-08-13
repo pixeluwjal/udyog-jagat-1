@@ -1,12 +1,12 @@
 // app/api/applications/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/lib/dbConnect';
-import Application from '@/models/Application'; // Assuming this path is correct
-import User from '@/models/User';               // Assuming this path is correct
-import Job from '@/models/Job';                 // Assuming this path is correct
-import SavedJob from '@/models/SavedJob';       // <--- NEW: Import SavedJob model
+import Application from '@/models/Application';
+import User from '@/models/User';
+import Job from '@/models/Job';
+import SavedJob from '@/models/SavedJob';
 import mongoose from 'mongoose';
-import { authMiddleware } from '@/lib/authMiddleware'; // Corrected import path
+import { authMiddleware } from '@/lib/authMiddleware';
 
 export async function POST(request: NextRequest) {
     await dbConnect();
@@ -19,7 +19,6 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: authResult.message }, { status: authResult.status });
     }
 
-    // Ensure authenticatedUser is not undefined after successful auth
     const authenticatedUser = authResult.user;
     if (!authenticatedUser) {
         console.error('API: Auth successful but user object is missing for POST.');
@@ -41,6 +40,7 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'Job not found' }, { status: 404 });
         }
 
+        // Check if the user has already applied
         const existingApplication = await Application.findOne({
             job: jobId,
             applicant: applicantIdFromToken,
@@ -53,8 +53,8 @@ export async function POST(request: NextRequest) {
 
         const applicant = await User.findById(applicantIdFromToken);
 
-        // Check for resumeGridFsId instead of resumePath
-        if (!applicant?.resumeGridFsId) {
+        // CORRECTED: Check for resume.resumeId
+        if (!applicant?.resume?.resumeId) {
             console.warn(`API: Applicant ${applicantIdFromToken} attempting to apply without a resume.`);
             return NextResponse.json(
                 { error: 'Resume required', redirect: '/seeker/profile' },
@@ -65,9 +65,8 @@ export async function POST(request: NextRequest) {
         const newApplication = new Application({
             job: jobId,
             applicant: applicantIdFromToken,
-            // Store the GridFS ID (converted to string) in the resumePath field
-            resumePath: applicant.resumeGridFsId.toString(),
-            status: 'Received', // Default status for new application is 'Received'
+            resumePath: applicant.resume.resumeId, // CORRECTED: Use resume.resumeId
+            status: 'Received',
             appliedAt: new Date(),
         });
 
@@ -100,11 +99,11 @@ export async function POST(request: NextRequest) {
     }
 }
 
+// GET /api/applications
 export async function GET(request: NextRequest) {
     await dbConnect();
     console.log('\n--- API: /api/applications GET - Request received ---');
 
-    // Allow 'admin', 'job_poster', and 'job_seeker' to access this GET endpoint
     const authResult = await authMiddleware(request, ['admin', 'job_poster', 'job_seeker']);
 
     if (!authResult.success) {
@@ -123,7 +122,6 @@ export async function GET(request: NextRequest) {
     try {
         let matchQuery: any = {};
 
-        // 1. Determine the base applicant/job filter based on role
         if (role === 'job_seeker') {
             matchQuery['applicant._id'] = new mongoose.Types.ObjectId(authenticatedUserId);
             console.log(`API: Job Seeker ${authenticatedUserId} fetching their own applications.`);
@@ -155,7 +153,6 @@ export async function GET(request: NextRequest) {
             return NextResponse.json({ error: 'Unauthorized role for this action' }, { status: 403 });
         }
 
-        // 2. Apply additional filters from query parameters
         const jobIdsParam = searchParams.get('jobIds');
         if (jobIdsParam) {
             const incomingJobIds = jobIdsParam.split(',')
@@ -166,7 +163,6 @@ export async function GET(request: NextRequest) {
                 return NextResponse.json({ success: true, applications: [], totalApplications: 0, page: 1, limit: 10 }, { status: 200 });
             }
 
-            // Intersect job filters if both role-based and query param filters exist
             if (matchQuery['job._id'] && matchQuery['job._id'].$in) {
                 const existingJobIds = matchQuery['job._id'].$in.map((id: mongoose.Types.ObjectId) => id.toString());
                 const filteredIncomingIds = incomingJobIds.filter(id => existingJobIds.includes(id.toString()));
@@ -181,7 +177,7 @@ export async function GET(request: NextRequest) {
         }
 
         const statusFilter = searchParams.get('status');
-        const allowedApplicationStatuses = ['Received', 'Interview Scheduled', 'Rejected', 'Hired']; // NEW: Updated allowed statuses
+        const allowedApplicationStatuses = ['Received', 'Interview Scheduled', 'Rejected', 'Hired'];
         if (statusFilter && allowedApplicationStatuses.includes(statusFilter)) {
             matchQuery.status = statusFilter;
             console.log(`API: Applying status filter: ${statusFilter}`);
@@ -190,7 +186,6 @@ export async function GET(request: NextRequest) {
         const searchTerm = searchParams.get('search');
         if (searchTerm) {
             const searchRegex = new RegExp(searchTerm, 'i');
-            // Use $or to search across multiple populated fields
             matchQuery.$or = [
                 { 'job.title': searchRegex },
                 { 'applicant.username': searchRegex },
@@ -200,8 +195,6 @@ export async function GET(request: NextRequest) {
             console.log(`API: Applying search term: ${searchTerm}`);
         }
 
-
-        // Pagination and Sorting
         const page = parseInt(searchParams.get('page') || '1', 10);
         const limit = parseInt(searchParams.get('limit') || '10', 10);
         const skip = (page - 1) * limit;
@@ -209,37 +202,31 @@ export async function GET(request: NextRequest) {
         const sortOrder = searchParams.get('sortOrder') === 'asc' ? 1 : -1;
         const sortBy = searchParams.get('sortBy') || 'appliedAt';
 
-        // Aggregation Pipeline for efficient searching and filtering on populated fields
         const pipeline: any[] = [
-            // Lookup and unwind Job details
             {
                 $lookup: {
-                    from: 'jobs', // The collection name for Job model
+                    from: 'jobs',
                     localField: 'job',
                     foreignField: '_id',
                     as: 'job'
                 }
             },
-            { $unwind: '$job' }, // Deconstructs the array field from the $lookup
+            { $unwind: '$job' },
 
-            // Lookup and unwind Applicant details
             {
                 $lookup: {
-                    from: 'users', // The collection name for User model
+                    from: 'users',
                     localField: 'applicant',
                     foreignField: '_id',
                     as: 'applicant'
                 }
             },
-            { $unwind: '$applicant' }, // Deconstructs the array field from the $lookup
+            { $unwind: '$applicant' },
 
-            // Apply all match conditions
             { $match: matchQuery },
 
-            // Sort results
             { $sort: { [sortBy]: sortOrder } },
 
-            // Facet for pagination and total count
             {
                 $facet: {
                     applications: [
@@ -251,7 +238,6 @@ export async function GET(request: NextRequest) {
                     ]
                 }
             },
-            // Reshape the output to get applications and totalCount at the top level
             {
                 $project: {
                     applications: 1,
@@ -260,11 +246,10 @@ export async function GET(request: NextRequest) {
             }
         ];
 
-        // Execute the aggregation pipeline
         const [result] = await Application.aggregate(pipeline);
 
-        const applications = result.applications || [];
-        const totalApplications = result.totalApplications || 0;
+        const applications = result?.applications || [];
+        const totalApplications = result?.totalApplications || 0;
 
         console.log(`API: Found ${totalApplications} total applications matching query.`);
         console.log(`API: Returning ${applications.length} applications for page ${page}.`);

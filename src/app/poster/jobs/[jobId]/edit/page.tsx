@@ -6,12 +6,16 @@ import { useAuth } from '@/app/context/AuthContext';
 import Sidebar from '@/app/components/Sidebar';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
+import Head from 'next/head';
 
-import { FiBriefcase, FiMapPin, FiDollarSign, FiUsers, FiMenu, FiXCircle, FiSave, FiChevronLeft, FiLoader, FiCheckCircle, FiChevronDown } from 'react-icons/fi';
+import { FiBriefcase, FiMapPin, FiUsers, FiMenu, FiXCircle, FiSave, FiChevronLeft, FiLoader, FiCheckCircle, FiChevronDown } from 'react-icons/fi';
 
 // Brand colors
 const primaryBlue = "#165BF8";
 const darkBlue = "#1C3991";
+const lightBlue = "#E9F2FF";
+const blueGray900 = "#1F2937";
+const blueGray600 = "#4B5563";
 
 // Interface for job data - should match IJob from models/Job.ts
 interface JobData {
@@ -19,7 +23,7 @@ interface JobData {
     title: string;
     description: string;
     location: string;
-    salary: number;
+    salary?: number;
     status: 'active' | 'inactive' | 'closed';
     numberOfOpenings: number;
     company: string;
@@ -33,26 +37,26 @@ interface JobData {
 
 // Framer Motion animation variants
 const fadeIn = {
-  hidden: { opacity: 0, y: 20 },
-  visible: { 
-    opacity: 1, 
-    y: 0, 
-    transition: { 
-      duration: 0.5, 
-      ease: [0.16, 1, 0.3, 1],
-      delay: 0.1
-    } 
-  },
+    hidden: { opacity: 0, y: 20 },
+    visible: { 
+        opacity: 1, 
+        y: 0, 
+        transition: { 
+            duration: 0.5, 
+            ease: [0.16, 1, 0.3, 1],
+            delay: 0.1
+        } 
+    },
 };
 
 const pulseEffect = {
-  scale: [1, 1.03, 1],
-  opacity: [0.8, 1, 0.8],
-  transition: { 
-    duration: 1.2, 
-    repeat: Infinity, 
-    ease: "easeInOut" 
-  }
+    scale: [1, 1.03, 1],
+    opacity: [0.8, 1, 0.8],
+    transition: { 
+        duration: 1.2, 
+        repeat: Infinity, 
+        ease: "easeInOut" 
+    }
 };
 
 export default function EditJobPage() {
@@ -135,7 +139,7 @@ export default function EditJobPage() {
             setTitle(data.job.title);
             setDescription(data.job.description);
             setLocation(data.job.location);
-            setSalary(data.job.salary);
+            setSalary(data.job.salary || '');
             setCompany(data.job.company);
             setJobType(data.job.jobType);
             setSkills(data.job.skills ? data.job.skills.join(', ') : '');
@@ -170,18 +174,21 @@ export default function EditJobPage() {
         }
 
         const updatedSkills = skills.split(',').map(s => s.trim()).filter(s => s.length > 0);
-
-        const updatedJobData = {
+        
+        const updatedJobData: Partial<JobData> = {
             title,
             description,
             location,
-            salary: Number(salary),
             company,
             jobType,
             skills: updatedSkills,
             numberOfOpenings: Number(numberOfOpenings),
-            status,
+            status, // Now always included in the payload
         };
+        
+        if (salary !== '') {
+            updatedJobData.salary = Number(salary);
+        }
 
         try {
             const response = await fetch(`/api/jobs/${jobId}`, {
@@ -207,6 +214,10 @@ export default function EditJobPage() {
         } finally {
             setSubmitting(false);
         }
+    };
+
+    const toggleSidebar = () => {
+        setIsSidebarOpen(!isSidebarOpen);
     };
 
     if (authLoading || !isAuthenticated || !user || user.firstLogin || (user.role !== 'job_poster' && user.role !== 'admin')) {
@@ -279,13 +290,16 @@ export default function EditJobPage() {
 
     return (
         <div className="flex h-screen bg-gradient-to-br from-[#f6f9ff] to-[#eef2ff] overflow-hidden font-inter">
+            <Head>
+                <title>Edit Job - {job?.title || 'JobConnect'}</title>
+            </Head>
             <Sidebar userRole={user.role} onLogout={logout} isOpen={isSidebarOpen} setIsOpen={setIsSidebarOpen} />
 
             <div className="flex-1 flex flex-col overflow-y-auto">
                 {/* Mobile Header */}
                 <div className="md:hidden bg-white/95 backdrop-blur-md shadow-sm p-4 flex items-center justify-between relative z-10">
                     <button
-                        onClick={() => setIsSidebarOpen(true)}
+                        onClick={toggleSidebar}
                         className="p-2 rounded-lg text-[#165BF8] hover:bg-[#165BF8]/10 focus:outline-none"
                         aria-label="Open sidebar"
                     >
@@ -306,18 +320,18 @@ export default function EditJobPage() {
                             className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4"
                         >
                             <div>
-                                <h1 className="text-3xl md:text-4xl font-bold text-[#1C3991] leading-tight">
+                                <h1 className="text-3xl md:text-4xl font-extrabold text-[#1F2937] leading-tight">
                                     <span className="bg-gradient-to-r from-[#165BF8] to-[#1C3991] bg-clip-text text-transparent">
                                         Edit Job
                                     </span>
                                 </h1>
-                                <p className="text-[#165BF8] text-lg mt-1">Update the details of your job posting</p>
+                                <p className="text-gray-500 text-lg mt-1">Update the details of your job posting</p>
                             </div>
                             <Link href="/poster/posted-jobs" passHref>
                                 <motion.button
                                     whileHover={{ scale: 1.02, boxShadow: `0 8px 16px ${primaryBlue}20` }}
                                     whileTap={{ scale: 0.98 }}
-                                    className="inline-flex items-center px-6 py-3 border border-transparent shadow-sm text-base font-medium rounded-xl text-white bg-[#165BF8] hover:bg-[#1a65ff] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#165BF8]/50 transition-all duration-200 w-full sm:w-auto"
+                                    className="inline-flex items-center px-6 py-3 border border-transparent shadow-sm text-base font-medium rounded-xl text-white bg-gradient-to-r from-[#165BF8] to-[#1C3991] hover:from-[#1a65ff] hover:to-[#2242a8] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#165BF8]/50 transition-all duration-200 w-full sm:w-auto"
                                 >
                                     <FiChevronLeft className="-ml-1 mr-2 h-5 w-5" />
                                     Back to Posted Jobs
@@ -365,8 +379,11 @@ export default function EditJobPage() {
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                     {/* Job Title */}
                                     <div className="space-y-2">
-                                        <label htmlFor="title" className="block text-sm font-medium text-[#1C3991]">Job Title</label>
+                                        <label htmlFor="title" className="block text-sm font-medium text-gray-700">Job Title</label>
                                         <div className="relative">
+                                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                                <FiBriefcase className="h-5 w-5 text-gray-400" />
+                                            </div>
                                             <input
                                                 type="text"
                                                 name="title"
@@ -374,18 +391,18 @@ export default function EditJobPage() {
                                                 value={title}
                                                 onChange={(e) => setTitle(e.target.value)}
                                                 required
-                                                className="block w-full px-4 py-3 rounded-xl border border-[#165BF8]/20 focus:ring-2 focus:ring-[#165BF8]/30 focus:border-[#165BF8] placeholder-gray-400 transition duration-200 shadow-sm"
+                                                className="block w-full pl-10 pr-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-[#165BF8] focus:border-[#165BF8] placeholder-gray-400 transition duration-200 shadow-sm"
                                             />
-                                            <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                                                <FiBriefcase className="h-5 w-5 text-[#165BF8]/70" />
-                                            </div>
                                         </div>
                                     </div>
 
                                     {/* Company Name */}
                                     <div className="space-y-2">
-                                        <label htmlFor="company" className="block text-sm font-medium text-[#1C3991]">Company Name</label>
+                                        <label htmlFor="company" className="block text-sm font-medium text-gray-700">Company Name</label>
                                         <div className="relative">
+                                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                                <FiUsers className="h-5 w-5 text-gray-400" />
+                                            </div>
                                             <input
                                                 type="text"
                                                 name="company"
@@ -393,18 +410,18 @@ export default function EditJobPage() {
                                                 value={company}
                                                 onChange={(e) => setCompany(e.target.value)}
                                                 required
-                                                className="block w-full px-4 py-3 rounded-xl border border-[#165BF8]/20 focus:ring-2 focus:ring-[#165BF8]/30 focus:border-[#165BF8] placeholder-gray-400 transition duration-200 shadow-sm"
+                                                className="block w-full pl-10 pr-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-[#165BF8] focus:border-[#165BF8] placeholder-gray-400 transition duration-200 shadow-sm"
                                             />
-                                            <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                                                <FiUsers className="h-5 w-5 text-[#165BF8]/70" />
-                                            </div>
                                         </div>
                                     </div>
                                     
                                     {/* Location */}
                                     <div className="space-y-2">
-                                        <label htmlFor="location" className="block text-sm font-medium text-[#1C3991]">Location</label>
+                                        <label htmlFor="location" className="block text-sm font-medium text-gray-700">Location</label>
                                         <div className="relative">
+                                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                                <FiMapPin className="h-5 w-5 text-gray-400" />
+                                            </div>
                                             <input
                                                 type="text"
                                                 name="location"
@@ -412,37 +429,14 @@ export default function EditJobPage() {
                                                 value={location}
                                                 onChange={(e) => setLocation(e.target.value)}
                                                 required
-                                                className="block w-full px-4 py-3 rounded-xl border border-[#165BF8]/20 focus:ring-2 focus:ring-[#165BF8]/30 focus:border-[#165BF8] placeholder-gray-400 transition duration-200 shadow-sm"
-                                            />
-                                            <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                                                <FiMapPin className="h-5 w-5 text-[#165BF8]/70" />
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {/* Salary */}
-                                    <div className="space-y-2">
-                                        <label htmlFor="salary" className="block text-sm font-medium text-[#1C3991]">Salary (INR)</label>
-                                        <div className="relative">
-                                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                                <span className="text-[#1C3991]">₹</span>
-                                            </div>
-                                            <input
-                                                type="number"
-                                                name="salary"
-                                                id="salary"
-                                                value={salary}
-                                                onChange={(e) => setSalary(e.target.value === '' ? '' : Number(e.target.value))}
-                                                required
-                                                min="0"
-                                                className="block w-full pl-8 pr-4 py-3 rounded-xl border border-[#165BF8]/20 focus:ring-2 focus:ring-[#165BF8]/30 focus:border-[#165BF8] placeholder-gray-400 transition duration-200 shadow-sm"
+                                                className="block w-full pl-10 pr-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-[#165BF8] focus:border-[#165BF8] placeholder-gray-400 transition duration-200 shadow-sm"
                                             />
                                         </div>
                                     </div>
 
                                     {/* Job Type */}
                                     <div className="space-y-2">
-                                        <label htmlFor="jobType" className="block text-sm font-medium text-[#1C3991]">Job Type</label>
+                                        <label htmlFor="jobType" className="block text-sm font-medium text-gray-700">Job Type</label>
                                         <div className="relative">
                                             <select
                                                 id="jobType"
@@ -450,7 +444,7 @@ export default function EditJobPage() {
                                                 value={jobType}
                                                 onChange={(e) => setJobType(e.target.value as JobData['jobType'])}
                                                 required
-                                                className="block w-full px-4 py-3 rounded-xl border border-[#165BF8]/20 focus:ring-2 focus:ring-[#165BF8]/30 focus:border-[#165BF8] placeholder-gray-400 transition duration-200 shadow-sm appearance-none pr-10"
+                                                className="block w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-[#165BF8] focus:border-[#165BF8] placeholder-gray-400 transition duration-200 shadow-sm appearance-none pr-10"
                                             >
                                                 <option value="Full-time">Full-time</option>
                                                 <option value="Part-time">Part-time</option>
@@ -458,16 +452,38 @@ export default function EditJobPage() {
                                                 <option value="Temporary">Temporary</option>
                                                 <option value="Internship">Internship</option>
                                             </select>
-                                            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-[#165BF8]/70">
+                                            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-400">
                                                 <FiChevronDown className="h-5 w-5" />
                                             </div>
                                         </div>
                                     </div>
                                     
+                                    {/* Salary */}
+                                    <div className="space-y-2">
+                                        <label htmlFor="salary" className="block text-sm font-medium text-gray-700">Salary (INR, optional)</label>
+                                        <div className="relative">
+                                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                                <span className="text-gray-400">₹</span>
+                                            </div>
+                                            <input
+                                                type="number"
+                                                name="salary"
+                                                id="salary"
+                                                value={salary}
+                                                onChange={(e) => setSalary(e.target.value === '' ? '' : Number(e.target.value))}
+                                                min="0"
+                                                className="block w-full pl-8 pr-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-[#165BF8] focus:border-[#165BF8] placeholder-gray-400 transition duration-200 shadow-sm"
+                                            />
+                                        </div>
+                                    </div>
+
                                     {/* Number of Openings */}
                                     <div className="space-y-2">
-                                        <label htmlFor="numberOfOpenings" className="block text-sm font-medium text-[#1C3991]">No. of Openings</label>
+                                        <label htmlFor="numberOfOpenings" className="block text-sm font-medium text-gray-700">No. of Openings</label>
                                         <div className="relative">
+                                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                                <FiUsers className="h-5 w-5 text-gray-400" />
+                                            </div>
                                             <input
                                                 type="number"
                                                 name="numberOfOpenings"
@@ -476,17 +492,14 @@ export default function EditJobPage() {
                                                 onChange={(e) => setNumberOfOpenings(e.target.value === '' ? '' : Number(e.target.value))}
                                                 required
                                                 min="0"
-                                                className="block w-full px-4 py-3 rounded-xl border border-[#165BF8]/20 focus:ring-2 focus:ring-[#165BF8]/30 focus:border-[#165BF8] placeholder-gray-400 transition duration-200 shadow-sm"
+                                                className="block w-full pl-10 pr-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-[#165BF8] focus:border-[#165BF8] placeholder-gray-400 transition duration-200 shadow-sm"
                                             />
-                                            <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                                                <FiUsers className="h-5 w-5 text-[#165BF8]/70" />
-                                            </div>
                                         </div>
                                     </div>
                                     
                                     {/* Skills */}
                                     <div className="space-y-2 col-span-1 md:col-span-2">
-                                        <label htmlFor="skills" className="block text-sm font-medium text-[#1C3991]">Skills (comma-separated)</label>
+                                        <label htmlFor="skills" className="block text-sm font-medium text-gray-700">Skills (comma-separated)</label>
                                         <textarea
                                             name="skills"
                                             id="skills"
@@ -494,45 +507,34 @@ export default function EditJobPage() {
                                             value={skills}
                                             onChange={(e) => setSkills(e.target.value)}
                                             placeholder="e.g., JavaScript, React, Node.js"
-                                            className="block w-full px-4 py-3 rounded-xl border border-[#165BF8]/20 focus:ring-2 focus:ring-[#165BF8]/30 focus:border-[#165BF8] placeholder-gray-400 transition duration-200 shadow-sm"
+                                            className="block w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-[#165BF8] focus:border-[#165BF8] placeholder-gray-400 transition duration-200 shadow-sm"
                                         ></textarea>
                                     </div>
 
-                                    {/* Job Status (Admin only) */}
-                                    {(user?.role === 'admin' || user?.role === 'job_poster') && (
-                                        <div className="space-y-2 col-span-1 md:col-span-2">
-                                            <label htmlFor="status" className="block text-sm font-medium text-[#1C3991]">Job Status</label>
-                                            <div className="relative">
-                                                {user?.role === 'admin' ? (
-                                                    <select
-                                                        id="status"
-                                                        name="status"
-                                                        value={status}
-                                                        onChange={(e) => setStatus(e.target.value as JobData['status'])}
-                                                        className="block w-full px-4 py-3 rounded-xl border border-[#165BF8]/20 focus:ring-2 focus:ring-[#165BF8]/30 focus:border-[#165BF8] placeholder-gray-400 transition duration-200 shadow-sm appearance-none pr-10"
-                                                    >
-                                                        <option value="active">Active</option>
-                                                        <option value="inactive">Inactive</option>
-                                                        <option value="closed">Closed</option>
-                                                    </select>
-                                                ) : (
-                                                    <p className="block w-full px-4 py-3 rounded-xl border border-[#165BF8]/20 bg-gray-100 text-gray-700">
-                                                        {status.charAt(0).toUpperCase() + status.slice(1)}
-                                                    </p>
-                                                )}
-                                                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-[#165BF8]/70">
-                                                    <FiChevronDown className="h-5 w-5" />
-                                                </div>
+                                    {/* Job Status - Now editable for all users */}
+                                    <div className="space-y-2 col-span-1 md:col-span-2">
+                                        <label htmlFor="status" className="block text-sm font-medium text-gray-700">Job Status</label>
+                                        <div className="relative">
+                                            <select
+                                                id="status"
+                                                name="status"
+                                                value={status}
+                                                onChange={(e) => setStatus(e.target.value as JobData['status'])}
+                                                className="block w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-[#165BF8] focus:border-[#165BF8] placeholder-gray-400 transition duration-200 shadow-sm appearance-none pr-10"
+                                            >
+                                                <option value="active">Active</option>
+                                                <option value="inactive">Inactive</option>
+                                                <option value="closed">Closed</option>
+                                            </select>
+                                            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-400">
+                                                <FiChevronDown className="h-5 w-5" />
                                             </div>
-                                            <p className="mt-1 text-xs text-gray-500">
-                                                Only an Admin can change the job status.
-                                            </p>
                                         </div>
-                                    )}
-
+                                    </div>
+                                    
                                     {/* Description */}
                                     <div className="mt-6 col-span-1 md:col-span-2">
-                                        <label htmlFor="description" className="block text-sm font-medium text-[#1C3991]">Job Description</label>
+                                        <label htmlFor="description" className="block text-sm font-medium text-gray-700">Job Description</label>
                                         <textarea
                                             name="description"
                                             id="description"
@@ -540,18 +542,18 @@ export default function EditJobPage() {
                                             value={description}
                                             onChange={(e) => setDescription(e.target.value)}
                                             required
-                                            className="block w-full px-4 py-3 rounded-xl border border-[#165BF8]/20 focus:ring-2 focus:ring-[#165BF8]/30 focus:border-[#165BF8] placeholder-gray-400 transition duration-200 shadow-sm"
+                                            className="block w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-[#165BF8] focus:border-[#165BF8] placeholder-gray-400 transition duration-200 shadow-sm"
                                         ></textarea>
                                     </div>
                                 </div>
 
-                                <div className="mt-8 flex justify-end space-x-4 border-t border-[#165BF8]/10 pt-6">
+                                <div className="mt-8 flex flex-col sm:flex-row justify-end space-y-3 sm:space-y-0 sm:space-x-4 border-t border-gray-100 pt-6">
                                     <Link href="/poster/posted-jobs" passHref>
                                         <motion.button
                                             type="button"
                                             whileHover={{ scale: 1.02 }}
                                             whileTap={{ scale: 0.98 }}
-                                            className="px-6 py-3 border border-gray-300 rounded-xl font-medium text-[#1C3991] hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#165BF8]/50 transition-all duration-200"
+                                            className="px-6 py-3 border border-gray-300 rounded-xl font-medium text-gray-700 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#165BF8]/50 transition-all duration-200 w-full sm:w-auto"
                                         >
                                             Cancel
                                         </motion.button>
@@ -561,11 +563,11 @@ export default function EditJobPage() {
                                         disabled={submitting}
                                         whileHover={{ scale: 1.02 }}
                                         whileTap={{ scale: 0.98 }}
-                                        className={`inline-flex items-center px-6 py-3 border border-transparent rounded-xl font-medium text-white bg-gradient-to-r from-[#165BF8] to-[#1C3991] hover:from-[#1a65ff] hover:to-[#2242a8] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#165BF8]/50 shadow-sm transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed`}
+                                        className={`inline-flex items-center justify-center px-6 py-3 border border-transparent rounded-xl font-medium text-white bg-gradient-to-r from-[#165BF8] to-[#1C3991] hover:from-[#1a65ff] hover:to-[#2242a8] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#165BF8]/50 shadow-sm transition-all duration-200 w-full sm:w-auto disabled:opacity-50 disabled:cursor-not-allowed`}
                                     >
                                         {submitting ? (
                                             <>
-                                                <FiLoader className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" />
+                                                <FiLoader className="animate-spin -ml-1 mr-3 h-5 w-5" />
                                                 Saving...
                                             </>
                                         ) : (

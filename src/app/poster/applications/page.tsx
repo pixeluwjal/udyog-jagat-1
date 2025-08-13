@@ -5,14 +5,14 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/app/context/AuthContext';
 import Sidebar from '@/app/components/Sidebar';
 import Link from 'next/link';
-import { FiSearch, FiFilter, FiXCircle, FiCheckCircle, FiLoader, FiChevronLeft, FiMenu, FiUser, FiMail, FiBriefcase, FiCalendar, FiDollarSign, FiRefreshCcw, FiMapPin, FiPhone, FiChevronDown } from 'react-icons/fi'; // Added FiPhone for phone number
+import { FiSearch, FiFilter, FiXCircle, FiCheckCircle, FiLoader, FiChevronLeft, FiMenu, FiUser, FiMail, FiBriefcase, FiCalendar, FiDollarSign, FiRefreshCcw, FiMapPin, FiPhone, FiChevronDown } from 'react-icons/fi';
 import { motion, AnimatePresence } from 'framer-motion';
 
 // Brand colors
 const primaryBlue = "#165BF8";
 const darkBlue = "#1C3991";
 
-// Interface for displaying application data - UPDATED STATUS ENUM AND ADDED JOB OPENINGS
+// Interface for displaying application data
 interface Application {
     _id: string;
     job: {
@@ -20,9 +20,9 @@ interface Application {
         title: string;
         description: string;
         location: string;
-        salary: number;
+        salary?: string | number; // Updated to be optional and accept string or number
         postedBy: string;
-        numberOfOpenings: number; // Added for display if needed
+        numberOfOpenings: number;
     };
     applicant: {
         _id: string;
@@ -34,33 +34,37 @@ interface Application {
             skills?: string[];
             experience?: string;
         };
-        resumeGridFsId?: string;
+        // FIX: Updated resume field to match the new User model structure
+        resume?: {
+            resumeId: string;
+            fileName: string;
+        };
     } | null;
-    status: 'Received' | 'Interview Scheduled' | 'Rejected' | 'Hired'; // UPDATED STATUS ENUM
+    status: 'Received' | 'Interview Scheduled' | 'Rejected' | 'Hired';
     appliedAt: string;
 }
 
 const fadeIn = {
-  hidden: { opacity: 0, y: 20 },
-  visible: { 
-    opacity: 1, 
-    y: 0, 
-    transition: { 
-      duration: 0.5, 
-      ease: [0.16, 1, 0.3, 1],
-      delay: 0.1
-    } 
-  },
+    hidden: { opacity: 0, y: 20 },
+    visible: {
+        opacity: 1,
+        y: 0,
+        transition: {
+            duration: 0.5,
+            ease: [0.16, 1, 0.3, 1],
+            delay: 0.1
+        }
+    },
 };
 
 const pulseEffect = {
-  scale: [1, 1.03, 1],
-  opacity: [0.8, 1, 0.8],
-  transition: { 
-    duration: 1.2, 
-    repeat: Infinity, 
-    ease: "easeInOut" 
-  }
+    scale: [1, 1.03, 1],
+    opacity: [0.8, 1, 0.8],
+    transition: {
+        duration: 1.2,
+        repeat: Infinity,
+        ease: "easeInOut"
+    }
 };
 
 export default function ApplicationsPage() {
@@ -145,6 +149,7 @@ export default function ApplicationsPage() {
 
     const updateApplicationStatus = async (id: string, newStatus: Application['status']) => {
         try {
+            // FIX: Sending the status in a JSON body as expected by the API
             const response = await fetch(`/api/applications/${id}`, {
                 method: 'PATCH',
                 headers: {
@@ -167,14 +172,14 @@ export default function ApplicationsPage() {
         }
     };
 
-    const handleViewResume = async (resumeGridFsId: string) => {
+    const handleViewResume = async (resumeId: string) => {
         if (!token) {
             setError('Authentication token missing. Please log in again.');
             return;
         }
 
         try {
-            const response = await fetch(`/api/resumes/${resumeGridFsId}`, {
+            const response = await fetch(`/api/resumes/${resumeId}`, {
                 method: 'GET',
                 headers: {
                     'Authorization': `Bearer ${token}`,
@@ -418,13 +423,13 @@ export default function ApplicationsPage() {
                                                 const isStatusFinal = application.status === 'Hired' || application.status === 'Rejected';
                                                 const statusColor =
                                                     application.status === 'Hired' ? 'bg-green-100 text-green-800' :
-                                                    application.status === 'Rejected' ? 'bg-red-100 text-red-800' :
-                                                    application.status === 'Interview Scheduled' ? 'bg-blue-100 text-blue-800' :
-                                                    'bg-yellow-100 text-yellow-800';
+                                                        application.status === 'Rejected' ? 'bg-red-100 text-red-800' :
+                                                            application.status === 'Interview Scheduled' ? 'bg-blue-100 text-blue-800' :
+                                                                'bg-yellow-100 text-yellow-800';
 
                                                 return (
-                                                    <motion.tr 
-                                                        key={application._id} 
+                                                    <motion.tr
+                                                        key={application._id}
                                                         initial={{ opacity: 0, y: 10 }}
                                                         animate={{ opacity: 1, y: 0 }}
                                                         transition={{ duration: 0.3 }}
@@ -437,7 +442,18 @@ export default function ApplicationsPage() {
                                                                 <FiMapPin className="inline-block mr-1.5 text-[#165BF8]/70" />{application.job.location}
                                                             </div>
                                                             <div className="text-xs text-gray-600 flex items-center mt-1">
-                                                                <FiDollarSign className="inline-block mr-1.5 text-[#165BF8]/70" />₹{application.job.salary.toLocaleString('en-IN')}
+                                                                {application.job.salary ? (
+                                                                    <>
+                                                                        <span className="flex-shrink-0 mr-1.5 font-medium text-base text-green-600/70">₹</span>
+                                                                        <span>
+                                                                            {typeof application.job.salary === 'number'
+                                                                                ? application.job.salary.toLocaleString('en-IN')
+                                                                                : application.job.salary}
+                                                                        </span>
+                                                                    </>
+                                                                ) : (
+                                                                    <span className="text-gray-400 italic">Not Specified</span>
+                                                                )}
                                                             </div>
                                                         </td>
                                                         <td className="px-6 py-4 whitespace-nowrap">
@@ -473,11 +489,11 @@ export default function ApplicationsPage() {
                                                         </td>
                                                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                                                             <div className="flex flex-col space-y-2 items-start">
-                                                                {application.applicant?.resumeGridFsId && (
+                                                                {application.applicant?.resume?.resumeId && (
                                                                     <motion.button
                                                                         whileHover={{ scale: 1.05 }}
                                                                         whileTap={{ scale: 0.95 }}
-                                                                        onClick={() => handleViewResume(application.applicant!.resumeGridFsId!)}
+                                                                        onClick={() => handleViewResume(application.applicant!.resume!.resumeId)}
                                                                         className="text-[#1C3991] hover:text-[#165BF8] flex items-center bg-transparent border border-[#165BF8]/30 hover:border-[#165BF8] px-3 py-1 rounded-md transition-all duration-200 text-sm"
                                                                         title="View Applicant's Resume"
                                                                     >

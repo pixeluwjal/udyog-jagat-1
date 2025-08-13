@@ -1,4 +1,3 @@
-// app/referrer/dashboard/page.tsx
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
@@ -19,35 +18,37 @@ import {
     FiTag,
     FiMenu,
     FiClipboard,
+    FiMessageSquare,
 } from 'react-icons/fi';
+import ChatModal from '../../seeker/find-referrer/ChatModal';
 
-// Define interfaces for your referral data
 interface RecentReferral {
     id: string;
-    candidateName: string; // Keep this for display, will default to email if name not set by candidate
+    candidateName: string;
     candidateEmail: string;
     referredOn: string;
-    referralCode: string; // Added referralCode
+    referralCode: string;
 }
 
 interface ReferralSummary {
     totalReferrals: number;
-    recentReferrals: RecentReferral[]; // This might become redundant if we show all generated codes
+    recentReferrals: RecentReferral[];
 }
 
-// Define an interface for the Referral Code object (from referrer/generate/page.tsx)
 interface ReferralCode {
     _id: string;
     code: string;
     candidateEmail: string;
-    expiresAt: string; // ISO string
+    candidateName: string;
+    expiresAt: string;
     isUsed: boolean;
-    createdAt: string; // ISO string
-    generatedByAdminUsername: string; // This will be the referrer's username
-    status: string; // This comes from your API based on isUsed and expiresAt
+    createdAt: string;
+    generatedByAdminUsername: string;
+    status: string;
+    // New fields for the chat feature
+    seekerId?: string;
 }
 
-// Framer Motion Variants for animations
 const fadeIn = {
     hidden: { opacity: 0, y: 20 },
     visible: { opacity: 1, y: 0, transition: { duration: 0.5, ease: "easeOut" } },
@@ -72,38 +73,36 @@ export default function ReferrerDashboardPage() {
     const { user: currentUser, loading: authLoading, isAuthenticated, logout, token } = useAuth();
     const router = useRouter();
 
-    // State for dashboard summary data
     const [referralSummary, setReferralSummary] = useState<ReferralSummary | null>(null);
     const [dataLoading, setDataLoading] = useState(true);
     const [dataError, setDataError] = useState<string | null>(null);
 
-    // State for generated referral codes list
     const [generatedReferrals, setGeneratedReferrals] = useState<ReferralCode[]>([]);
     const [loadingReferrals, setLoadingReferrals] = useState(true);
     const [referralsError, setReferralsError] = useState<string | null>(null);
     const [copySuccess, setCopySuccess] = useState<string | null>(null);
     const [filterStatus, setFilterStatus] = useState<string>("all");
-    const [isSidebarOpen, setIsSidebarOpen] = useState(false); // State for sidebar visibility
+    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+    
+    // New state for the chat modal
+    const [isChatOpen, setIsChatOpen] = useState(false);
+    const [chatPartner, setChatPartner] = useState<ReferralCode | null>(null);
 
-    // Helper function to format date to DD/MM/YYYY
     const formatDate = (isoString: string): string => {
         if (!isoString) return "";
         const date = new Date(isoString);
         const day = String(date.getDate()).padStart(2, "0");
-        const month = String(date.getMonth() + 1).padStart(2, "0"); // Months are 0-indexed
+        const month = String(date.getMonth() + 1).padStart(2, "0");
         const year = date.getFullYear();
         return `${day}/${month}/${year}`;
     };
 
-    // --- Data Fetching Logic for Dashboard Summary ---
     const fetchReferralSummaryData = useCallback(async (referrerId: string, authToken: string) => {
         setDataLoading(true);
         setDataError(null);
         console.log(`Fetching referrer dashboard summary data for ID: ${referrerId}`);
 
         try {
-            // This API route would need to be implemented separately to provide summary data
-            // For now, it's a placeholder. The actual list of codes will come from fetchGeneratedReferralCodes.
             const response = await fetch(`/api/referrer/dashboard-summary?userId=${referrerId}`, {
                 method: 'GET',
                 headers: {
@@ -129,7 +128,6 @@ export default function ReferrerDashboardPage() {
         }
     }, []);
 
-    // --- Data Fetching Logic for Generated Referral Codes List ---
     const fetchGeneratedReferralCodes = useCallback(async () => {
         setLoadingReferrals(true);
         setReferralsError(null);
@@ -141,7 +139,6 @@ export default function ReferrerDashboardPage() {
         }
 
         try {
-            // This API route is the one from the previous response: /api/referrer/referral-codes
             const response = await fetch(`/api/referrer/referral-codes?status=${filterStatus}`, {
                 headers: {
                     Authorization: `Bearer ${token}`,
@@ -163,7 +160,6 @@ export default function ReferrerDashboardPage() {
         }
     }, [token, filterStatus]);
 
-    // --- Copy Code to Clipboard Logic ---
     const handleCopyCode = (code: string) => {
         navigator.clipboard.writeText(code)
             .then(() => {
@@ -172,7 +168,6 @@ export default function ReferrerDashboardPage() {
             })
             .catch((err) => {
                 console.error("Failed to copy text: ", err);
-                // Fallback for older browsers
                 const el = document.createElement("textarea");
                 el.value = code;
                 document.body.appendChild(el);
@@ -184,7 +179,21 @@ export default function ReferrerDashboardPage() {
             });
     };
 
-    // --- Authentication and Redirection Logic ---
+    // New function to open the chat modal
+    const handleOpenChat = (referral: ReferralCode) => {
+        if (!referral.seekerId) {
+            setReferralsError('Cannot open chat: Seeker ID not found for this referral.');
+            return;
+        }
+        setChatPartner(referral);
+        setIsChatOpen(true);
+    };
+
+    const handleCloseChat = () => {
+        setIsChatOpen(false);
+        setChatPartner(null);
+    };
+
     useEffect(() => {
         if (authLoading) return;
 
@@ -211,7 +220,7 @@ export default function ReferrerDashboardPage() {
 
         if (currentUser._id && token) {
             fetchReferralSummaryData(currentUser._id, token);
-            fetchGeneratedReferralCodes(); // Fetch the detailed list of generated codes
+            fetchGeneratedReferralCodes();
         } else if (currentUser._id && !token) {
             console.error("ReferrerDashboardPage: Authentication token is missing, cannot fetch data.");
             setDataError("Authentication error: Please log in again.");
@@ -225,9 +234,7 @@ export default function ReferrerDashboardPage() {
             setDataLoading(false);
             setLoadingReferrals(false);
         }
-
     }, [authLoading, isAuthenticated, currentUser, router, fetchReferralSummaryData, fetchGeneratedReferralCodes, token]);
-
 
     if (authLoading || !isAuthenticated || !currentUser || currentUser.firstLogin || currentUser.role !== 'job_referrer') {
         return (
@@ -254,7 +261,6 @@ export default function ReferrerDashboardPage() {
 
     return (
         <div className="flex h-screen bg-gradient-to-br from-blue-50 to-indigo-100 overflow-hidden font-inter">
-            {/* Sidebar Component */}
             <Sidebar
                 userRole={currentUser.role}
                 onLogout={logout}
@@ -263,7 +269,6 @@ export default function ReferrerDashboardPage() {
             />
 
             <div className="flex-1 flex flex-col overflow-y-auto">
-                {/* Mobile header */}
                 <div className="md:hidden bg-white/95 backdrop-blur-md shadow-lg p-4 flex justify-between items-center z-10 sticky top-0">
                     <motion.button
                         whileHover={{ scale: 1.05 }}
@@ -276,11 +281,11 @@ export default function ReferrerDashboardPage() {
                     <h1 className="text-2xl font-extrabold bg-gradient-to-r from-[#4F39F6] to-[#1A3BAD] bg-clip-text text-transparent absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2">
                         Referrer Dashboard
                     </h1>
-                    <div className="w-6 h-6"></div> {/* Placeholder for alignment */}
+                    <div className="w-6 h-6"></div>
                 </div>
 
                 <main className="flex-1 overflow-y-auto p-4 md:p-8">
-                    <div className="max-w-7xl mx-auto space-y-10"> {/* Increased space-y */}
+                    <div className="max-w-7xl mx-auto space-y-10">
                         <h1 className="text-3xl md:text-4xl font-extrabold text-gray-800 bg-clip-text text-transparent bg-gradient-to-r from-[#4F39F6] to-[#1A3BAD]">
                             Welcome, {currentUser.username || 'Referrer'}!
                         </h1>
@@ -288,7 +293,6 @@ export default function ReferrerDashboardPage() {
                             Here's an overview of your generated Referral codes and referral activity.
                         </p>
 
-                        {/* Referral Statistics Section */}
                         <motion.div
                             initial="hidden"
                             animate="visible"
@@ -312,12 +316,9 @@ export default function ReferrerDashboardPage() {
                                     </div>
                                     <FiCode className="w-12 h-12 text-indigo-400 opacity-70" />
                                 </div>
-                                {/* You can add more summary cards here if your /api/referrer/dashboard-summary provides more data */}
-                                {/* For example: Number of used codes, number of active codes, etc. */}
                             </div>
                         </motion.div>
 
-                        {/* Your Generated Access Codes Section */}
                         <motion.div
                             initial="hidden"
                             animate="visible"
@@ -427,18 +428,26 @@ export default function ReferrerDashboardPage() {
                                             </div>
                                             <div
                                                 className={`mt-5 px-4 py-1.5 text-sm font-bold rounded-full text-center tracking-wide flex items-center justify-center gap-2
-                                              ${
-                                                referral.status ===
-                                                "Already Used"
-                                                  ? "bg-green-100 text-green-800 border border-green-200"
-                                                  : referral.status ===
-                                                    "Unused and Expired"
-                                                  ? "bg-red-100 text-red-800 border border-red-200"
-                                                  : "bg-orange-100 text-orange-800 border border-orange-200"
-                                              }`}
+                                                ${
+                                                    referral.status === "Already Used"
+                                                        ? "bg-green-100 text-green-800 border border-green-200"
+                                                        : referral.status === "Unused and Expired"
+                                                        ? "bg-red-100 text-red-800 border border-red-200"
+                                                        : "bg-orange-100 text-orange-800 border border-orange-200"
+                                                }`}
                                             >
                                                 <FiTag className="h-4 w-4" /> Status: {referral.status}
                                             </div>
+                                            {referral.isUsed && referral.seekerId && (
+                                                <motion.button
+                                                    whileHover={{ scale: 1.02 }}
+                                                    whileTap={{ scale: 0.98 }}
+                                                    onClick={() => handleOpenChat(referral)}
+                                                    className="mt-4 w-full flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all duration-200"
+                                                >
+                                                    <FiMessageSquare className="h-4 w-4" /> Chat with Candidate
+                                                </motion.button>
+                                            )}
                                         </motion.div>
                                     ))}
                                 </motion.div>
@@ -461,6 +470,13 @@ export default function ReferrerDashboardPage() {
                     </motion.div>
                 )}
             </AnimatePresence>
+            <ChatModal 
+                isOpen={isChatOpen} 
+                onClose={handleCloseChat} 
+                referrer={chatPartner} 
+                currentUserId={currentUser._id} 
+                currentUsername={currentUser.username || 'Referrer'}
+            />
         </div>
     );
 }

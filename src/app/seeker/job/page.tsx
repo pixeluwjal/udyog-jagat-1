@@ -1,4 +1,3 @@
-// app/seeker/jobs/page.tsx
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
@@ -6,16 +5,20 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/app/context/AuthContext';
 import Link from 'next/link';
 import Sidebar from '@/app/components/Sidebar';
-import { FiSearch, FiFilter, FiXCircle, FiSave, FiBriefcase, FiMapPin, FiUsers, FiDollarSign, FiCalendar, FiExternalLink, FiLogOut, FiMenu, FiRefreshCcw, FiChevronLeft, FiCheckCircle } from 'react-icons/fi';
+import { FiSearch, FiFilter, FiXCircle, FiSave, FiBriefcase, FiMapPin, FiUsers, FiDollarSign, FiCalendar, FiLogOut, FiMenu, FiRefreshCcw, FiChevronLeft, FiCheckCircle } from 'react-icons/fi';
 import { FaRegHandPointUp } from 'react-icons/fa';
+import Head from 'next/head';
 
 // Define a simple color theme for consistency
 const colorTheme = {
     job_seeker: {
-        mobileButton: 'bg-[#1938A8]', // Primary blue for buttons
-        hover: 'hover:bg-[#182E78]', // Darker blue on hover
-        active: 'bg-[#1938A8]', // Active state for pagination
-        text: 'text-white', // Text color for active elements
+        primary: '#1938A8',
+        secondary: '#182E78',
+        accent: '#E9F2FF',
+        textLight: '#ffffff',
+        textDark: '#1F2937',
+        border: '#e5e7eb',
+        background: 'bg-gradient-to-br from-blue-50 to-indigo-100'
     },
 };
 
@@ -25,19 +28,19 @@ interface JobDisplay {
     title: string;
     description: string;
     location: string;
-    salary: number;
+    salary?: number;
+    status: string; // The status field is important for filtering
     company: string;
     jobType: string;
     createdAt: string;
     postedBy: string;
-    companyLogo?: string; // Added for company logo display
-    skills?: string[]; // Added for skills display
-    numberOfOpenings?: number; // Added for number of openings display
-    // New fields to track applied and saved status
+    companyLogo?: string;
+    skills?: string[];
+    numberOfOpenings?: number;
     isApplied: boolean;
-    applicationId?: string; // Storing the application ID to use for withdrawal
+    applicationId?: string;
     isSaved: boolean;
-    savedJobId?: string; // Storing the saved job ID to use for unsaving
+    savedJobId?: string;
 }
 
 export default function JobsPage() {
@@ -47,39 +50,34 @@ export default function JobsPage() {
     const [jobs, setJobs] = useState<JobDisplay[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [message, setMessage] = useState<string | null>(null); // For success messages
-    const [isSidebarOpen, setIsSidebarOpen] = useState(false); // State for mobile sidebar (main nav)
-    const [isFilterSidebarOpen, setIsFilterSidebarOpen] = useState(false); // State for mobile filter sidebar
+    const [message, setMessage] = useState<string | null>(null);
+    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+    const [isFilterSidebarOpen, setIsFilterSidebarOpen] = useState(false);
 
     // Filter states
     const [searchTerm, setSearchTerm] = useState('');
-    const [locationFilter, setLocationFilter] = useState(''); // Added location filter state
-    const [salaryFilter, setSalaryFilter] = useState<'all' | 'less_1' | '1_plus' | '5_plus' | '10_plus' | '20_plus'>('all');
+    const [locationFilter, setLocationFilter] = useState('');
+    const [salaryRangeFilter, setSalaryRangeFilter] = useState('all');
     const [appliedFilter, setAppliedFilter] = useState<'all' | 'applied' | 'saved'>('all');
 
     // Pagination states
     const [currentPage, setCurrentPage] = useState(1);
     const [totalPages, setTotalPages] = useState(1);
-    const jobsPerPage = 10; // Define how many jobs per page
+    const jobsPerPage = 10;
 
     // State to manage application status (for loading indicators on buttons)
     const [applicationStatus, setApplicationStatus] = useState<{ [key: string]: 'Applying...' | 'Applied' | undefined }>({});
 
-    // Helper to get minimum salary value from filter string
-    const getMinSalary = (filter: string): number | null => {
+    // Helper to get salary range values from filter string
+    const getSalaryRange = (filter: string): { min: number | null; max: number | null } => {
         switch (filter) {
-            case '1_plus': return 100000;
-            case '5_plus': return 500000;
-            case '10_plus': return 1000000;
-            case '20_plus': return 2000000;
-            default: return null;
+            case '0-5': return { min: 0, max: 500000 };
+            case '5-10': return { min: 500000, max: 1000000 };
+            case '10-15': return { min: 1000000, max: 1500000 };
+            case '15-20': return { min: 1500000, max: 2000000 };
+            case '20-plus': return { min: 2000000, max: null };
+            default: return { min: null, max: null };
         }
-    };
-
-    // Helper to get maximum salary value for 'Less than 1 LPA'
-    const getMaxSalary = (filter: string): number | null => {
-        if (filter === 'less_1') return 99999; // Less than 1 LPA
-        return null;
     };
 
     // --- Redirection Logic ---
@@ -116,19 +114,20 @@ export default function JobsPage() {
             queryParams.append('limit', String(jobsPerPage));
             queryParams.append('sortBy', 'createdAt');
             queryParams.append('sortOrder', 'desc');
+            
+            // CORRECTED: Filter for active status directly in the API call
+            queryParams.append('status', 'active'); 
 
             if (searchTerm) queryParams.append('search', searchTerm);
             if (locationFilter) queryParams.append('location', locationFilter);
             
-            if (salaryFilter !== 'all') {
-                const minSalary = getMinSalary(salaryFilter);
-                if (minSalary !== null) {
-                    queryParams.append('minSalary', String(minSalary));
-                }
-                const maxSalary = getMaxSalary(salaryFilter);
-                if (maxSalary !== null) {
-                    queryParams.append('maxSalary', String(maxSalary));
-                }
+            // Append salary range filters if provided
+            const salaryValues = getSalaryRange(salaryRangeFilter);
+            if (salaryValues.min !== null) {
+                queryParams.append('minSalary', String(salaryValues.min));
+            }
+            if (salaryValues.max !== null) {
+                queryParams.append('maxSalary', String(salaryValues.max));
             }
 
             const response = await fetch(`/api/jobs?${queryParams.toString()}`, {
@@ -142,10 +141,11 @@ export default function JobsPage() {
             }
 
             if (Array.isArray(data.jobs)) {
-                // Filter out jobs with 0 openings
-                const jobsWithOpenings = data.jobs.filter((job: any) => 
-                    job.numberOfOpenings === undefined || job.numberOfOpenings > 0
-                );
+                 // Redundant but critical client-side filter to ensure only active jobs are processed
+                const activeJobs = data.jobs.filter(job => job.status === 'active');
+
+                 // Filter out jobs with 0 openings
+                const jobsWithOpenings = activeJobs.filter(job => job.numberOfOpenings === undefined || job.numberOfOpenings > 0);
 
                 // Fetch user's applied and saved jobs to merge with the job list
                 const myAppsResponse = await fetch('/api/applications/my-applications', {
@@ -158,18 +158,18 @@ export default function JobsPage() {
                 }
 
                 // Correctly map application IDs and saved job IDs
-                const appliedJobMap = new Map(myAppsData.applications.map((app: any) => [app.job._id, app._id])); // Map jobId to applicationId
-                const savedJobMap = new Map(myAppsData.savedJobs.map((saved: any) => [saved.job._id, saved._id])); // Map jobId to savedJobId
+                const appliedJobMap = new Map(myAppsData.applications.map((app: any) => [app.job._id, app._id]));
+                const savedJobMap = new Map(myAppsData.savedJobs.map((saved: any) => [saved.job._id, saved._id]));
 
-                const jobsWithStatus = jobsWithOpenings.map((job: any) => ({ // Use jobsWithOpenings here
+                const jobsWithStatus = jobsWithOpenings.map((job: any) => ({
                     ...job,
                     isApplied: appliedJobMap.has(job._id),
-                    applicationId: appliedJobMap.get(job._id), // Get the actual application ID
+                    applicationId: appliedJobMap.get(job._id),
                     isSaved: savedJobMap.has(job._id),
                     savedJobId: savedJobMap.get(job._id),
                 }));
 
-                // Apply the 'applied' and 'saved' filters
+                // Apply the 'applied' and 'saved' filters to the client-side list
                 const filteredJobs = jobsWithStatus.filter((job: JobDisplay) => {
                     if (appliedFilter === 'applied') return job.isApplied;
                     if (appliedFilter === 'saved') return job.isSaved;
@@ -187,7 +187,7 @@ export default function JobsPage() {
         } finally {
             setLoading(false);
         }
-    }, [token, user, currentPage, searchTerm, locationFilter, salaryFilter, appliedFilter]);
+    }, [token, user, currentPage, searchTerm, locationFilter, salaryRangeFilter, appliedFilter]);
 
     useEffect(() => {
         if (!authLoading && isAuthenticated && user && user.role === 'job_seeker') {
@@ -196,19 +196,17 @@ export default function JobsPage() {
     }, [authLoading, isAuthenticated, user, fetchJobs]);
 
     const handleApplyFilters = () => {
-        setCurrentPage(1); // Reset to first page on filter change
+        setCurrentPage(1);
         fetchJobs();
-        setIsFilterSidebarOpen(false); // Close filter sidebar on mobile
+        setIsFilterSidebarOpen(false);
     };
 
     const handleClearFilters = () => {
         setSearchTerm('');
         setLocationFilter('');
-        setSalaryFilter('all');
+        setSalaryRangeFilter('all');
         setAppliedFilter('all');
-        setCurrentPage(1); // Reset to first page
-        // fetchJobs will be called by useEffect due to filter state changes
-        setIsFilterSidebarOpen(false); // Close filter sidebar on mobile
+        setCurrentPage(1);
     };
 
     const handlePageChange = (page: number) => {
@@ -218,9 +216,8 @@ export default function JobsPage() {
     };
 
     const handleWithdrawApplication = async (jobId: string) => {
-        // Removed window.confirm()
-        setMessage(null); // Clear previous messages
-        setError(null); // Clear previous errors
+        setMessage(null);
+        setError(null);
 
         try {
             const jobToUpdate = jobs.find(job => job._id === jobId);
@@ -238,20 +235,18 @@ export default function JobsPage() {
                 throw new Error(data.error || 'Failed to withdraw application');
             }
 
-            // Update the state to reflect the change
             setJobs(prevJobs => prevJobs.map(job =>
                 job._id === jobId ? { ...job, isApplied: false, applicationId: undefined } : job
             ));
             setMessage('Application withdrawn successfully!');
-            console.log(`Successfully withdrew application for job ${jobId}`);
         } catch (err: any) {
             setError(err.message || 'Failed to withdraw application.');
         }
     };
 
     const handleSaveJob = async (jobId: string) => {
-        setMessage(null); // Clear previous messages
-        setError(null); // Clear previous errors
+        setMessage(null);
+        setError(null);
         try {
             const response = await fetch('/api/seeker/saved-jobs', {
                 method: 'POST',
@@ -278,38 +273,44 @@ export default function JobsPage() {
     };
 
     const handleUnsaveJob = async (jobId: string) => {
-        setMessage(null); // Clear previous messages
-        setError(null); // Clear previous errors
+        setMessage(null);
+        setError(null);
         try {
             const jobToUpdate = jobs.find(job => job._id === jobId);
             if (!jobToUpdate || !jobToUpdate.savedJobId) {
                 throw new Error("Saved job ID not found for unsaving.");
             }
 
-            const response = await fetch(`/api/seeker/saved-jobs/${jobToUpdate.savedJobId}`, {
+            const response = await fetch(`/api/seeker/saved-jobs?jobId=${jobToUpdate.savedJobId}`, {
                 method: 'DELETE',
                 headers: { 'Authorization': `Bearer ${token}` }
             });
 
             if (!response.ok) {
-                const data = await response.json();
+                let data;
+                try {
+                    data = await response.json();
+                } catch {
+                    data = {};
+                }
                 throw new Error(data.error || 'Failed to unsave job');
             }
 
-            setJobs(prevJobs => prevJobs.map(job =>
-                job._id === jobId ? { ...job, isSaved: false, savedJobId: undefined } : job
-            ));
+            setJobs(prevJobs =>
+                prevJobs.map(job =>
+                    job._id === jobId ? { ...job, isSaved: false, savedJobId: undefined } : job
+                )
+            );
             setMessage('Job unsaved successfully!');
         } catch (err: any) {
             setError(err.message || 'Failed to unsave job.');
         }
     };
 
-    // New handleApply function
     const handleApply = async (jobId: string) => {
         setApplicationStatus(prev => ({ ...prev, [jobId]: 'Applying...' }));
-        setMessage(null); // Clear previous messages
-        setError(null); // Clear previous errors
+        setMessage(null);
+        setError(null);
         try {
             const response = await fetch('/api/applications', {
                 method: 'POST',
@@ -333,17 +334,16 @@ export default function JobsPage() {
             setMessage('Successfully applied for the job!');
         } catch (err: any) {
             setError(err.message || 'An unexpected error occurred during application.');
-            setApplicationStatus(prev => ({ ...prev, [jobId]: undefined })); // Reset status on error
+            setApplicationStatus(prev => ({ ...prev, [jobId]: undefined }));
         }
     };
-
 
     // --- Loading and Unauthorized State Display ---
     if (authLoading || !isAuthenticated || !user || user.firstLogin || user.role !== 'job_seeker') {
         return (
-            <div className="flex h-screen bg-gray-50 justify-center items-center font-inter">
+            <div className={`flex h-screen ${colorTheme.job_seeker.background} justify-center items-center font-inter`}>
                 <div className="text-center">
-                    <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#1938A8] mx-auto"></div>
+                    <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-600 mx-auto"></div>
                     <p className="mt-4 text-gray-700">Loading page...</p>
                 </div>
             </div>
@@ -351,14 +351,17 @@ export default function JobsPage() {
     }
 
     return (
-        <div className="flex h-screen bg-gradient-to-br from-blue-50 to-indigo-100 overflow-hidden font-inter">
-            <Sidebar userRole={user.role} onLogout={logout} isOpen={isSidebarOpen} toggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)} />
+        <div className={`flex h-screen ${colorTheme.job_seeker.background} overflow-hidden font-inter`}>
+            <Head>
+                <title>Browse Jobs - JobConnect</title>
+            </Head>
+            <Sidebar userRole={user.role} onLogout={logout} isOpen={isSidebarOpen} setIsOpen={setIsSidebarOpen} />
 
             <div className="flex-1 flex flex-col overflow-y-auto">
-                {/* Mobile Header - centered and white background with Hamburger and Filter Icons */}
+                {/* Mobile Header */}
                 <div className="md:hidden bg-white shadow-sm p-4 flex items-center justify-between relative z-20">
                     <button
-                        onClick={() => setIsSidebarOpen(true)} // Toggles main sidebar
+                        onClick={() => setIsSidebarOpen(true)}
                         className="p-2 text-gray-600 hover:text-gray-800 rounded-md focus:outline-none focus:ring-2 focus:ring-inset focus:ring-indigo-500 transition-colors duration-200"
                         aria-label="Open navigation"
                     >
@@ -385,7 +388,7 @@ export default function JobsPage() {
                             overflow-y-auto flex-shrink-0
                         `}
                     >
-                        <div className="p-6 md:p-0"> {/* Padding for mobile overlay */}
+                        <div className="p-6 md:p-0">
                             <div className="flex justify-between items-center mb-6 md:mb-6">
                                 <h2 className="text-2xl font-bold text-gray-800">Filters</h2>
                                 <button
@@ -414,7 +417,7 @@ export default function JobsPage() {
                                 <input
                                     type="text"
                                     id="location"
-                                    placeholder="e.g., New York, Remote"
+                                    placeholder="New York"
                                     className="w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-[#1938A8] focus:border-[#1938A8] transition duration-200 text-gray-800 placeholder-gray-400"
                                     value={locationFilter}
                                     onChange={(e) => setLocationFilter(e.target.value)}
@@ -422,19 +425,19 @@ export default function JobsPage() {
                             </div>
 
                             <div className="mb-6 pb-6 border-b border-gray-200">
-                                <label htmlFor="salary" className="block text-sm font-semibold text-gray-700 mb-2">Minimum Salary</label>
+                                <label htmlFor="salary" className="block text-sm font-semibold text-gray-700 mb-2">Salary (LPA)</label>
                                 <select
                                     id="salary"
                                     className="w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-[#1938A8] focus:border-[#1938A8] transition duration-200 bg-white text-gray-800"
-                                    value={salaryFilter}
-                                    onChange={(e) => setSalaryFilter(e.target.value as any)}
+                                    value={salaryRangeFilter}
+                                    onChange={(e) => setSalaryRangeFilter(e.target.value)}
                                 >
                                     <option value="all">Any</option>
-                                    <option value="less_1">Less than 1 LPA</option>
-                                    <option value="1_plus">1 LPA +</option>
-                                    <option value="5_plus">5 LPA +</option>
-                                    <option value="10_plus">10 LPA +</option>
-                                    <option value="20_plus">20 LPA +</option>
+                                    <option value="0-5">0 - 5 LPA</option>
+                                    <option value="5-10">5 - 10 LPA</option>
+                                    <option value="10-15">10 - 15 LPA</option>
+                                    <option value="15-20">15 - 20 LPA</option>
+                                    <option value="20-plus">20 LPA +</option>
                                 </select>
                             </div>
 
@@ -456,7 +459,7 @@ export default function JobsPage() {
                             <div className="flex flex-col gap-3">
                                 <button
                                     onClick={handleApplyFilters}
-                                    className={`w-full ${colorTheme.job_seeker.mobileButton} ${colorTheme.job_seeker.hover} text-white font-semibold py-3 px-8 rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#1938A8] transition duration-300 shadow-lg transform hover:scale-105`}
+                                    className={`w-full bg-[#1938A8] hover:bg-[#182E78] text-white font-semibold py-3 px-8 rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#1938A8] transition duration-300 shadow-lg transform hover:scale-105`}
                                 >
                                     Apply Filters
                                 </button>
@@ -480,8 +483,8 @@ export default function JobsPage() {
                     )}
 
                     {/* Main Content Area (Right Column) */}
-                    <div className="flex-1 overflow-y-auto p-6 md:p-8 bg-white">
-                        <div className="max-w-4xl mx-auto"> {/* Constrain width for better readability of stacked cards */}
+                    <main className="flex-1 overflow-y-auto p-6 md:p-8">
+                        <div className="max-w-4xl mx-auto">
                             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 md:mb-8 gap-4">
                                 <div>
                                     <h1 className="text-3xl md:text-4xl font-extrabold text-gray-800">Browse Jobs</h1>
@@ -526,7 +529,7 @@ export default function JobsPage() {
                                     <p className="mt-1 text-base text-gray-500">Try adjusting your search filters or check back later. New opportunities are posted daily!</p>
                                 </div>
                             ) : (
-                                <div className="grid grid-cols-1 gap-6"> {/* Changed to single column grid */}
+                                <div className="grid grid-cols-1 gap-6">
                                     {jobs.map((job) => (
                                         <div key={job._id} className="bg-white rounded-xl shadow-lg border border-gray-200 hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1 flex flex-col">
                                             <Link href={`/seeker/job/${job._id}`} passHref className="flex-grow cursor-pointer">
@@ -576,35 +579,37 @@ export default function JobsPage() {
 
                                             <div className="p-6 pt-0 flex flex-col sm:flex-row items-end sm:items-center justify-between gap-3 mt-auto">
                                                 <div className="text-left sm:text-right w-full sm:w-auto">
-                                                    <span className="text-2xl font-extrabold text-[#1938A8]">₹{job.salary.toLocaleString('en-IN')}</span>
-                                                    <span className="text-sm text-gray-500 ml-1">/year</span>
+                                                    {job.salary ? (
+                                                        <>
+                                                            <span className="text-2xl font-extrabold text-[#1938A8]">₹{job.salary.toLocaleString('en-IN')}</span>
+                                                            <span className="text-sm text-gray-500 ml-1">/year</span>
+                                                        </>
+                                                    ) : (
+                                                        <span className="text-lg font-medium text-gray-500">Salary Not Specified</span>
+                                                    )}
                                                 </div>
                                                 <div className="text-sm text-gray-500 w-full sm:w-auto text-left sm:text-right flex items-center">
                                                     <FiCalendar className="mr-1" size={14} /> Posted {new Date(job.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
                                                 </div>
-                                                {/* Display Number of Openings */}
                                                 {job.numberOfOpenings !== undefined && (
                                                     <div className="text-sm text-gray-500 w-full sm:w-auto text-left sm:text-right flex items-center">
                                                         <FiUsers className="mr-1" size={14} /> Openings: {job.numberOfOpenings}
                                                     </div>
                                                 )}
                                                 <div className="flex gap-3 w-full sm:w-auto justify-start sm:justify-end flex-wrap">
-                                                    {/* Save/Unsave Button - Hidden if already applied */}
                                                     {!job.isApplied && (
                                                         <button
                                                             onClick={() => job.isSaved ? handleUnsaveJob(job._id) : handleSaveJob(job._id)}
                                                             className={`py-2 px-5 rounded-lg font-semibold transition-all duration-200 shadow-md flex items-center justify-center gap-2
                                                                 ${job.isSaved
                                                                     ? 'bg-yellow-400 text-yellow-900 hover:bg-yellow-500 focus:ring-yellow-500'
-                                                                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300 focus:ring-gray-400'
+                                                                    : `bg-white text-[#1938A8] border border-[#1938A8] hover:bg-gray-100 focus:ring-[#1938A8]`
                                                                 } focus:outline-none focus:ring-2 focus:ring-offset-2`}
                                                         >
                                                             <FiSave className="w-5 h-5" />
                                                             {job.isSaved ? 'Saved' : 'Save'}
                                                         </button>
                                                     )}
-
-                                                    {/* Apply/Applied/Withdraw Button */}
                                                     {job.isApplied ? (
                                                         <>
                                                             <span className="inline-flex items-center justify-center py-2 px-5 text-sm font-medium rounded-lg shadow-sm text-green-700 bg-green-100 w-full sm:w-auto cursor-not-allowed">
@@ -620,7 +625,7 @@ export default function JobsPage() {
                                                     ) : (
                                                         <button
                                                             onClick={() => handleApply(job._id)}
-                                                            className={`${colorTheme.job_seeker.mobileButton} ${colorTheme.job_seeker.hover} text-white py-2 px-6 rounded-lg font-semibold transition-all duration-200 shadow-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#1938A8]`}
+                                                            className={`bg-[#1938A8] hover:bg-[#182E78] text-white py-2 px-6 rounded-lg font-semibold transition-all duration-200 shadow-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#1938A8]`}
                                                             disabled={applicationStatus[job._id] === 'Applying...'}
                                                         >
                                                             {applicationStatus[job._id] === 'Applying...' ? (
@@ -675,7 +680,7 @@ export default function JobsPage() {
                                 </div>
                             )}
                         </div>
-                    </div>
+                    </main>
                 </div>
             </div>
         </div>

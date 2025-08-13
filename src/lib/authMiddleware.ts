@@ -23,7 +23,7 @@ export interface AuthResult {
   success: boolean;
   message?: string;
   status?: number;
-  user?: DecodedToken; // Contains the decoded token payload
+  user?: DecodedToken & { _id: string }; // Combine DecodedToken with _id
 }
 
 // Define the type for the required roles array
@@ -59,8 +59,13 @@ export async function authMiddleware(
       }
     }
 
-    // Return success with decoded user data
-    return { success: true, user: decoded };
+    // Return success with decoded user data, mapping `id` to `_id`
+    const userWithMongoId = {
+        ...decoded,
+        _id: decoded.id, // This is the crucial fix
+    };
+
+    return { success: true, user: userWithMongoId };
 
   } catch (error: any) {
     if (error instanceof jwt.TokenExpiredError) {

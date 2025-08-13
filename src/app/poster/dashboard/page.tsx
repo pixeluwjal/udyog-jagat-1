@@ -30,7 +30,7 @@ interface JobDisplay {
   title: string;
   description: string;
   location: string;
-  salary: number;
+  salary?: string | number; // Made optional and flexible for number or string
   status: 'active' | 'inactive' | 'closed';
   numberOfOpenings: number;
   company: string;
@@ -85,7 +85,7 @@ export default function PosterDashboardPage() {
   const router = useRouter();
 
   const [recentJobs, setRecentJobs] = useState<JobDisplay[]>([]);
-  const [applicationsCount, setApplicationsCount] = useState<number>(0); // NEW: State for total applications
+  const [applicationsCount, setApplicationsCount] = useState<number>(0);
   const [dataLoading, setDataLoading] = useState(true);
   const [dataError, setDataError] = useState<string | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -157,26 +157,26 @@ export default function PosterDashboardPage() {
 
   const fetchApplicationsCount = useCallback(async () => {
     try {
-        if (!token || !user?._id) {
-            throw new Error('Authentication token or user ID not available.');
-        }
+      if (!token || !user?._id) {
+        throw new Error('Authentication token or user ID not available.');
+      }
 
-        const response = await fetch(`/api/applications/count?postedBy=${user._id}`, {
-            headers: {
-                Authorization: `Bearer ${token}`,
-            },
-        });
+      const response = await fetch(`/api/applications/count?postedBy=${user._id}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
 
-        if (!response.ok) {
-            throw new Error('Failed to fetch application count');
-        }
+      if (!response.ok) {
+        throw new Error('Failed to fetch application count');
+      }
 
-        const data = await response.json();
-        setApplicationsCount(data.count);
+      const data = await response.json();
+      setApplicationsCount(data.count);
 
     } catch (err) {
-        console.error('Error fetching application count:', err);
-        setApplicationsCount(0);
+      console.error('Error fetching application count:', err);
+      setApplicationsCount(0);
     }
   }, [token, user]);
 
@@ -439,7 +439,18 @@ export default function PosterDashboardPage() {
                               </div>
 
                               <div className="flex items-center text-sm text-gray-600">
-                                ₹{job.salary.toLocaleString('en-IN')}
+                                {job.salary ? (
+                                    <>
+                                        <span className="flex-shrink-0 mr-1.5 font-medium text-lg text-green-600/70">
+                                            ₹
+                                        </span>
+                                        {typeof job.salary === 'number'
+                                            ? `${job.salary.toLocaleString('en-IN')}`
+                                            : job.salary}
+                                    </>
+                                ) : (
+                                    <span className="text-gray-400 italic">Not Specified</span>
+                                )}
                               </div>
 
                               <div className="flex items-center text-sm text-gray-600">

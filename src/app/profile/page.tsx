@@ -18,9 +18,10 @@ import {
   FiBookOpen,
   FiMapPin,
   FiGlobe,
-  FiActivity,
   FiTag,
-  FiArrowLeft
+  FiFileText, // Added for resume icon
+  FiUploadCloud, // Added for upload icon
+  FiDownload, // Added for download icon
 } from "react-icons/fi";
 
 // Brand colors
@@ -61,10 +62,47 @@ export default function ProfilePage() {
   const [newPassword, setNewPassword] = useState("");
   const [confirmNewPassword, setConfirmNewPassword] = useState("");
 
+  const [resume, setResume] = useState<{ fileName: string; resumeId: string } | null>(null);
+  const [resumeFile, setResumeFile] = useState<File | null>(null);
+
   const [loading, setLoading] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false); // New state for download loading
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+  // Function to fetch the user's resume details
+  const fetchResumeDetails = async () => {
+    if (!token || !currentUser || currentUser.role !== 'job_seeker') return;
+
+    try {
+      // Corrected API endpoint to fetch resume metadata
+      const response = await fetch("/api/resumes", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        if (response.status === 404) {
+          // No resume found, which is a valid state
+          setResume(null);
+          return;
+        }
+        throw new Error("Failed to fetch resume details.");
+      }
+
+      const data = await response.json();
+      setResume({
+        fileName: data.fileName,
+        resumeId: data.resumeId,
+      });
+    } catch (err: any) {
+      console.error("Error fetching resume details:", err);
+      // We don't set an error here, as a missing resume isn't a critical failure
+    }
+  };
 
   useEffect(() => {
     if (!authLoading) {
@@ -78,9 +116,13 @@ export default function ProfilePage() {
           valayaNagar: currentUser.valayaNagar || "",
           khandaBhaga: currentUser.khandaBhaga || "",
         });
+        // FIX: Fetch resume details whenever the currentUser or token changes
+        if (currentUser.role === 'job_seeker') {
+          fetchResumeDetails();
+        }
       }
     }
-  }, [authLoading, isAuthenticated, currentUser, router]);
+  }, [authLoading, isAuthenticated, currentUser, router, token]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -92,6 +134,12 @@ export default function ProfilePage() {
     if (name === "currentPassword") setCurrentPassword(value);
     else if (name === "newPassword") setNewPassword(value);
     else if (name === "confirmNewPassword") setConfirmNewPassword(value);
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      setResumeFile(e.target.files[0]);
+    }
   };
 
   const handleSaveProfile = async (e: FormEvent) => {
@@ -204,6 +252,82 @@ export default function ProfilePage() {
       setError(err.message || "An unexpected error occurred during password change.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleResumeUpload = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!resumeFile) {
+      setError("Please select a file to upload.");
+      return;
+    }
+
+    setIsUploading(true);
+    setError(null);
+    setMessage(null);
+
+    const formData = new FormData();
+    formData.append("resume", resumeFile);
+
+    try {
+      // Corrected API endpoint for resume upload
+      const response = await fetch("/api/resumes", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        body: formData,
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to upload resume.");
+      }
+
+      // Update the resume state with the new data
+      setResume({ fileName: data.fileName, resumeId: data.resumeId });
+      setResumeFile(null);
+      setMessage("Resume uploaded successfully!");
+    } catch (err: any) {
+      setError(err.message || "An unexpected error occurred during resume upload.");
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  // FIX: New function to handle resume download
+  const handleDownloadResume = async () => {
+    if (!resume || !token) {
+      setError("No resume found or authentication token missing.");
+      return;
+    }
+
+    setIsDownloading(true);
+    setError(null);
+
+    try {
+      const response = await fetch(`/api/resumes/${resume.resumeId}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to download resume.");
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      window.open(url, '_blank');
+      window.URL.revokeObjectURL(url); // Clean up the URL object
+      setMessage("Resume opened in a new tab.");
+
+    } catch (err: any) {
+      console.error("Error downloading resume:", err);
+      setError(err.message || "An unexpected error occurred during resume download.");
+    } finally {
+      setIsDownloading(false);
     }
   };
 
@@ -475,6 +599,88 @@ export default function ProfilePage() {
                 </motion.div>
               )}
             </form>
+            
+            {/* --- New Resume Section --- */}
+            {currentUser.role === 'job_seeker' && (
+                <motion.div
+                initial="hidden"
+                animate="visible"
+                variants={fadeIn}
+                className="mt-10 bg-white rounded-3xl shadow-xl border border-gray-100 p-6 md:p-8"
+              >
+                <h2 className="text-2xl font-extrabold text-gray-800 bg-clip-text text-transparent bg-gradient-to-r from-teal-600 to-cyan-700 mb-6">
+                  Manage Resume
+                </h2>
+                <form onSubmit={handleResumeUpload} className="space-y-6">
+                  <div>
+                    <label htmlFor="resume-file" className="block text-sm font-semibold text-[#1C3991] mb-2">
+                        <FiFileText className="inline-block mr-2 text-teal-600" /> Upload a new resume
+                    </label>
+                    <input
+                      type="file"
+                      id="resume-file"
+                      onChange={handleFileChange}
+                      className="block w-full text-sm text-gray-500
+                        file:mr-4 file:py-2 file:px-4
+                        file:rounded-xl file:border-0
+                        file:text-sm file:font-semibold
+                        file:bg-teal-50 file:text-teal-700
+                        hover:file:bg-teal-100"
+                      disabled={isUploading}
+                    />
+                  </div>
+                  {/* FIX: Only render the link if the resume.resumeId exists */}
+                  {resume && resume.resumeId && (
+                      <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl border border-gray-200">
+                          <span className="flex items-center text-gray-700 font-medium">
+                              <FiCheckCircle className="text-green-500 mr-2 h-5 w-5" />
+                              Your current resume:
+                          </span>
+                          <motion.button
+                              onClick={handleDownloadResume}
+                              disabled={isDownloading}
+                              whileHover={{ scale: 1.05 }}
+                              whileTap={{ scale: 0.95 }}
+                              className="text-sm font-medium text-blue-600 hover:underline flex items-center disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                              {isDownloading ? (
+                                <>
+                                  <FiLoader className="animate-spin mr-2" />
+                                  Loading...
+                                </>
+                              ) : (
+                                <>
+                                  {resume.fileName} <FiDownload className="ml-2" />
+                                </>
+                              )}
+                          </motion.button>
+                      </div>
+                  )}
+                  <motion.button
+                    type="submit"
+                    disabled={isUploading || !resumeFile}
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    className={`w-full flex justify-center items-center py-3 px-4 border border-transparent rounded-xl shadow-lg text-lg font-semibold text-white bg-gradient-to-r from-teal-500 to-cyan-600 hover:from-teal-600 hover:to-cyan-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-teal-500 transition-all duration-200 ${
+                      isUploading ? "opacity-70 cursor-not-allowed" : ""
+                    }`}
+                  >
+                    {isUploading ? (
+                      <>
+                        <FiLoader className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" />
+                        Uploading Resume...
+                      </>
+                    ) : (
+                      <>
+                        <FiUploadCloud className="-ml-1 mr-3 h-5 w-5" />
+                        Upload Resume
+                      </>
+                    )}
+                  </motion.button>
+                </form>
+              </motion.div>
+            )}
+            {/* --- End New Resume Section --- */}
 
             <motion.div
               initial="hidden"
@@ -560,6 +766,7 @@ export default function ProfilePage() {
                 </motion.button>
               </form>
             </motion.div>
+
           </motion.div>
         </div>
       </div>

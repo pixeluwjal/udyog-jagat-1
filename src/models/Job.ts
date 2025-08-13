@@ -6,7 +6,7 @@ export interface IJob extends Document {
     title: string;
     description: string;
     location: string;
-    salary: number;
+    salary?: number | string; // Made optional and supports both number (for single value) or string (for ranges)
     status: 'active' | 'inactive' | 'closed'; // Added status
     numberOfOpenings: number; // NEW: Number of openings for this position
     postedBy: mongoose.Schema.Types.ObjectId; // Reference to the User model's _id
@@ -26,7 +26,7 @@ const JobSchema: Schema<IJob> = new Schema({
     title: { type: String, required: true, trim: true },
     description: { type: String, required: true },
     location: { type: String, required: true, trim: true },
-    salary: { type: Number, required: true, min: 0 },
+    salary: { type: Schema.Types.Mixed }, // Changed to Mixed type to accept either number or string
     status: { // Added status to schema
         type: String,
         enum: ['active', 'inactive', 'closed'],
