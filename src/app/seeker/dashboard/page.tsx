@@ -362,7 +362,7 @@ export default function JobSeekerDashboardPage() {
                                     <div className="text-center py-8 text-gray-500">
                                         You haven't applied to any jobs recently.
                                         <div className="mt-4">
-                                            <Link href="/seeker/jobs" passHref>
+                                            <Link href="/seeker/job" passHref>
                                                 <button className={`inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-[${jobSeekerTheme.primaryColor}] hover:bg-[${jobSeekerTheme.darkPrimaryColor}] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[${jobSeekerTheme.primaryColor}] transition-all duration-200`}>
                                                     <svg className="-ml-1 mr-2 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 13.255A23.55 23.55 0 0112 15c-1.606 0-3.14-.153-4.59-.445M21 4.87V11m0 0h-7.5M21 11l-3.25-3.25M12 3a9 9 0 100 18 9 9 0 000-18z" />
