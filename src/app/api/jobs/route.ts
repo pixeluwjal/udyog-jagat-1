@@ -70,14 +70,9 @@ export async function GET(request: NextRequest) {
     }
 
     // --- Apply filters ---
-    // Search keywords (title + description + company + skills)
+    // Search ONLY on job role (title)
     if (searchTerm) {
-        query.$or = [
-            { title: { $regex: searchTerm, $options: 'i' } },
-            { description: { $regex: searchTerm, $options: 'i' } },
-            { company: { $regex: searchTerm, $options: 'i' } },
-            { skills: { $regex: searchTerm, $options: 'i' } },
-        ];
+        query.title = { $regex: searchTerm, $options: 'i' };
     }
 
     // Location
@@ -133,5 +128,57 @@ export async function GET(request: NextRequest) {
     } catch (error) {
         console.error('API: Fetch jobs error:', error);
         return NextResponse.json({ error: 'Server error fetching jobs.' }, { status: 500 });
+    }
+}
+
+// POST /api/jobs
+export async function POST(request: NextRequest) {
+    await dbConnect();
+    console.log('\n--- API: /api/jobs POST - Request received ---');
+
+    const authResult = await authMiddleware(request, 'job_poster');
+    if (!authResult.success || !authResult.user) {
+        return NextResponse.json({ error: authResult.message }, { status: authResult.status });
+    }
+
+    const { id: jobPosterId } = authResult.user;
+
+    try {
+        const { title, description, location, salary, company, jobType, skills, companyLogo, numberOfOpenings } = await request.json();
+
+        if (!title || !description || !location || !company || !jobType || numberOfOpenings === undefined || numberOfOpenings === null || numberOfOpenings <= 0) {
+            return NextResponse.json(
+                { error: 'All required fields must be provided, and Number of Openings must be a positive number.' },
+                { status: 400 }
+            );
+        }
+
+        const newJob = new Job({
+            title,
+            description,
+            location,
+            salary,
+            company,
+            jobType,
+            skills: skills || [],
+            companyLogo: companyLogo || null,
+            numberOfOpenings,
+            postedBy: new mongoose.Types.ObjectId(jobPosterId),
+            status: 'active',
+        });
+
+        await newJob.save();
+
+        return NextResponse.json(
+            { message: 'Job posted successfully!', job: newJob.toObject() },
+            { status: 201 }
+        );
+    } catch (error) {
+        console.error('API: Create job error:', error);
+        if (error instanceof mongoose.Error.ValidationError) {
+            const errors = Object.keys(error.errors).map(key => error.errors[key].message);
+            return NextResponse.json({ error: 'Validation failed', details: errors }, { status: 400 });
+        }
+        return NextResponse.json({ error: 'Server error posting job.' }, { status: 500 });
     }
 }
