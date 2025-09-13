@@ -12,7 +12,10 @@ export async function GET(request: NextRequest) {
     const authResult = await authMiddleware(request, ['job_poster', 'admin', 'job_seeker']);
     if (!authResult.success || !authResult.user) {
         console.warn(`API: Fetch jobs failed auth or user data missing: ${authResult.message}`);
-        return NextResponse.json({ error: authResult.message || 'Authentication failed' }, { status: authResult.status || 401 });
+        return NextResponse.json(
+            { error: authResult.message || 'Authentication failed' },
+            { status: authResult.status || 401 }
+        );
     }
 
     const user = authResult.user;
@@ -36,7 +39,7 @@ export async function GET(request: NextRequest) {
 
     let query: any = {};
 
-    // Role-based filtering
+    // --- Role-based filtering ---
     if (user.role === 'job_poster') {
         query.postedBy = new mongoose.Types.ObjectId(user.id);
         if (statusFilter && ['active', 'inactive', 'closed'].includes(statusFilter)) {
@@ -53,48 +56,59 @@ export async function GET(request: NextRequest) {
         }
         console.log(`API: Admin viewing jobs.`);
     } else if (user.role === 'job_seeker') {
-        // CORRECTED: Job seekers always see only active jobs by default
-        query.status = 'active'; 
-        // A job seeker can further filter by status if they want, e.g. for "applied jobs"
+        query.status = 'active'; // default for seekers
         if (statusFilter && ['active', 'inactive', 'closed'].includes(statusFilter)) {
-             query.status = statusFilter;
+            query.status = statusFilter;
         }
         console.log(`API: Job Seeker viewing jobs.`);
     } else {
         console.warn(`API: Unauthorized role '${user.role}' attempting to view jobs.`);
-        return NextResponse.json({ message: 'Forbidden: Insufficient role to view jobs.' }, { status: 403 });
+        return NextResponse.json(
+            { message: 'Forbidden: Insufficient role to view jobs.' },
+            { status: 403 }
+        );
     }
 
-    // Apply general search/filter terms
+    // --- Apply filters ---
+    // Search keywords (title + description + company + skills)
     if (searchTerm) {
-        query.title = { $regex: searchTerm, $options: 'i' };
-    }
-    if (locationFilter) {
-        query.location = { $regex: locationFilter, $options: 'i'};
+        query.$or = [
+            { title: { $regex: searchTerm, $options: 'i' } },
+            { description: { $regex: searchTerm, $options: 'i' } },
+            { company: { $regex: searchTerm, $options: 'i' } },
+            { skills: { $regex: searchTerm, $options: 'i' } },
+        ];
     }
 
-    // CORRECTED: Apply numerical salary range filter
+    // Location
+    if (locationFilter) {
+        query.location = { $regex: locationFilter, $options: 'i' };
+    }
+
+    // Salary
     if (!isNaN(minSalary) || !isNaN(maxSalary)) {
         query.salary = {};
-        if (!isNaN(minSalary)) {
-            query.salary.$gte = minSalary;
-        }
-        if (!isNaN(maxSalary)) {
-            query.salary.$lte = maxSalary;
-        }
+        if (!isNaN(minSalary)) query.salary.$gte = minSalary;
+        if (!isNaN(maxSalary)) query.salary.$lte = maxSalary;
     }
 
+    // Exclude a job
     if (excludeJobId && mongoose.isValidObjectId(excludeJobId)) {
         query._id = { $ne: new mongoose.Types.ObjectId(excludeJobId) };
     }
+
+    // Job type
     if (jobTypeFilter) {
         query.jobType = jobTypeFilter;
     }
+
+    // Skills
     if (skillsFilter) {
         const skillsArray = skillsFilter.split(',').map(skill => skill.trim());
         query.skills = { $in: skillsArray };
     }
 
+    // Openings
     if (!isNaN(minOpenings) && minOpenings >= 0) {
         query.numberOfOpenings = { ...query.numberOfOpenings, $gte: minOpenings };
     }
@@ -119,54 +133,5 @@ export async function GET(request: NextRequest) {
     } catch (error) {
         console.error('API: Fetch jobs error:', error);
         return NextResponse.json({ error: 'Server error fetching jobs.' }, { status: 500 });
-    }
-}
-
-// POST /api/jobs
-export async function POST(request: NextRequest) {
-    await dbConnect();
-    console.log('\n--- API: /api/jobs POST - Request received ---');
-
-    const authResult = await authMiddleware(request, 'job_poster');
-    if (!authResult.success || !authResult.user) {
-        return NextResponse.json({ error: authResult.message }, { status: authResult.status });
-    }
-
-    const { id: jobPosterId, email: jobPosterEmail } = authResult.user;
-
-    try {
-        const { title, description, location, salary, company, jobType, skills, companyLogo, numberOfOpenings } = await request.json();
-
-        if (!title || !description || !location || !company || !jobType || numberOfOpenings === undefined || numberOfOpenings === null || numberOfOpenings <= 0) {
-            return NextResponse.json({ error: 'All required fields must be provided, and Number of Openings must be a positive number.' }, { status: 400 });
-        }
-
-        const newJob = new Job({
-            title,
-            description,
-            location,
-            salary,
-            company,
-            jobType,
-            skills: skills || [],
-            companyLogo: companyLogo || null,
-            numberOfOpenings,
-            postedBy: new mongoose.Types.ObjectId(jobPosterId),
-            status: 'active',
-        });
-
-        await newJob.save();
-
-        return NextResponse.json(
-            { message: 'Job posted successfully!', job: newJob.toObject() },
-            { status: 201 }
-        );
-    } catch (error) {
-        console.error('API: Create job error:', error);
-        if (error instanceof mongoose.Error.ValidationError) {
-            const errors = Object.keys(error.errors).map(key => error.errors[key].message);
-            return NextResponse.json({ error: 'Validation failed', details: errors }, { status: 400 });
-        }
-        return NextResponse.json({ error: 'Server error posting job.' }, { status: 500 });
     }
 }
