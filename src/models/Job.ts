@@ -1,62 +1,87 @@
-// models/Job.ts
-import mongoose, { Schema, Document } from 'mongoose';
+import mongoose, { Schema, Document } from "mongoose";
 
-// Define the interface for a Job document
 export interface IJob extends Document {
-    title: string;
-    description: string;
-    location: string;
-    salary?: number | string; // Made optional and supports both number (for single value) or string (for ranges)
-    status: 'active' | 'inactive' | 'closed'; // Added status
-    numberOfOpenings: number; // NEW: Number of openings for this position
-    postedBy: mongoose.Schema.Types.ObjectId; // Reference to the User model's _id
-    createdAt: Date;
-    updatedAt: Date;
-
-    // --- NEW FIELDS ADDED ---
-    company: string; // The company name
-    jobType: 'Full-time' | 'Part-time' | 'Contract' | 'Temporary' | 'Internship'; // Type of job
-    skills?: string[]; // Array of required skills
-    companyLogo?: string; // URL or path to company logo (optional)
-    // --- END NEW FIELDS ---
+  title: string;
+  description: string;
+  location: string;
+  salaryOriginal?: string;   // "20-30 LPA"
+  salaryMin?: number;        // 2000000
+  salaryMax?: number | null; // 3000000 or null
+  status: "active" | "inactive" | "closed";
+  numberOfOpenings: number;
+  postedBy: mongoose.Schema.Types.ObjectId;
+  company: string;
+  jobType: "Full-time" | "Part-time" | "Contract" | "Temporary" | "Internship";
+  skills?: string[];
+  companyLogo?: string;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
-// Define the Job Schema
-const JobSchema: Schema<IJob> = new Schema({
+const JobSchema = new Schema<IJob>(
+  {
     title: { type: String, required: true, trim: true },
     description: { type: String, required: true },
     location: { type: String, required: true, trim: true },
-    salary: { type: Schema.Types.Mixed }, // Changed to Mixed type to accept either number or string
-    status: { // Added status to schema
-        type: String,
-        enum: ['active', 'inactive', 'closed'],
-        default: 'active',
+
+    // ✅ Salary fields
+    salaryOriginal: { type: String },   // Store the dropdown string
+    salaryMin: { type: Number },
+    salaryMax: { type: Number },
+
+    status: {
+      type: String,
+      enum: ["active", "inactive", "closed"],
+      default: "active",
     },
-    numberOfOpenings: { // NEW: Number of openings field added to schema
-        type: Number,
-        required: true,
-        min: 0, // Allow 0, as it will decrement to 0 and then deactivate
-        default: 1, // Default to at least one opening
-    },
-    postedBy: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'User', // This references your 'User' model
-        required: true,
-    },
-    // --- NEW SCHEMA FIELDS ADDED ---
+    numberOfOpenings: { type: Number, required: true, min: 1 },
+    postedBy: { type: Schema.Types.ObjectId, ref: "User", required: true },
     company: { type: String, required: true, trim: true },
     jobType: {
-        type: String,
-        enum: ['Full-time', 'Part-time', 'Contract', 'Temporary', 'Internship'],
-        default: 'Full-time',
-        required: true,
+      type: String,
+      enum: ["Full-time", "Part-time", "Contract", "Temporary", "Internship"],
+      required: true,
     },
-    skills: [{ type: String, trim: true }], // Array of strings
-    companyLogo: { type: String, trim: true }, // Optional string for URL/path
-    // --- END NEW SCHEMA FIELDS ---
-}, { timestamps: true }); // Mongoose will automatically add createdAt and updatedAt
+    skills: [{ type: String, trim: true }],
+    companyLogo: { type: String, trim: true },
+  },
+  { timestamps: true }
+);
 
-// Check if the model already exists to prevent OverwriteModelError
-const Job = mongoose.models.Job || mongoose.model<IJob>('Job', JobSchema);
+// ✅ Pre-save hook: convert salaryOriginal into salaryMin & salaryMax
+JobSchema.pre<IJob>("save", function (next) {
+  if (this.salaryOriginal) {
+    const str = this.salaryOriginal.toLowerCase().replace(/₹|,/g, "").trim();
+
+    // "20-30 lpa"
+    const matchRange = str.match(/(\d+)\s*-\s*(\d+)\s*lpa/);
+    if (matchRange) {
+      this.salaryMin = parseInt(matchRange[1], 10) * 100000;
+      this.salaryMax = parseInt(matchRange[2], 10) * 100000;
+      return next();
+    }
+
+    // "15 lpa"
+    const matchSingle = str.match(/(\d+)\s*lpa/);
+    if (matchSingle) {
+      this.salaryMin = parseInt(matchSingle[1], 10) * 100000;
+      this.salaryMax = this.salaryMin;
+      return next();
+    }
+
+    // "50+ lpa"
+    const matchPlus = str.match(/(\d+)\+\s*lpa/);
+    if (matchPlus) {
+      this.salaryMin = parseInt(matchPlus[1], 10) * 100000;
+      this.salaryMax = null;
+      return next();
+    }
+  }
+
+  next();
+});
+
+const Job =
+  mongoose.models.Job || mongoose.model<IJob>("Job", JobSchema);
 
 export default Job;

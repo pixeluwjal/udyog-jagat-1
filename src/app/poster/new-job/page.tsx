@@ -1,41 +1,47 @@
-'use client';
+"use client";
 
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { useAuth } from '@/app/context/AuthContext';
-import { useRouter } from 'next/navigation';
-import Sidebar from '@/app/components/Sidebar';
-import Link from 'next/link';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useState, useEffect, useCallback, useRef } from "react";
+import { useAuth } from "@/app/context/AuthContext";
+import { useRouter } from "next/navigation";
+import Sidebar from "@/app/components/Sidebar";
+import Link from "next/link";
+import { motion, AnimatePresence } from "framer-motion";
+import { salaryRanges } from "@/lib/constants"; // Import the shared constant
 
 // Import icons for better aesthetics
 import {
-  FiBriefcase, FiMapPin, FiType, FiUsers, FiXCircle, FiCheckCircle, FiLoader, FiChevronLeft, FiMenu, FiClock, FiSearch, FiChevronDown
-} from 'react-icons/fi';
+  FiBriefcase,
+  FiMapPin,
+  FiType,
+  FiUsers,
+  FiXCircle,
+  FiCheckCircle,
+  FiLoader,
+  FiChevronLeft,
+  FiMenu,
+  FiClock,
+  FiSearch,
+  FiChevronDown,
+  FiDollarSign,
+  FiZap,
+} from "react-icons/fi";
 
 // Brand colors
 const primaryBlue = "#165BF8";
 const darkBlue = "#1C3991";
+const lightGray = "#f9fafb";
 
-interface JobFormData {
-  title: string;
-  description: string;
-  location: string;
-  salary: string; // Changed to string to handle ranges
-  company: string;
-  jobType: 'Full-time' | 'Part-time' | 'Contract' | 'Temporary' | 'Internship' | '';
-  numberOfOpenings: number | '';
-}
-
+// Animation variants for smooth entry
 const fadeIn = {
   hidden: { opacity: 0, y: 20 },
   visible: {
     opacity: 1,
     y: 0,
     transition: {
-      duration: 0.5,
+      duration: 0.6,
       ease: [0.16, 1, 0.3, 1],
-      delay: 0.1
-    }
+      delay: 0.1,
+    },
   },
 };
 
@@ -45,33 +51,48 @@ const pulseEffect = {
   transition: {
     duration: 1.2,
     repeat: Infinity,
-    ease: "easeInOut"
-  }
+    ease: "easeInOut",
+  },
 };
 
-const salaryRanges = [
-  '0-5 LPA',
-  '5-10 LPA',
-  '10-20 LPA',
-  '20-30 LPA',
-  '30-50 LPA',
-  '50+ LPA',
-];
+interface JobFormData {
+  title: string;
+  description: string;
+  location: string;
+  salary: string;
+  company: string;
+  jobType:
+    | "Full-time"
+    | "Part-time"
+    | "Contract"
+    | "Temporary"
+    | "Internship"
+    | "";
+  numberOfOpenings: number | "";
+  skills: string; // Added skills field
+}
 
 export default function NewJobPage() {
-  const { user, loading: authLoading, isAuthenticated, logout, token } = useAuth();
+  const {
+    user,
+    loading: authLoading,
+    isAuthenticated,
+    logout,
+    token,
+  } = useAuth();
   const router = useRouter();
   const [formData, setFormData] = useState<JobFormData>({
-    title: '',
-    description: '',
-    location: '',
-    salary: '',
-    company: '',
-    jobType: '',
-    numberOfOpenings: '',
+    title: "",
+    description: "",
+    location: "",
+    salary: "",
+    company: "",
+    jobType: "",
+    numberOfOpenings: "",
+    skills: "", // Initialize new skills field
   });
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
   const [formLoading, setFormLoading] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [locationSuggestions, setLocationSuggestions] = useState<string[]>([]);
@@ -83,16 +104,16 @@ export default function NewJobPage() {
   useEffect(() => {
     const fetchCities = async () => {
       try {
-        const response = await fetch('/api/cities');
+        const response = await fetch("/api/cities");
         if (!response.ok) {
-          throw new Error('Failed to fetch cities');
+          throw new Error("Failed to fetch cities");
         }
         const data = await response.json();
         if (Array.isArray(data.cities)) {
           setAllCities(data.cities);
         }
       } catch (err) {
-        console.error('Error fetching cities:', err);
+        console.error("Error fetching cities:", err);
       }
     };
     fetchCities();
@@ -102,39 +123,48 @@ export default function NewJobPage() {
     if (authLoading) return;
 
     if (!isAuthenticated || !user) {
-      router.push('/login');
+      router.push("/login");
       return;
     }
 
     if (user.firstLogin) {
-      router.push('/change-password');
+      router.push("/change-password");
       return;
     }
 
-    if (user.role !== 'job_poster') {
-      if (user.role === 'admin') {
-        router.push('/admin/dashboard');
-      } else if (user.role === 'job_seeker') {
-        router.push('/seeker/dashboard');
+    if (user.role !== "job_poster") {
+      if (user.role === "admin") {
+        router.push("/admin/dashboard");
+      } else if (user.role === "job_seeker") {
+        router.push("/seeker/dashboard");
       } else {
-        router.push('/');
+        router.push("/");
       }
       return;
     }
   }, [authLoading, isAuthenticated, user, router]);
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+  const handleInputChange = (
+    e: React.ChangeEvent<
+      HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
+    >
+  ) => {
     const { name, value } = e.target;
     setFormData((prevFormData) => ({
       ...prevFormData,
-      [name]: (name === 'numberOfOpenings') ? (value === '' ? '' : Number(value)) : value,
+      [name]:
+        name === "numberOfOpenings"
+          ? value === ""
+            ? ""
+            : Number(value)
+          : value,
     }));
 
     // Handle location suggestions based on fetched data
-    if (name === 'location') {
+    if (name === "location") {
       if (value.length > 1) {
         // This is where case-insensitivity is handled
-        const filteredCities = allCities.filter(city =>
+        const filteredCities = allCities.filter((city) =>
           city.toLowerCase().startsWith(value.toLowerCase())
         );
         setLocationSuggestions(filteredCities);
@@ -153,55 +183,81 @@ export default function NewJobPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
-    setSuccess('');
+    setError("");
+    setSuccess("");
     setFormLoading(true);
 
     if (!token) {
-      setError('Authentication token missing. Please log in again.');
+      setError("Authentication token missing. Please log in again.");
       setFormLoading(false);
       return;
     }
 
-    if (!formData.title || !formData.description || !formData.location ||
-      !formData.company || !formData.jobType ||
-      formData.numberOfOpenings === '') {
-      setError('All required fields must be filled: Job Title, Description, Location, Company, Job Type, and No. of Openings.');
+    if (
+      !formData.title ||
+      !formData.description ||
+      !formData.location ||
+      !formData.company ||
+      !formData.jobType ||
+      formData.numberOfOpenings === ""
+    ) {
+      setError(
+        "All required fields must be filled: Job Title, Description, Location, Company, Job Type, and No. of Openings."
+      );
       setFormLoading(false);
       return;
     }
 
-    if (typeof formData.numberOfOpenings === 'number' && formData.numberOfOpenings <= 0) {
-      setError('Number of Openings must be a positive number.');
+    if (
+      typeof formData.numberOfOpenings === "number" &&
+      formData.numberOfOpenings <= 0
+    ) {
+      setError("Number of Openings must be a positive number.");
       setFormLoading(false);
       return;
     }
 
     try {
-      const response = await fetch('/api/jobs', {
-        method: 'POST',
+      const response = await fetch("/api/jobs", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({
+          ...formData,
+          salaryOriginal: formData.salary || null, // send as salaryOriginal
+          skills: formData.skills
+            .split(",")
+            .map((s) => s.trim())
+            .filter((s) => s !== ""),
+        }),
       });
 
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to create job');
+        throw new Error(data.error || "Failed to create job");
       }
 
-      setSuccess('Job posted successfully!');
-      setFormData({ title: '', description: '', location: '', salary: '', company: '', jobType: '', numberOfOpenings: '' });
-      router.push('/poster/dashboard');
+      setSuccess("Job posted successfully!");
+      setFormData({
+        title: "",
+        description: "",
+        location: "",
+        salary: "",
+        company: "",
+        jobType: "",
+        numberOfOpenings: "",
+        skills: "",
+      });
+      router.push("/poster/dashboard");
     } catch (err: unknown) {
-      console.error('Error posting job:', err);
-      let errorMessage = 'Failed to post job.';
+      console.error("Error posting job:", err);
+      let errorMessage = "Failed to post job.";
       if (err instanceof Error) {
         errorMessage = err.message;
-      } else if (typeof err === 'string') {
+      } else if (typeof err === "string") {
         errorMessage = err;
       }
       setError(errorMessage);
@@ -210,7 +266,13 @@ export default function NewJobPage() {
     }
   };
 
-  if (authLoading || !isAuthenticated || !user || user.firstLogin || user.role !== 'job_poster') {
+  if (
+    authLoading ||
+    !isAuthenticated ||
+    !user ||
+    user.firstLogin ||
+    user.role !== "job_poster"
+  ) {
     return (
       <div className="flex h-screen bg-gradient-to-br from-[#f6f9ff] to-[#eef2ff] justify-center items-center">
         <motion.div
@@ -234,7 +296,12 @@ export default function NewJobPage() {
 
   return (
     <div className="flex h-screen bg-gradient-to-br from-[#f6f9ff] to-[#eef2ff] overflow-hidden font-inter">
-      <Sidebar userRole={user.role} onLogout={logout} isOpen={isSidebarOpen} setIsOpen={setIsSidebarOpen} />
+      <Sidebar
+        userRole={user.role}
+        onLogout={logout}
+        isOpen={isSidebarOpen}
+        setIsOpen={setIsSidebarOpen}
+      />
 
       <div className="flex-1 flex flex-col overflow-y-auto">
         {/* Mobile Header */}
@@ -266,11 +333,16 @@ export default function NewJobPage() {
                 <h1 className="text-3xl md:text-4xl font-bold text-[#1C3991] leading-tight">
                   Post a New Job
                 </h1>
-                <p className="text-[#165BF8] text-lg mt-1">Fill out the details to create a new job listing.</p>
+                <p className="text-[#165BF8] text-lg mt-1">
+                  Fill out the details to create a new job listing.
+                </p>
               </div>
               <Link href="/poster/dashboard" passHref>
                 <motion.button
-                  whileHover={{ scale: 1.02, boxShadow: `0 8px 16px ${primaryBlue}20` }}
+                  whileHover={{
+                    scale: 1.02,
+                    boxShadow: `0 8px 16px ${primaryBlue}20`,
+                  }}
                   whileTap={{ scale: 0.98 }}
                   className="flex items-center px-4 py-2 bg-[#165BF8] text-white rounded-xl font-semibold shadow-md transition-all duration-300 w-full md:w-auto justify-center"
                 >
@@ -327,7 +399,10 @@ export default function NewJobPage() {
               <form onSubmit={handleSubmit} className="p-6 space-y-6">
                 {/* Job Title Field */}
                 <div className="space-y-2">
-                  <label htmlFor="title" className="block text-sm font-medium text-[#1C3991]">
+                  <label
+                    htmlFor="title"
+                    className="block text-sm font-medium text-[#1C3991]"
+                  >
                     Job Title <span className="text-red-500">*</span>
                   </label>
                   <div className="relative">
@@ -349,7 +424,10 @@ export default function NewJobPage() {
 
                 {/* Company Field */}
                 <div className="space-y-2">
-                  <label htmlFor="company" className="block text-sm font-medium text-[#1C3991]">
+                  <label
+                    htmlFor="company"
+                    className="block text-sm font-medium text-[#1C3991]"
+                  >
                     Company Name <span className="text-red-500">*</span>
                   </label>
                   <div className="relative">
@@ -371,7 +449,10 @@ export default function NewJobPage() {
 
                 {/* Job Description Field */}
                 <div className="space-y-2">
-                  <label htmlFor="description" className="block text-sm font-medium text-[#1C3991]">
+                  <label
+                    htmlFor="description"
+                    className="block text-sm font-medium text-[#1C3991]"
+                  >
                     Job Description <span className="text-red-500">*</span>
                   </label>
                   <textarea
@@ -384,14 +465,19 @@ export default function NewJobPage() {
                     rows={6}
                     required
                   />
-                  <p className="text-xs text-gray-500 mt-1">Markdown formatting supported</p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Markdown formatting supported
+                  </p>
                 </div>
 
                 {/* Location and Job Type - Side by Side on Desktop */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {/* Location Field with Autocomplete */}
                   <div className="space-y-2 relative">
-                    <label htmlFor="location" className="block text-sm font-medium text-[#1C3991]">
+                    <label
+                      htmlFor="location"
+                      className="block text-sm font-medium text-[#1C3991]"
+                    >
                       Location <span className="text-red-500">*</span>
                     </label>
                     <div className="relative">
@@ -402,7 +488,9 @@ export default function NewJobPage() {
                         value={formData.location}
                         onChange={handleInputChange}
                         onFocus={() => setShowSuggestions(true)}
-                        onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
+                        onBlur={() =>
+                          setTimeout(() => setShowSuggestions(false), 200)
+                        }
                         className="block w-full px-4 py-3 rounded-xl border border-[#165BF8]/20 focus:ring-2 focus:ring-[#165BF8]/30 focus:border-[#165BF8] placeholder-gray-400 transition duration-200 shadow-sm"
                         placeholder="e.g. New York, NY or Remote"
                         required
@@ -430,7 +518,10 @@ export default function NewJobPage() {
 
                   {/* Job Type Field */}
                   <div className="space-y-2">
-                    <label htmlFor="jobType" className="block text-sm font-medium text-[#1C3991]">
+                    <label
+                      htmlFor="jobType"
+                      className="block text-sm font-medium text-[#1C3991]"
+                    >
                       Job Type <span className="text-red-500">*</span>
                     </label>
                     <div className="relative">
@@ -460,7 +551,10 @@ export default function NewJobPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {/* Salary Field - Now a dropdown for ranges */}
                   <div className="space-y-2">
-                    <label htmlFor="salary" className="block text-sm font-medium text-[#1C3991]">
+                    <label
+                      htmlFor="salary"
+                      className="block text-sm font-medium text-[#1C3991]"
+                    >
                       Salary (Optional)
                     </label>
                     <div className="relative">
@@ -472,7 +566,7 @@ export default function NewJobPage() {
                         className="block w-full px-4 py-3 rounded-xl border border-[#165BF8]/20 focus:ring-2 focus:ring-[#165BF8]/30 focus:border-[#165BF8] placeholder-gray-400 transition duration-200 shadow-sm appearance-none pr-10"
                       >
                         <option value="">Select a Salary Range</option>
-                        {salaryRanges.map(range => (
+                        {salaryRanges.map((range) => (
                           <option key={range} value={range}>
                             {range}
                           </option>
@@ -486,7 +580,10 @@ export default function NewJobPage() {
 
                   {/* Number of Openings Field */}
                   <div className="space-y-2">
-                    <label htmlFor="numberOfOpenings" className="block text-sm font-medium text-[#1C3991]">
+                    <label
+                      htmlFor="numberOfOpenings"
+                      className="block text-sm font-medium text-[#1C3991]"
+                    >
                       No. of Openings <span className="text-red-500">*</span>
                     </label>
                     <div className="relative">
@@ -506,6 +603,33 @@ export default function NewJobPage() {
                       />
                     </div>
                   </div>
+                </div>
+
+                {/* Skills Field */}
+                <div className="space-y-2">
+                  <label
+                    htmlFor="skills"
+                    className="block text-sm font-medium text-[#1C3991]"
+                  >
+                    Skills (Optional)
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      id="skills"
+                      name="skills"
+                      value={formData.skills}
+                      onChange={handleInputChange}
+                      className="block w-full px-4 py-3 rounded-xl border border-[#165BF8]/20 focus:ring-2 focus:ring-[#165BF8]/30 focus:border-[#165BF8] placeholder-gray-400 transition duration-200 shadow-sm"
+                      placeholder="e.g. React, Node.js, MongoDB"
+                    />
+                    <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                      <FiZap className="h-5 w-5 text-[#165BF8]/70" />
+                    </div>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Enter skills separated by commas.
+                  </p>
                 </div>
 
                 {/* Form Actions */}

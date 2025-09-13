@@ -1,12 +1,25 @@
-'use client';
+"use client";
 
-import { useEffect, useState, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
-import { useAuth } from '@/app/context/AuthContext';
-import Link from 'next/link';
-import Sidebar from '@/app/components/Sidebar';
-import { FiBriefcase, FiMapPin, FiDollarSign, FiEdit, FiUsers, FiMenu, FiXCircle, FiActivity, FiClock, FiPlus, FiZap, FiLoader } from 'react-icons/fi';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useEffect, useState, useCallback } from "react";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/app/context/AuthContext";
+import Link from "next/link";
+import Sidebar from "@/app/components/Sidebar";
+import {
+  FiBriefcase,
+  FiMapPin,
+  FiDollarSign,
+  FiEdit,
+  FiUsers,
+  FiMenu,
+  FiXCircle,
+  FiActivity,
+  FiClock,
+  FiPlus,
+  FiZap,
+  FiLoader,
+} from "react-icons/fi";
+import { motion, AnimatePresence } from "framer-motion";
 
 // Brand colors
 const primaryBlue = "#165BF8";
@@ -20,7 +33,7 @@ interface UserDisplay {
   role: string;
   firstLogin: boolean;
   isSuperAdmin: boolean;
-  status: 'active' | 'inactive';
+  status: "active" | "inactive";
   createdAt: string;
 }
 
@@ -31,10 +44,10 @@ interface JobDisplay {
   description: string;
   location: string;
   salary?: string | number; // Made optional and flexible for number or string
-  status: 'active' | 'inactive' | 'closed';
+  status: "active" | "inactive" | "closed";
   numberOfOpenings: number;
   company: string;
-  jobType: 'Full-time' | 'Part-time' | 'Contract' | 'Temporary' | 'Internship';
+  jobType: "Full-time" | "Part-time" | "Contract" | "Temporary" | "Internship";
   skills?: string[];
   companyLogo?: string;
   postedBy: string;
@@ -65,9 +78,9 @@ const cardAnimation = {
     transition: {
       duration: 0.6,
       ease: [0.16, 1, 0.3, 1],
-      staggerChildren: 0.1
-    }
-  }
+      staggerChildren: 0.1,
+    },
+  },
 };
 
 const pulseEffect = {
@@ -81,7 +94,13 @@ const pulseEffect = {
 };
 
 export default function PosterDashboardPage() {
-  const { user, loading: authLoading, isAuthenticated, logout, token } = useAuth();
+  const {
+    user,
+    loading: authLoading,
+    isAuthenticated,
+    logout,
+    token,
+  } = useAuth();
   const router = useRouter();
 
   const [recentJobs, setRecentJobs] = useState<JobDisplay[]>([]);
@@ -94,25 +113,35 @@ export default function PosterDashboardPage() {
     if (authLoading) return;
 
     if (!isAuthenticated || !user) {
-      console.warn('PosterDashboardPage: Not authenticated. Redirecting to /login.');
-      router.push('/login');
+      console.warn(
+        "PosterDashboardPage: Not authenticated. Redirecting to /login."
+      );
+      router.push("/login");
       return;
     }
 
     if (user.firstLogin) {
-      console.warn('PosterDashboardPage: User is firstLogin. Redirecting to /change-password.');
-      router.push('/change-password');
+      console.warn(
+        "PosterDashboardPage: User is firstLogin. Redirecting to /change-password."
+      );
+      router.push("/change-password");
       return;
     }
 
-    if (user.role !== 'job_poster') {
-      console.warn(`PosterDashboardPage: Incorrect role (${user.role}). Redirecting.`);
-      if (user.role === 'admin') {
-        router.push('/admin/dashboard');
-      } else if (user.role === 'job_seeker') {
-        router.push(user.onboardingStatus === 'completed' ? '/seeker/dashboard' : '/seeker/onboarding');
+    if (user.role !== "job_poster") {
+      console.warn(
+        `PosterDashboardPage: Incorrect role (${user.role}). Redirecting.`
+      );
+      if (user.role === "admin") {
+        router.push("/admin/dashboard");
+      } else if (user.role === "job_seeker") {
+        router.push(
+          user.onboardingStatus === "completed"
+            ? "/seeker/dashboard"
+            : "/seeker/onboarding"
+        );
       } else {
-        router.push('/');
+        router.push("/");
       }
       return;
     }
@@ -122,7 +151,7 @@ export default function PosterDashboardPage() {
     setDataError(null);
     try {
       if (!token || !user?._id) {
-        throw new Error('Authentication token or user ID not available.');
+        throw new Error("Authentication token or user ID not available.");
       }
 
       const response = await fetch(
@@ -137,19 +166,19 @@ export default function PosterDashboardPage() {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to fetch recent jobs');
+        throw new Error(data.error || "Failed to fetch recent jobs");
       }
 
       if (Array.isArray(data.jobs)) {
         setRecentJobs(data.jobs);
       } else {
         setDataError(
-          'Failed to fetch recent jobs: Invalid data format from server.'
+          "Failed to fetch recent jobs: Invalid data format from server."
         );
         setRecentJobs([]);
       }
     } catch (err: any) {
-      setDataError(err.message || 'Failed to load recent job data.');
+      setDataError(err.message || "Failed to load recent job data.");
     } finally {
       setDataLoading(false);
     }
@@ -158,42 +187,50 @@ export default function PosterDashboardPage() {
   const fetchApplicationsCount = useCallback(async () => {
     try {
       if (!token || !user?._id) {
-        throw new Error('Authentication token or user ID not available.');
+        throw new Error("Authentication token or user ID not available.");
       }
 
-      const response = await fetch(`/api/applications/count?postedBy=${user._id}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      const response = await fetch(
+        `/api/applications/count?postedBy=${user._id}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
 
       if (!response.ok) {
-        throw new Error('Failed to fetch application count');
+        throw new Error("Failed to fetch application count");
       }
 
       const data = await response.json();
       setApplicationsCount(data.count);
-
     } catch (err) {
-      console.error('Error fetching application count:', err);
+      console.error("Error fetching application count:", err);
       setApplicationsCount(0);
     }
   }, [token, user]);
 
   useEffect(() => {
-    if (!authLoading && isAuthenticated && user && user.role === 'job_poster') {
+    if (!authLoading && isAuthenticated && user && user.role === "job_poster") {
       setDataLoading(true);
       fetchRecentJobs();
       fetchApplicationsCount();
     }
-  }, [authLoading, isAuthenticated, user, fetchRecentJobs, fetchApplicationsCount]);
+  }, [
+    authLoading,
+    isAuthenticated,
+    user,
+    fetchRecentJobs,
+    fetchApplicationsCount,
+  ]);
 
   if (
     authLoading ||
     !isAuthenticated ||
     !user ||
     user.firstLogin ||
-    user.role !== 'job_poster'
+    user.role !== "job_poster"
   ) {
     return (
       <div className="flex h-screen bg-gradient-to-br from-[#f6f9ff] to-[#eef2ff] justify-center items-center">
@@ -218,7 +255,12 @@ export default function PosterDashboardPage() {
 
   return (
     <div className="flex h-screen bg-gradient-to-br from-[#f6f9ff] to-[#eef2ff] overflow-hidden font-inter">
-      <Sidebar userRole={user.role} onLogout={logout} isOpen={isSidebarOpen} setIsOpen={setIsSidebarOpen} />
+      <Sidebar
+        userRole={user.role}
+        onLogout={logout}
+        isOpen={isSidebarOpen}
+        setIsOpen={setIsSidebarOpen}
+      />
 
       <div className="flex-1 flex flex-col overflow-y-auto">
         {/* Mobile Header (visible only on small screens) */}
@@ -252,7 +294,7 @@ export default function PosterDashboardPage() {
               <div>
                 <h1 className="text-3xl md:text-4xl font-bold text-[#1C3991] leading-tight">
                   <span className="bg-gradient-to-r from-[#165BF8] to-[#1C3991] bg-clip-text text-transparent">
-                    Welcome back, {user.username || 'Job Poster'}!
+                    Welcome back, {user.username || "Job Poster"}!
                   </span>
                 </h1>
                 <p className="text-[#165BF8] mt-2">
@@ -263,7 +305,10 @@ export default function PosterDashboardPage() {
               <div className="flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-4 w-full md:w-auto">
                 <Link href="/poster/new-job" passHref>
                   <motion.button
-                    whileHover={{ scale: 1.02, boxShadow: `0 8px 16px ${primaryBlue}20` }}
+                    whileHover={{
+                      scale: 1.02,
+                      boxShadow: `0 8px 16px ${primaryBlue}20`,
+                    }}
                     whileTap={{ scale: 0.98 }}
                     className="flex items-center px-6 py-3 bg-[#165BF8] text-white rounded-xl font-semibold shadow-md transition-all duration-300 w-full justify-center"
                   >
@@ -273,7 +318,10 @@ export default function PosterDashboardPage() {
                 </Link>
                 <Link href="/poster/posted-jobs" passHref>
                   <motion.button
-                    whileHover={{ scale: 1.02, boxShadow: `0 8px 16px ${darkBlue}20` }}
+                    whileHover={{
+                      scale: 1.02,
+                      boxShadow: `0 8px 16px ${darkBlue}20`,
+                    }}
                     whileTap={{ scale: 0.98 }}
                     className="flex items-center px-6 py-3 bg-white text-[#1C3991] rounded-xl font-semibold shadow-md transition-all duration-300 w-full justify-center border border-[#165BF8]/20"
                   >
@@ -294,13 +342,20 @@ export default function PosterDashboardPage() {
               {/* Total Posted Jobs Card */}
               <motion.div
                 variants={fadeIn}
-                whileHover={{ y: -5, boxShadow: `0 10px 25px -5px ${primaryBlue}1A` }}
+                whileHover={{
+                  y: -5,
+                  boxShadow: `0 10px 25px -5px ${primaryBlue}1A`,
+                }}
                 className="bg-white p-6 rounded-2xl shadow-sm border border-[#165BF8]/10 flex flex-col justify-between transition-all duration-300"
               >
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-gray-500 text-sm font-medium">Total Posted Jobs</p>
-                    <h3 className="text-3xl font-bold mt-1 text-[#1C3991]">{recentJobs.length}</h3>
+                    <p className="text-gray-500 text-sm font-medium">
+                      Total Posted Jobs
+                    </p>
+                    <h3 className="text-3xl font-bold mt-1 text-[#1C3991]">
+                      {recentJobs.length}
+                    </h3>
                   </div>
                   <div className="p-4 rounded-full bg-[#165BF8]/10 text-[#165BF8]">
                     <FiBriefcase className="w-7 h-7" />
@@ -311,14 +366,21 @@ export default function PosterDashboardPage() {
               {/* Active Jobs Card */}
               <motion.div
                 variants={fadeIn}
-                whileHover={{ y: -5, boxShadow: `0 10px 25px -5px ${primaryBlue}1A` }}
+                whileHover={{
+                  y: -5,
+                  boxShadow: `0 10px 25px -5px ${primaryBlue}1A`,
+                }}
                 className="bg-white p-6 rounded-2xl shadow-sm border border-[#165BF8]/10 flex flex-col justify-between transition-all duration-300"
               >
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-gray-500 text-sm font-medium">Active Jobs</p>
-                    <h3 className="text-3xl font-bold mt-1 text-[#1C3991]">{
-                        recentJobs.filter((job) => job.status === 'active').length
+                    <p className="text-gray-500 text-sm font-medium">
+                      Active Jobs
+                    </p>
+                    <h3 className="text-3xl font-bold mt-1 text-[#1C3991]">
+                      {
+                        recentJobs.filter((job) => job.status === "active")
+                          .length
                       }
                     </h3>
                   </div>
@@ -331,14 +393,19 @@ export default function PosterDashboardPage() {
               {/* Total Applications Card (Placeholder) */}
               <motion.div
                 variants={fadeIn}
-                whileHover={{ y: -5, boxShadow: `0 10px 25px -5px ${primaryBlue}1A` }}
+                whileHover={{
+                  y: -5,
+                  boxShadow: `0 10px 25px -5px ${primaryBlue}1A`,
+                }}
                 className="bg-white p-6 rounded-2xl shadow-sm border border-[#165BF8]/10 flex flex-col justify-between transition-all duration-300"
               >
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-gray-500 text-sm font-medium">Total Applications</p>
+                    <p className="text-gray-500 text-sm font-medium">
+                      Total Applications
+                    </p>
                     <h3 className="text-3xl font-bold mt-1 text-[#1C3991]">
-                        {applicationsCount}
+                      {applicationsCount}
                     </h3>
                   </div>
                   <div className="p-4 rounded-full bg-indigo-100/30 text-indigo-600">
@@ -419,7 +486,10 @@ export default function PosterDashboardPage() {
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ duration: 0.3 }}
-                      whileHover={{ y: -3, boxShadow: `0 8px 16px ${primaryBlue}15` }}
+                      whileHover={{
+                        y: -3,
+                        boxShadow: `0 8px 16px ${primaryBlue}15`,
+                      }}
                       className="bg-white border border-[#165BF8]/10 rounded-xl overflow-hidden shadow-sm transition-all duration-200"
                     >
                       <div className="p-6">
@@ -439,17 +509,23 @@ export default function PosterDashboardPage() {
                               </div>
 
                               <div className="flex items-center text-sm text-gray-600">
-                                {job.salary ? (
-                                    <>
-                                        <span className="flex-shrink-0 mr-1.5 font-medium text-lg text-green-600/70">
-                                            ₹
-                                        </span>
-                                        {typeof job.salary === 'number'
-                                            ? `${job.salary.toLocaleString('en-IN')}`
-                                            : job.salary}
-                                    </>
+                                {job.salaryOriginal ? (
+                                  <span className="text-green-600/80 font-medium">
+                                    {job.salaryOriginal}
+                                  </span>
+                                ) : job.salaryMin && job.salaryMax ? (
+                                  <span className="text-green-600/80 font-medium">
+                                    {job.salaryMin / 100000} -{" "}
+                                    {job.salaryMax / 100000} LPA
+                                  </span>
+                                ) : job.salaryMin ? (
+                                  <span className="text-green-600/80 font-medium">
+                                    {job.salaryMin / 100000}+ LPA
+                                  </span>
                                 ) : (
-                                    <span className="text-gray-400 italic">Not Specified</span>
+                                  <span className="text-gray-400 italic">
+                                    Not Specified
+                                  </span>
                                 )}
                               </div>
 
@@ -460,8 +536,10 @@ export default function PosterDashboardPage() {
 
                               <div className="flex items-center text-sm text-gray-600">
                                 <FiClock className="flex-shrink-0 mr-1.5 h-5 w-5 text-[#165BF8]/70" />
-                                Posted{' '}
-                                {new Date(job.createdAt).toLocaleDateString('en-GB')}
+                                Posted{" "}
+                                {new Date(job.createdAt).toLocaleDateString(
+                                  "en-GB"
+                                )}
                               </div>
                             </div>
                           </div>
@@ -469,17 +547,17 @@ export default function PosterDashboardPage() {
                           <span
                             className={`ml-4 inline-flex items-center px-3 py-1 rounded-full text-sm font-medium 
                             ${
-                              job.status === 'active'
-                                ? 'bg-green-100/30 text-green-800'
-                                : job.status === 'closed'
-                                ? 'bg-red-100/30 text-red-800'
-                                : 'bg-gray-100/30 text-gray-800'
+                              job.status === "active"
+                                ? "bg-green-100/30 text-green-800"
+                                : job.status === "closed"
+                                ? "bg-red-100/30 text-red-800"
+                                : "bg-gray-100/30 text-gray-800"
                             }`}
                           >
-                            {(job.status || 'inactive')
+                            {(job.status || "inactive")
                               .charAt(0)
                               .toUpperCase() +
-                              (job.status || 'inactive').slice(1)}
+                              (job.status || "inactive").slice(1)}
                           </span>
                         </div>
 

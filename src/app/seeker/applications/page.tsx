@@ -1,4 +1,3 @@
-// app/seeker/applications/page.tsx
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
@@ -15,7 +14,10 @@ interface ApplicationDisplay {
         _id: string;
         title: string;
         location: string;
-        salary: number;
+        // ✅ Changed to match the actual data structure
+        salaryOriginal?: string;
+        salaryMin?: number;
+        salaryMax?: number | null;
         company?: string; // Added company
         companyLogo?: string; // Added companyLogo
         jobType?: string; // Added jobType
@@ -273,8 +275,9 @@ export default function SeekerApplicationsPage() {
                                                     <FiCalendar className="mr-2 text-indigo-500" size={16} />
                                                     <span>Applied On: {new Date(app.appliedAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
                                                 </div>
+                                                {/* ✅ FIX: Use salaryOriginal if it exists */}
                                                 <p className="text-lg text-gray-800 font-bold mt-2">
-                                                    ₹{app.job.salary.toLocaleString('en-IN')} / year
+                                                    {app.job.salaryOriginal || 'Salary Not Specified'}
                                                 </p>
                                             </div>
                                         </div>

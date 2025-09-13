@@ -1,4 +1,3 @@
-// app/seeker/saved-jobs/page.tsx
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
@@ -14,7 +13,10 @@ interface Job {
     title: string;
     description: string;
     location: string;
-    salary: number;
+    // ✅ FIX: Changed to match the actual data structure
+    salaryOriginal?: string;
+    salaryMin?: number;
+    salaryMax?: number | null;
     company?: string;
     companyLogo?: string;
     jobType?: string;
@@ -287,9 +289,9 @@ export default function SeekerSavedJobsPage() {
                                                 )}
                                             </div>
 
+                                            {/* ✅ FIX: Use salaryOriginal if it exists */}
                                             <p className="text-lg text-gray-800 font-bold mb-3 flex items-center">
-                                                {/* Removed FiDollarSign icon */}
-                                                ₹{savedJob.job.salary.toLocaleString('en-IN')} / year
+                                                {savedJob.job.salaryOriginal || 'Salary Not Specified'}
                                             </p>
                                             <p className="text-sm text-gray-700 line-clamp-3 mb-4">{savedJob.job.description}</p>
                                         </div>

@@ -21,11 +21,13 @@ interface ApplicationDisplay {
         _id: string;
         title: string;
         location: string;
-        salary: number;
-        company?: string; // Added company
-        companyLogo?: string; // Added companyLogo
-        jobType?: string; // Added jobType
-        numberOfOpenings?: number; // Added numberOfOpenings
+        salaryOriginal?: string; 
+        salaryMin?: number; 
+        salaryMax?: number | null; 
+        company?: string;
+        companyLogo?: string;
+        jobType?: string;
+        numberOfOpenings?: number;
     };
     status: 'pending' | 'reviewed' | 'interview' | 'accepted' | 'rejected';
     appliedAt: string;
@@ -404,9 +406,16 @@ export default function JobSeekerDashboardPage() {
                                                             <FiCalendar className="mr-2 text-indigo-500" size={16} />
                                                             <span>Applied On: {new Date(app.appliedAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
                                                         </div>
-                                                        <p className="text-lg text-gray-800 font-bold mt-2">
-                                                            ₹{app.job.salary.toLocaleString('en-IN')} / year
-                                                        </p>
+                                                        {/* CORRECTED CODE BLOCK - Use salaryOriginal */}
+                                                        {app.job.salaryOriginal ? (
+                                                            <p className="text-lg text-gray-800 font-bold mt-2">
+                                                                ₹{app.job.salaryOriginal}
+                                                            </p>
+                                                        ) : (
+                                                            <p className="text-lg text-gray-500 font-medium mt-2">
+                                                                Salary Not Specified
+                                                            </p>
+                                                        )}
                                                     </div>
                                                     <span className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full capitalize ${getStatusClasses(app.status)}`}>
                                                         {app.status.charAt(0).toUpperCase() + app.status.slice(1)}
