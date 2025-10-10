@@ -5,7 +5,6 @@ import dbConnect from '@/lib/dbConnect';
 import mongoose from 'mongoose';
 import { authMiddleware } from '@/lib/authMiddleware';
 import { Readable } from 'stream';
-import { User as UserModel, IUser } from '@/models/User';
 
 // Helper function to convert a web stream to a Node.js Readable stream
 function webStreamToNodeStream(webStream: ReadableStream): Readable {
@@ -32,8 +31,8 @@ function webStreamToNodeStream(webStream: ReadableStream): Readable {
   return nodeStream;
 }
 
-// Get or create the User model to prevent errors in Next.js environment
-const User = mongoose.models.User || mongoose.model<IUser>('User', UserModel.schema);
+// Get the User model from mongoose
+const User = mongoose.models.User || (await import('@/models/User')).default;
 
 /**
  * GET /api/resumes
@@ -77,7 +76,7 @@ export async function POST(request: NextRequest) {
   if (!authResult.success) {
     return NextResponse.json({ error: authResult.message }, { status: authResult.status });
   }
-  const authenticatedUser = authResult.user as IUser;
+  const authenticatedUser = authResult.user;
 
   if (!authenticatedUser || !authenticatedUser._id) {
     console.warn(`API: Authenticated user object is missing or has no ID.`);
