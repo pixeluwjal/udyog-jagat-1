@@ -3,6 +3,62 @@
 import { useState, FormEvent, useEffect, ChangeEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/app/context/AuthContext';
+import { motion, AnimatePresence } from 'framer-motion';
+import {
+  FiUser,
+  FiPhone,
+  FiAward,
+  FiFileText,
+  FiUploadCloud,
+  FiCheckCircle,
+  FiXCircle,
+  FiLoader,
+  FiArrowLeft,
+  FiMail,
+  FiBriefcase
+} from 'react-icons/fi';
+
+// Brand colors
+const primaryBlue = "#165BF8";
+const darkBlue = "#1C3991";
+
+// Animation variants
+const fadeIn = {
+  hidden: { opacity: 0, y: 30 },
+  visible: { 
+    opacity: 1, 
+    y: 0, 
+    transition: { 
+      duration: 0.6, 
+      ease: [0.16, 1, 0.3, 1],
+      delay: 0.1
+    } 
+  },
+};
+
+const cardAnimation = {
+  hidden: { opacity: 0, y: 20, scale: 0.98 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    scale: 1,
+    transition: { 
+      duration: 0.7, 
+      ease: [0.16, 1, 0.3, 1],
+      staggerChildren: 0.15
+    }
+  }
+};
+
+const pulseEffect = {
+  scale: [1, 1.05, 1],
+  opacity: [1, 0.8, 1],
+  transition: { 
+    duration: 1.5, 
+    repeat: Infinity, 
+    ease: "easeInOut" 
+  }
+};
 
 export default function SeekerOnboardingPage() {
   const { user, loading: authLoading, isAuthenticated, token, logout, login } = useAuth();
@@ -108,251 +164,351 @@ export default function SeekerOnboardingPage() {
 
   if (authLoading || !user || user.role !== 'job_seeker' || user.onboardingStatus === 'completed') {
     return (
-      <div className="flex h-screen bg-gray-50">
-        <div className="m-auto">
-          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500"></div>
-        </div>
+      <div className="flex h-screen bg-gradient-to-br from-[#f6f9ff] to-[#eef2ff] justify-center items-center">
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="flex flex-col items-center"
+        >
+          <motion.div
+            animate={pulseEffect}
+            className="rounded-full p-6 bg-gradient-to-br from-[#165BF8] to-[#1C3991] shadow-2xl"
+          >
+            <FiLoader className="text-white h-12 w-12 animate-spin" />
+          </motion.div>
+          <motion.p
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.3 }}
+            className="mt-6 text-xl font-semibold text-[#1C3991]"
+          >
+            Loading Onboarding...
+          </motion.p>
+        </motion.div>
       </div>
     );
   }
 
   return (
-    <div className="flex h-screen bg-gray-50 overflow-hidden">
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <div className="flex-1 overflow-y-auto p-4 md:p-6">
-          <div className="max-w-3xl mx-auto">
-            {/* Header */}
-            <div className="mb-8 text-center">
-              <h1 className="text-3xl md:text-4xl font-extrabold mb-2">
-                <span className="bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 to-purple-600">
-                  Complete Your Profile
-                </span>
+    <div className="flex h-screen bg-gradient-to-br from-[#f6f9ff] to-[#eef2ff] overflow-hidden font-inter">
+      <div className="flex-1 flex flex-col overflow-y-auto">
+        <div className="flex-1 overflow-y-auto p-4 md:p-8">
+          <div className="max-w-4xl mx-auto space-y-8">
+            {/* Header Section */}
+            <motion.div
+              initial="hidden"
+              animate="visible"
+              variants={fadeIn}
+              className="text-center"
+            >
+              <motion.div
+                whileHover={{ scale: 1.05 }}
+                className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-[#165BF8] to-[#1C3991] rounded-3xl shadow-2xl mb-6"
+              >
+                <FiUser className="h-10 w-10 text-white" />
+              </motion.div>
+              <h1 className="text-4xl md:text-5xl font-black bg-gradient-to-r from-[#165BF8] to-[#1C3991] bg-clip-text text-transparent mb-4">
+                Complete Your Profile
               </h1>
-              <p className="text-gray-500 max-w-lg mx-auto">
-                Fill out your details to access the job seeker dashboard
+              <p className="text-lg text-[#165BF8] font-medium max-w-2xl mx-auto">
+                Set up your professional profile to unlock amazing job opportunities
               </p>
-            </div>
+            </motion.div>
 
-            {/* Notification Alerts */}
-            {error && (
-              <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-6 rounded-r-lg">
-                <div className="flex">
-                  <div className="flex-shrink-0">
-                    <svg className="h-5 w-5 text-red-500" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                    </svg>
-                  </div>
-                  <div className="ml-3">
-                    <p className="text-sm text-red-700">{error}</p>
-                  </div>
-                </div>
-              </div>
-            )}
-            
-            {message && (
-              <div className="bg-green-50 border-l-4 border-green-500 p-4 mb-6 rounded-r-lg">
-                <div className="flex">
-                  <div className="flex-shrink-0">
-                    <svg className="h-5 w-5 text-green-500" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                    </svg>
-                  </div>
-                  <div className="ml-3">
-                    <p className="text-sm text-green-700">{message}</p>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Enhanced Form Card */}
-            <div className="bg-white rounded-xl shadow-lg overflow-hidden border border-gray-100">
-              {/* Form Header */}
-              <div className="bg-gradient-to-r from-indigo-50 to-purple-50 px-6 py-4 border-b border-gray-200">
-                <h2 className="text-lg font-semibold text-gray-800 flex items-center">
-                  <svg className="w-5 h-5 text-indigo-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                  </svg>
-                  Personal Information
-                </h2>
-              </div>
-
-              {/* Form Content */}
-              <form onSubmit={handleSubmit} className="p-6 space-y-6">
-                {/* Full Name Field */}
-                <div className="space-y-2">
-                  <label htmlFor="fullName" className="block text-sm font-medium text-gray-700">
-                    Full Name <span className="text-red-500">*</span>
-                  </label>
-                  <div className="relative">
-                    <input
-                      type="text"
-                      id="fullName"
-                      name="fullName"
-                      value={fullName}
-                      onChange={(e) => setFullName(e.target.value)}
-                      className="block w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 placeholder-gray-400 transition duration-200"
-                      placeholder="John Doe"
-                      required
-                    />
-                    <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                      <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                      </svg>
+            {/* Progress Steps */}
+            <motion.div
+              initial="hidden"
+              animate="visible"
+              variants={fadeIn}
+              transition={{ delay: 0.1 }}
+              className="flex justify-center"
+            >
+              <div className="flex items-center space-x-8">
+                {[
+                  { step: 1, label: "Personal Info", completed: true },
+                  { step: 2, label: "Professional", completed: false },
+                  { step: 3, label: "Resume", completed: false }
+                ].map((item, index) => (
+                  <div key={item.step} className="flex items-center">
+                    <div className={`flex items-center justify-center w-10 h-10 rounded-full border-2 font-bold text-sm ${
+                      item.completed 
+                        ? 'bg-[#165BF8] border-[#165BF8] text-white' 
+                        : 'border-[#165BF8]/30 text-[#165BF8]'
+                    }`}>
+                      {item.completed ? <FiCheckCircle className="w-5 h-5" /> : item.step}
                     </div>
-                  </div>
-                </div>
-
-                {/* Phone Field */}
-                <div className="space-y-2">
-                  <label htmlFor="phone" className="block text-sm font-medium text-gray-700">
-                    Phone Number <span className="text-red-500">*</span>
-                  </label>
-                  <div className="relative">
-                    <input
-                      type="tel"
-                      id="phone"
-                      name="phone"
-                      value={phone}
-                      onChange={(e) => setPhone(e.target.value)}
-                      className="block w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 placeholder-gray-400 transition duration-200"
-                      placeholder="+1 (555) 123-4567"
-                      required
-                    />
-                    <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                      <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-                      </svg>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Skills Field */}
-                <div className="space-y-2">
-                  <label htmlFor="skills" className="block text-sm font-medium text-gray-700">
-                    Skills (comma separated) <span className="text-red-500">*</span>
-                  </label>
-                  <div className="relative">
-                    <input
-                      type="text"
-                      id="skills"
-                      name="skills"
-                      value={skills}
-                      onChange={(e) => setSkills(e.target.value)}
-                      className="block w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 placeholder-gray-400 transition duration-200"
-                      placeholder="JavaScript, React, Node.js"
-                      required
-                    />
-                    <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                      <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-                      </svg>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Experience Field */}
-                <div className="space-y-2">
-                  <label htmlFor="experience" className="block text-sm font-medium text-gray-700">
-                    Experience Summary <span className="text-red-500">*</span>
-                  </label>
-                  <textarea
-                    id="experience"
-                    name="experience"
-                    value={experience}
-                    onChange={(e) => setExperience(e.target.value)}
-                    className="block w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 placeholder-gray-400 transition duration-200 min-h-[150px]"
-                    placeholder="Describe your professional experience..."
-                    required
-                  />
-                </div>
-
-                {/* Resume Upload Field */}
-                <div className="space-y-2">
-                  <label htmlFor="resume" className="block text-sm font-medium text-gray-700">
-                    Resume (PDF only) <span className="text-red-500">*</span>
-                  </label>
-                  <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md">
-                    <div className="space-y-1 text-center">
-                      <svg
-                        className="mx-auto h-12 w-12 text-gray-400"
-                        stroke="currentColor"
-                        fill="none"
-                        viewBox="0 0 48 48"
-                        aria-hidden="true"
-                      >
-                        <path
-                          d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02"
-                          strokeWidth={2}
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        />
-                      </svg>
-                      <div className="flex text-sm text-gray-600">
-                        <label
-                          htmlFor="resume"
-                          className="relative cursor-pointer bg-white rounded-md font-medium text-indigo-600 hover:text-indigo-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-indigo-500"
-                        >
-                          <span>Upload a file</span>
-                          <input
-                            id="resume"
-                            name="resume"
-                            type="file"
-                            accept=".pdf"
-                            onChange={handleFileChange}
-                            className="sr-only"
-                            required
-                          />
-                        </label>
-                        <p className="pl-1">or drag and drop</p>
-                      </div>
-                      <p className="text-xs text-gray-500">PDF up to 10MB</p>
-                    </div>
-                  </div>
-                  {resumeFile && (
-                    <p className="mt-2 text-sm text-gray-600 flex items-center">
-                      <svg className="flex-shrink-0 h-5 w-5 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                      {resumeFile.name}
-                    </p>
-                  )}
-                </div>
-
-                {/* Form Actions */}
-                <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 pt-6 border-t border-gray-200">
-                  <button
-                    type="button"
-                    onClick={() => router.push('/seeker/dashboard')}
-                    className="px-6 py-3 border border-gray-300 rounded-lg font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all duration-200"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className="px-6 py-3 border border-transparent rounded-lg font-medium text-white bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 shadow-sm transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                    disabled={loading}
-                  >
-                    {loading ? (
-                      <span className="flex items-center justify-center">
-                        <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                        Processing...
-                      </span>
-                    ) : (
-                      <span className="flex items-center justify-center">
-                        <svg className="-ml-1 mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                        </svg>
-                        Complete Onboarding
-                      </span>
+                    <span className="ml-2 text-sm font-medium text-[#1C3991]">{item.label}</span>
+                    {index < 2 && (
+                      <div className="ml-8 w-12 h-0.5 bg-[#165BF8]/30"></div>
                     )}
-                  </button>
+                  </div>
+                ))}
+              </div>
+            </motion.div>
+
+            {/* Main Form Card */}
+            <motion.div
+              initial="hidden"
+              animate="visible"
+              variants={cardAnimation}
+              className="bg-white rounded-3xl shadow-2xl border border-[#165BF8]/10 overflow-hidden"
+            >
+              <div className="p-8 border-b border-[#165BF8]/10">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-4">
+                    <div className="p-3 rounded-2xl bg-gradient-to-br from-[#165BF8] to-[#1C3991] text-white shadow-lg">
+                      <FiBriefcase className="h-7 w-7" />
+                    </div>
+                    <div>
+                      <h2 className="text-2xl font-black text-[#1C3991]">Professional Profile</h2>
+                      <p className="text-[#165BF8] font-medium">Tell us about your skills and experience</p>
+                    </div>
+                  </div>
                 </div>
-              </form>
-            </div>
+              </div>
+
+              <div className="p-8">
+                <AnimatePresence>
+                  {error && (
+                    <motion.div
+                      initial={{ opacity: 0, y: -10, scale: 0.95 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: -10, scale: 0.95 }}
+                      className="p-4 bg-red-50 border-l-4 border-red-500 rounded-xl shadow-sm text-red-700 font-medium flex items-center space-x-3 mb-6"
+                    >
+                      <FiXCircle className="h-6 w-6 text-red-500 flex-shrink-0" />
+                      <span className="font-semibold">{error}</span>
+                    </motion.div>
+                  )}
+                  {message && (
+                    <motion.div
+                      initial={{ opacity: 0, y: -10, scale: 0.95 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: -10, scale: 0.95 }}
+                      className="p-4 bg-green-50 border-l-4 border-green-500 rounded-xl shadow-sm text-green-700 font-medium flex items-center space-x-3 mb-6"
+                    >
+                      <FiCheckCircle className="h-6 w-6 text-green-500 flex-shrink-0" />
+                      <span className="font-semibold">{message}</span>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
+                <form onSubmit={handleSubmit} className="space-y-8">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Full Name Field */}
+                    <motion.div variants={cardAnimation}>
+                      <label className="block text-sm font-bold text-[#1C3991] mb-3 uppercase tracking-wide">
+                        <FiUser className="inline-block mr-2 text-[#165BF8]" /> Full Name
+                      </label>
+                      <div className="relative group">
+                        <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                          <FiUser className="h-5 w-5 text-[#165BF8]/70" />
+                        </div>
+                        <input
+                          type="text"
+                          value={fullName}
+                          onChange={(e) => setFullName(e.target.value)}
+                          className="block w-full pl-12 pr-4 py-3.5 text-lg border-2 border-[#165BF8]/20 rounded-2xl shadow-sm placeholder-[#165BF8]/50 focus:outline-none focus:ring-4 focus:ring-[#165BF8]/20 focus:border-[#165BF8] text-[#1C3991] bg-white transition-all duration-300 group-hover:border-[#165BF8]/40"
+                          placeholder="John Doe"
+                          required
+                        />
+                      </div>
+                    </motion.div>
+
+                    {/* Phone Field */}
+                    <motion.div variants={cardAnimation}>
+                      <label className="block text-sm font-bold text-[#1C3991] mb-3 uppercase tracking-wide">
+                        <FiPhone className="inline-block mr-2 text-[#165BF8]" /> Phone Number
+                      </label>
+                      <div className="relative group">
+                        <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                          <FiPhone className="h-5 w-5 text-[#165BF8]/70" />
+                        </div>
+                        <input
+                          type="tel"
+                          value={phone}
+                          onChange={(e) => setPhone(e.target.value)}
+                          className="block w-full pl-12 pr-4 py-3.5 text-lg border-2 border-[#165BF8]/20 rounded-2xl shadow-sm placeholder-[#165BF8]/50 focus:outline-none focus:ring-4 focus:ring-[#165BF8]/20 focus:border-[#165BF8] text-[#1C3991] bg-white transition-all duration-300 group-hover:border-[#165BF8]/40"
+                          placeholder="+1 (555) 123-4567"
+                          required
+                        />
+                      </div>
+                    </motion.div>
+                  </div>
+
+                  {/* Skills Field */}
+                  <motion.div variants={cardAnimation}>
+                    <label className="block text-sm font-bold text-[#1C3991] mb-3 uppercase tracking-wide">
+                      <FiAward className="inline-block mr-2 text-[#165BF8]" /> Skills & Expertise
+                    </label>
+                    <div className="relative group">
+                      <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                        <FiAward className="h-5 w-5 text-[#165BF8]/70" />
+                      </div>
+                      <input
+                        type="text"
+                        value={skills}
+                        onChange={(e) => setSkills(e.target.value)}
+                        className="block w-full pl-12 pr-4 py-3.5 text-lg border-2 border-[#165BF8]/20 rounded-2xl shadow-sm placeholder-[#165BF8]/50 focus:outline-none focus:ring-4 focus:ring-[#165BF8]/20 focus:border-[#165BF8] text-[#1C3991] bg-white transition-all duration-300 group-hover:border-[#165BF8]/40"
+                        placeholder="JavaScript, React, Node.js, Python, etc."
+                        required
+                      />
+                    </div>
+                    <p className="mt-2 text-sm text-[#165BF8] font-medium">Separate skills with commas</p>
+                  </motion.div>
+
+                  {/* Experience Field */}
+                  <motion.div variants={cardAnimation}>
+                    <label className="block text-sm font-bold text-[#1C3991] mb-3 uppercase tracking-wide">
+                      <FiBriefcase className="inline-block mr-2 text-[#165BF8]" /> Professional Experience
+                    </label>
+                    <textarea
+                      value={experience}
+                      onChange={(e) => setExperience(e.target.value)}
+                      className="block w-full px-4 py-3.5 text-lg border-2 border-[#165BF8]/20 rounded-2xl shadow-sm placeholder-[#165BF8]/50 focus:outline-none focus:ring-4 focus:ring-[#165BF8]/20 focus:border-[#165BF8] text-[#1C3991] bg-white transition-all duration-300 min-h-[150px] resize-none"
+                      placeholder="Describe your professional background, key achievements, and career journey..."
+                      required
+                    />
+                  </motion.div>
+
+                  {/* Resume Upload Field */}
+                  <motion.div variants={cardAnimation}>
+                    <label className="block text-sm font-bold text-[#1C3991] mb-3 uppercase tracking-wide">
+                      <FiFileText className="inline-block mr-2 text-[#165BF8]" /> Upload Resume
+                    </label>
+                    
+                    <div className={`border-2 border-dashed rounded-2xl p-8 text-center transition-all duration-300 group ${
+                      resumeFile 
+                        ? 'border-[#165BF8] bg-[#165BF8]/5' 
+                        : 'border-[#165BF8]/30 hover:border-[#165BF8] hover:bg-[#165BF8]/5'
+                    }`}>
+                      <input
+                        type="file"
+                        accept=".pdf,.doc,.docx"
+                        onChange={handleFileChange}
+                        className="hidden"
+                        id="resume-upload"
+                        required
+                      />
+                      
+                      <label htmlFor="resume-upload" className="cursor-pointer">
+                        <div className="flex flex-col items-center justify-center space-y-4">
+                          <div className="p-4 rounded-2xl bg-[#165BF8]/10 text-[#165BF8] group-hover:scale-110 transition-transform duration-300">
+                            <FiUploadCloud className="h-8 w-8" />
+                          </div>
+                          
+                          <div className="text-center">
+                            <p className="text-lg font-bold text-[#1C3991] mb-2">
+                              {resumeFile ? 'Resume Selected' : 'Upload Your Resume'}
+                            </p>
+                            <p className="text-[#165BF8] font-medium">
+                              {resumeFile ? resumeFile.name : 'Click to browse or drag and drop'}
+                            </p>
+                            <p className="text-sm text-[#165BF8]/70 mt-2">
+                              PDF, DOC, DOCX up to 10MB
+                            </p>
+                          </div>
+
+                          {!resumeFile && (
+                            <motion.div
+                              whileHover={{ scale: 1.05 }}
+                              whileTap={{ scale: 0.95 }}
+                              className="px-6 py-3 bg-[#165BF8]/10 text-[#165BF8] rounded-xl font-bold hover:bg-[#165BF8]/20 transition-all duration-300"
+                            >
+                              Choose File
+                            </motion.div>
+                          )}
+                        </div>
+                      </label>
+                    </div>
+
+                    {resumeFile && (
+                      <motion.div
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="mt-4 p-4 bg-green-50 border-2 border-green-200 rounded-xl flex items-center justify-between"
+                      >
+                        <div className="flex items-center space-x-3">
+                          <FiCheckCircle className="h-6 w-6 text-green-500" />
+                          <div>
+                            <p className="font-bold text-green-800">{resumeFile.name}</p>
+                            <p className="text-sm text-green-600">
+                              {(resumeFile.size / (1024 * 1024)).toFixed(2)} MB
+                            </p>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setResumeFile(null)}
+                          className="p-2 text-red-500 hover:bg-red-50 rounded-xl transition-colors duration-200"
+                        >
+                          <FiXCircle className="h-5 w-5" />
+                        </button>
+                      </motion.div>
+                    )}
+                  </motion.div>
+
+                  {/* Form Actions */}
+                  <motion.div
+                    variants={cardAnimation}
+                    className="flex flex-col-reverse sm:flex-row justify-between items-center gap-4 pt-8 border-t border-[#165BF8]/10"
+                  >
+                    <motion.button
+                      type="button"
+                      onClick={() => router.push('/seeker/dashboard')}
+                      whileHover={{ scale: 1.05, boxShadow: "0 8px 25px rgba(22, 91, 248, 0.2)" }}
+                      whileTap={{ scale: 0.95 }}
+                      className="flex items-center px-6 py-3.5 bg-white text-[#165BF8] rounded-2xl hover:bg-[#165BF8]/10 transition-all duration-300 font-bold shadow-lg border-2 border-[#165BF8]/20"
+                    >
+                      <FiArrowLeft className="mr-2 w-5 h-5" /> Back to Dashboard
+                    </motion.button>
+
+                    <motion.button
+                      type="submit"
+                      disabled={loading}
+                      whileHover={{ scale: 1.02, boxShadow: "0 15px 30px rgba(22, 91, 248, 0.3)" }}
+                      whileTap={{ scale: 0.98 }}
+                      className={`
+                        flex items-center px-8 py-3.5 rounded-2xl shadow-xl text-lg font-black text-white
+                        bg-gradient-to-r from-[#165BF8] to-[#1C3991]
+                        hover:from-[#1a65ff] hover:to-[#2242a8]
+                        focus:outline-none focus:ring-4 focus:ring-[#165BF8]/30
+                        transition-all duration-300
+                        ${loading ? "opacity-70 cursor-not-allowed" : ""}
+                      `}
+                    >
+                      {loading ? (
+                        <>
+                          <FiLoader className="animate-spin mr-3 h-6 w-6" />
+                          Completing Profile...
+                        </>
+                      ) : (
+                        <>
+                          <FiCheckCircle className="mr-3 h-6 w-6" />
+                          Complete Onboarding
+                        </>
+                      )}
+                    </motion.button>
+                  </motion.div>
+                </form>
+              </div>
+            </motion.div>
+
+            {/* Help Text */}
+            <motion.div
+              initial="hidden"
+              animate="visible"
+              variants={fadeIn}
+              transition={{ delay: 0.4 }}
+              className="text-center"
+            >
+              <p className="text-sm text-[#165BF8] font-medium">
+                Need help? Contact our support team at{" "}
+                <a href="mailto:support@udyogjagat.com" className="font-bold hover:underline">
+                  support@udyogjagat.com
+                </a>
+              </p>
+            </motion.div>
           </div>
         </div>
       </div>
