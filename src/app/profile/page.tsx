@@ -19,24 +19,61 @@ import {
   FiMapPin,
   FiGlobe,
   FiTag,
-  FiFileText, // Added for resume icon
-  FiUploadCloud, // Added for upload icon
-  FiDownload, // Added for download icon
+  FiFileText,
+  FiUploadCloud,
+  FiDownload,
+  FiShield,
+  FiAward,
+  FiKey,
 } from "react-icons/fi";
 
 // Brand colors
 const primaryBlue = "#165BF8";
 const darkBlue = "#1C3991";
 
+// Enhanced Animation Variants
 const fadeIn = {
-  hidden: { opacity: 0, y: 20 },
-  visible: { opacity: 1, y: 0, transition: { duration: 0.5, ease: "easeOut" } },
+  hidden: { opacity: 0, y: 30 },
+  visible: { 
+    opacity: 1, 
+    y: 0, 
+    transition: { 
+      duration: 0.6, 
+      ease: [0.16, 1, 0.3, 1],
+      delay: 0.1
+    } 
+  },
+};
+
+const cardAnimation = {
+  hidden: { opacity: 0, y: 20, scale: 0.98 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    scale: 1,
+    transition: { 
+      duration: 0.7, 
+      ease: [0.16, 1, 0.3, 1],
+      staggerChildren: 0.15
+    }
+  }
 };
 
 const pulseEffect = {
   scale: [1, 1.05, 1],
-  opacity: [1, 0.7, 1],
-  transition: { duration: 0.8, repeat: Infinity, ease: "easeInOut" },
+  opacity: [1, 0.8, 1],
+  transition: { 
+    duration: 1.5, 
+    repeat: Infinity, 
+    ease: "easeInOut" 
+  }
+};
+
+const cardHover = {
+  scale: 1.02,
+  y: -5,
+  boxShadow: "0 20px 40px rgba(22, 91, 248, 0.15)",
+  transition: { type: "spring", stiffness: 300, damping: 20 }
 };
 
 export default function ProfilePage() {
@@ -67,17 +104,15 @@ export default function ProfilePage() {
 
   const [loading, setLoading] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
-  const [isDownloading, setIsDownloading] = useState(false); // New state for download loading
+  const [isDownloading, setIsDownloading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
-  // Function to fetch the user's resume details
   const fetchResumeDetails = async () => {
     if (!token || !currentUser || currentUser.role !== 'job_seeker') return;
 
     try {
-      // Corrected API endpoint to fetch resume metadata
       const response = await fetch("/api/resumes", {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -86,7 +121,6 @@ export default function ProfilePage() {
 
       if (!response.ok) {
         if (response.status === 404) {
-          // No resume found, which is a valid state
           setResume(null);
           return;
         }
@@ -100,7 +134,6 @@ export default function ProfilePage() {
       });
     } catch (err: any) {
       console.error("Error fetching resume details:", err);
-      // We don't set an error here, as a missing resume isn't a critical failure
     }
   };
 
@@ -116,7 +149,6 @@ export default function ProfilePage() {
           valayaNagar: currentUser.valayaNagar || "",
           khandaBhaga: currentUser.khandaBhaga || "",
         });
-        // FIX: Fetch resume details whenever the currentUser or token changes
         if (currentUser.role === 'job_seeker') {
           fetchResumeDetails();
         }
@@ -270,7 +302,6 @@ export default function ProfilePage() {
     formData.append("resume", resumeFile);
 
     try {
-      // Corrected API endpoint for resume upload
       const response = await fetch("/api/resumes", {
         method: "POST",
         headers: {
@@ -285,7 +316,6 @@ export default function ProfilePage() {
         throw new Error(data.error || "Failed to upload resume.");
       }
 
-      // Update the resume state with the new data
       setResume({ fileName: data.fileName, resumeId: data.resumeId });
       setResumeFile(null);
       setMessage("Resume uploaded successfully!");
@@ -296,7 +326,6 @@ export default function ProfilePage() {
     }
   };
 
-  // FIX: New function to handle resume download
   const handleDownloadResume = async () => {
     if (!resume || !token) {
       setError("No resume found or authentication token missing.");
@@ -320,7 +349,7 @@ export default function ProfilePage() {
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       window.open(url, '_blank');
-      window.URL.revokeObjectURL(url); // Clean up the URL object
+      window.URL.revokeObjectURL(url);
       setMessage("Resume opened in a new tab.");
 
     } catch (err: any) {
@@ -337,18 +366,22 @@ export default function ProfilePage() {
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
           className="flex flex-col items-center"
         >
           <motion.div
             animate={pulseEffect}
-            className="rounded-full p-4 bg-[#165BF8]/10 shadow-inner"
+            className="rounded-full p-6 bg-gradient-to-br from-[#165BF8] to-[#1C3991] shadow-2xl"
           >
-            <FiLoader className="text-[#165BF8] h-12 w-12 animate-spin" />
+            <FiLoader className="text-white h-12 w-12 animate-spin" />
           </motion.div>
-          <p className="mt-6 text-lg font-medium text-[#1C3991]">
-            Loading profile...
-          </p>
+          <motion.p
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.3 }}
+            className="mt-6 text-xl font-semibold text-[#1C3991]"
+          >
+            Loading Profile...
+          </motion.p>
         </motion.div>
       </div>
     );
@@ -359,6 +392,15 @@ export default function ProfilePage() {
     currentUser.role === 'admin' ||
     currentUser.role === 'job_referrer';
 
+  const getRoleIcon = (role: string) => {
+    switch (role) {
+      case 'admin': return <FiShield className="h-5 w-5" />;
+      case 'job_poster': return <FiUser className="h-5 w-5" />;
+      case 'job_seeker': return <FiAward className="h-5 w-5" />;
+      default: return <FiUser className="h-5 w-5" />;
+    }
+  };
+
   return (
     <div className="flex h-screen bg-gradient-to-br from-[#f6f9ff] to-[#eef2ff] overflow-hidden font-inter">
       <Sidebar
@@ -366,408 +408,482 @@ export default function ProfilePage() {
         onLogout={logout}
         isOpen={isSidebarOpen}
         setIsOpen={setIsSidebarOpen}
-        userEmail= {currentUser.email}
+        userEmail={currentUser.email}
       />
 
       <div className="flex-1 flex flex-col overflow-y-auto">
-        {/* Mobile header */}
-        <div className="md:hidden bg-white/95 backdrop-blur-md shadow-lg p-4 flex justify-between items-center z-10 sticky top-0">
+        {/* Enhanced Mobile Header */}
+        <div className="md:hidden bg-white/95 backdrop-blur-md shadow-2xl p-4 flex items-center justify-between z-10 sticky top-0 border-b border-[#165BF8]/10">
           <motion.button
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
-            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-            className="p-2 rounded-md text-gray-600 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-[#165BF8]"
-            aria-label="Toggle sidebar"
+            onClick={() => setIsSidebarOpen(true)}
+            className="p-3 rounded-xl bg-[#165BF8]/10 text-[#165BF8] hover:bg-[#165BF8]/20 transition-all duration-200"
           >
             <FiMenu className="h-6 w-6" />
           </motion.button>
-          <h1 className="text-2xl font-extrabold bg-gradient-to-r from-[#165BF8] to-[#1C3991] bg-clip-text text-transparent absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2">
+          
+          <motion.h1 
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="text-2xl font-black bg-gradient-to-r from-[#165BF8] to-[#1C3991] bg-clip-text text-transparent"
+          >
             My Profile
-          </h1>
-          <div className="w-6 h-6"></div>
+          </motion.h1>
+          
+          <div className="w-12"></div>
         </div>
 
         <div className="flex-1 overflow-y-auto p-4 md:p-8">
-          <motion.div
-            initial="hidden"
-            animate="visible"
-            variants={fadeIn}
-            className="max-w-3xl mx-auto bg-white rounded-3xl shadow-xl border border-[#165BF8]/10 p-6 md:p-8"
-          >
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-              <h1 className="text-3xl font-extrabold text-gray-800 bg-clip-text text-transparent bg-gradient-to-r from-[#165BF8] to-[#1C3991]">
-                My Profile
-              </h1>
-              <motion.button
-                whileHover={{
-                  scale: 1.05,
-                  boxShadow: `0 4px 15px #165BF830`,
-                }}
-                whileTap={{ scale: 0.95 }}
-                onClick={() => setIsEditing(!isEditing)}
-                className="flex items-center px-4 py-2 bg-[#165BF8]/10 text-[#1C3991] rounded-lg hover:bg-[#165BF8]/20 transition-colors text-sm font-medium shadow-sm"
-              >
-                {isEditing ? (
-                  <>
-                    <FiXCircle className="mr-2 w-5 h-5" /> Cancel Edit
-                  </>
-                ) : (
-                  <>
-                    <FiEdit className="mr-2 w-5 h-5" /> Edit Profile
-                  </>
-                )}
-              </motion.button>
-            </div>
-
-            <AnimatePresence>
-              {error && (
-                <motion.div
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  transition={{ duration: 0.3 }}
-                  className="p-3 bg-red-100 border-l-4 border-red-500 rounded-r-lg shadow-sm text-sm text-red-700 font-medium flex items-center mb-4"
-                  role="alert"
-                >
-                  <FiXCircle className="h-5 w-5 text-red-500 mr-2" /> {error}
-                </motion.div>
-              )}
-              {message && (
-                <motion.div
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  transition={{ duration: 0.3 }}
-                  className="p-3 bg-green-100 border-l-4 border-green-500 rounded-r-lg shadow-sm text-sm text-green-700 font-medium flex items-center mb-4"
-                  role="alert"
-                >
-                  <FiCheckCircle className="h-5 w-5 text-green-500 mr-2" />
-                  {message}
-                </motion.div>
-              )}
-            </AnimatePresence>
-
-            <form onSubmit={handleSaveProfile} className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Username */}
-                <div>
-                  <label
-                    htmlFor="username"
-                    className="block text-sm font-semibold text-[#1C3991] mb-2"
-                  >
-                    <FiUser className="inline-block mr-2 text-[#165BF8]" /> Username
-                  </label>
-                  <input
-                    type="text"
-                    id="username"
-                    name="username"
-                    value={formData.username}
-                    onChange={handleChange}
-                    readOnly={!isEditing}
-                    className={`block w-full px-4 py-3 border border-[#165BF8]/20 rounded-xl shadow-sm placeholder-[#165BF8]/50 focus:outline-none focus:ring-2 focus:ring-[#165BF8]/30 focus:border-[#165BF8] transition-all duration-200 text-[#1C3991] ${
-                      !isEditing ? "bg-gray-100 cursor-not-allowed" : "bg-white"
-                    }`}
-                  />
-                </div>
-                {/* Email - Always Read-Only */}
-                <div>
-                  <label
-                    htmlFor="email"
-                    className="block text-sm font-semibold text-[#1C3991] mb-2"
-                  >
-                    <FiMail className="inline-block mr-2 text-[#165BF8]" /> Email
-                  </label>
-                  <input
-                    type="email"
-                    id="email"
-                    name="email"
-                    value={formData.email}
-                    readOnly={true}
-                    className="block w-full px-4 py-3 border border-gray-300 rounded-xl shadow-sm bg-gray-100 cursor-not-allowed text-[#1C3991] transition-all duration-200"
-                  />
-                </div>
-                {/* Role - Read-Only */}
-                <div>
-                  <label
-                    htmlFor="role"
-                    className="block text-sm font-semibold text-[#1C3991] mb-2"
-                  >
-                    <FiTag className="inline-block mr-2 text-[#165BF8]" /> Role
-                  </label>
-                  <input
-                    type="text"
-                    id="role"
-                    name="role"
-                    value={currentUser.role.replace('_', ' ')}
-                    readOnly={true}
-                    className="block w-full px-4 py-3 border border-gray-300 rounded-xl shadow-sm bg-gray-100 cursor-not-allowed text-[#1C3991] capitalize transition-all duration-200"
-                  />
-                </div>
-              </div>
-
-              {shouldDisplayAdditionalFields && (
-                <div className="pt-6 border-t border-[#165BF8]/10 mt-6 space-y-6">
-                  <h3 className="text-xl font-semibold text-[#1C3991]">
-                    Additional Details
-                  </h3>
-                  <div>
-                    <label htmlFor="milanShaka" className="block text-sm font-semibold text-[#1C3991] mb-2">
-                      <FiBookOpen className="inline-block mr-2 text-[#165BF8]" /> Milan/Shaka
-                    </label>
-                    <input
-                      type="text"
-                      id="milanShaka"
-                      name="milanShaka"
-                      value={formData.milanShaka}
-                      onChange={handleChange}
-                      readOnly={!isEditing}
-                      className={`block w-full px-4 py-3 border border-[#165BF8]/20 rounded-xl shadow-sm placeholder-[#165BF8]/50 focus:outline-none focus:ring-2 focus:ring-[#165BF8]/30 focus:border-[#165BF8] transition-all duration-200 text-[#1C3991] ${
-                        !isEditing ? "bg-gray-100 cursor-not-allowed" : "bg-white"
-                      }`}
-                      placeholder="Enter Milan/Shaka"
-                    />
-                  </div>
-                  <div>
-                    <label htmlFor="valayaNagar" className="block text-sm font-semibold text-[#1C3991] mb-2">
-                      <FiMapPin className="inline-block mr-2 text-[#165BF8]" /> Valaya/Nagar
-                    </label>
-                    <input
-                      type="text"
-                      id="valayaNagar"
-                      name="valayaNagar"
-                      value={formData.valayaNagar}
-                      onChange={handleChange}
-                      readOnly={!isEditing}
-                      className={`block w-full px-4 py-3 border border-[#165BF8]/20 rounded-xl shadow-sm placeholder-[#165BF8]/50 focus:outline-none focus:ring-2 focus:ring-[#165BF8]/30 focus:border-[#165BF8] transition-all duration-200 text-[#1C3991] ${
-                        !isEditing ? "bg-gray-100 cursor-not-allowed" : "bg-white"
-                      }`}
-                      placeholder="Enter Valaya/Nagar"
-                    />
-                  </div>
-                  <div>
-                    <label htmlFor="khandaBhaga" className="block text-sm font-semibold text-[#1C3991] mb-2">
-                      <FiGlobe className="inline-block mr-2 text-[#165BF8]" /> Khanda/Bhaga
-                    </label>
-                    <input
-                      type="text"
-                      id="khandaBhaga"
-                      name="khandaBhaga"
-                      value={formData.khandaBhaga}
-                      onChange={handleChange}
-                      readOnly={!isEditing}
-                      className={`block w-full px-4 py-3 border border-[#165BF8]/20 rounded-xl shadow-sm placeholder-[#165BF8]/50 focus:outline-none focus:ring-2 focus:ring-[#165BF8]/30 focus:border-[#165BF8] transition-all duration-200 text-[#1C3991] ${
-                        !isEditing ? "bg-gray-100 cursor-not-allowed" : "bg-white"
-                      }`}
-                      placeholder="Enter Khanda/Bhaga"
-                    />
-                  </div>
-                </div>
-              )}
-
-              {isEditing && (
-                <motion.div
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: 10 }}
-                  transition={{ duration: 0.3 }}
-                  className="mt-6"
-                >
-                  <motion.button
-                    type="submit"
-                    disabled={loading}
-                    whileHover={{
-                      scale: 1.02,
-                      boxShadow: "0 10px 20px rgba(0, 0, 0, 0.15)",
-                    }}
-                    whileTap={{ scale: 0.98 }}
-                    className={`w-full flex justify-center items-center py-3 px-4 border border-transparent rounded-xl shadow-lg text-lg font-semibold text-white bg-gradient-to-r from-green-500 to-teal-600 hover:from-green-600 hover:to-teal-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-all duration-200 ${
-                      loading ? "opacity-70 cursor-not-allowed" : ""
-                    }`}
-                  >
-                    {loading ? (
-                      <>
-                        <FiLoader className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" />
-                        Saving Profile...
-                      </>
-                    ) : (
-                      <>
-                        <FiSave className="-ml-1 mr-3 h-5 w-5" />
-                        Save Profile Changes
-                      </>
-                    )}
-                  </motion.button>
-                </motion.div>
-              )}
-            </form>
-            
-            {/* --- New Resume Section --- */}
-            {currentUser.role === 'job_seeker' && (
-                <motion.div
-                initial="hidden"
-                animate="visible"
-                variants={fadeIn}
-                className="mt-10 bg-white rounded-3xl shadow-xl border border-gray-100 p-6 md:p-8"
-              >
-                <h2 className="text-2xl font-extrabold text-gray-800 bg-clip-text text-transparent bg-gradient-to-r from-teal-600 to-cyan-700 mb-6">
-                  Manage Resume
-                </h2>
-                <form onSubmit={handleResumeUpload} className="space-y-6">
-                  <div>
-                    <label htmlFor="resume-file" className="block text-sm font-semibold text-[#1C3991] mb-2">
-                        <FiFileText className="inline-block mr-2 text-teal-600" /> Upload a new resume
-                    </label>
-                    <input
-                      type="file"
-                      id="resume-file"
-                      onChange={handleFileChange}
-                      className="block w-full text-sm text-gray-500
-                        file:mr-4 file:py-2 file:px-4
-                        file:rounded-xl file:border-0
-                        file:text-sm file:font-semibold
-                        file:bg-teal-50 file:text-teal-700
-                        hover:file:bg-teal-100"
-                      disabled={isUploading}
-                    />
-                  </div>
-                  {/* FIX: Only render the link if the resume.resumeId exists */}
-                  {resume && resume.resumeId && (
-                      <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl border border-gray-200">
-                          <span className="flex items-center text-gray-700 font-medium">
-                              <FiCheckCircle className="text-green-500 mr-2 h-5 w-5" />
-                              Your current resume:
-                          </span>
-                          <motion.button
-                              onClick={handleDownloadResume}
-                              disabled={isDownloading}
-                              whileHover={{ scale: 1.05 }}
-                              whileTap={{ scale: 0.95 }}
-                              className="text-sm font-medium text-blue-600 hover:underline flex items-center disabled:opacity-50 disabled:cursor-not-allowed"
-                          >
-                              {isDownloading ? (
-                                <>
-                                  <FiLoader className="animate-spin mr-2" />
-                                  Loading...
-                                </>
-                              ) : (
-                                <>
-                                  {resume.fileName} <FiDownload className="ml-2" />
-                                </>
-                              )}
-                          </motion.button>
-                      </div>
-                  )}
-                  <motion.button
-                    type="submit"
-                    disabled={isUploading || !resumeFile}
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    className={`w-full flex justify-center items-center py-3 px-4 border border-transparent rounded-xl shadow-lg text-lg font-semibold text-white bg-gradient-to-r from-teal-500 to-cyan-600 hover:from-teal-600 hover:to-cyan-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-teal-500 transition-all duration-200 ${
-                      isUploading ? "opacity-70 cursor-not-allowed" : ""
-                    }`}
-                  >
-                    {isUploading ? (
-                      <>
-                        <FiLoader className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" />
-                        Uploading Resume...
-                      </>
-                    ) : (
-                      <>
-                        <FiUploadCloud className="-ml-1 mr-3 h-5 w-5" />
-                        Upload Resume
-                      </>
-                    )}
-                  </motion.button>
-                </form>
-              </motion.div>
-            )}
-            {/* --- End New Resume Section --- */}
-
+          <div className="max-w-4xl mx-auto space-y-8">
+            {/* Page Header */}
             <motion.div
               initial="hidden"
               animate="visible"
               variants={fadeIn}
-              className="mt-10 bg-white rounded-3xl shadow-xl border border-gray-100 p-6 md:p-8"
+              className="text-center"
             >
-              <h2 className="text-2xl font-extrabold text-gray-800 bg-clip-text text-transparent bg-gradient-to-r from-red-600 to-red-800 mb-6">
-                Change Password
-              </h2>
-              <form onSubmit={handleChangePassword} className="space-y-6">
-                <div>
-                  <label htmlFor="currentPassword" className="block text-sm font-semibold text-gray-700 mb-2">
-                    <FiLock className="inline-block mr-2 text-gray-500" /> Current Password
-                  </label>
-                  <input
-                    type="password"
-                    id="currentPassword"
-                    name="currentPassword"
-                    value={currentPassword}
-                    onChange={handlePasswordChangeInput}
-                    className="block w-full px-4 py-3 border border-gray-300 rounded-xl shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200"
-                    placeholder="Enter your current password"
-                    required
-                    disabled={loading}
-                  />
-                </div>
-                <div>
-                  <label htmlFor="newPassword" className="block text-sm font-semibold text-gray-700 mb-2">
-                    <FiLock className="inline-block mr-2 text-gray-500" /> New Password
-                  </label>
-                  <input
-                    type="password"
-                    id="newPassword"
-                    name="newPassword"
-                    value={newPassword}
-                    onChange={handlePasswordChangeInput}
-                    className="block w-full px-4 py-3 border border-gray-300 rounded-xl shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200"
-                    placeholder="Enter new password (min 6 characters)"
-                    required
-                    disabled={loading}
-                  />
-                </div>
-                <div>
-                  <label htmlFor="confirmNewPassword" className="block text-sm font-semibold text-gray-700 mb-2">
-                    <FiLock className="inline-block mr-2 text-gray-500" /> Confirm New Password
-                  </label>
-                  <input
-                    type="password"
-                    id="confirmNewPassword"
-                    name="confirmNewPassword"
-                    value={confirmNewPassword}
-                    onChange={handlePasswordChangeInput}
-                    className="block w-full px-4 py-3 border border-gray-300 rounded-xl shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200"
-                    placeholder="Confirm your new password"
-                    required
-                    disabled={loading}
-                  />
-                </div>
-                <motion.button
-                  type="submit"
-                  disabled={loading}
-                  whileHover={{
-                    scale: 1.02,
-                    boxShadow: "0 10px 20px rgba(0, 0, 0, 0.15)",
-                  }}
-                  whileTap={{ scale: 0.98 }}
-                  className={`w-full flex justify-center items-center py-3 px-4 border border-transparent rounded-xl shadow-lg text-lg font-semibold text-white bg-gradient-to-r from-red-500 to-rose-600 hover:from-red-600 hover:to-rose-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-all duration-200 ${
-                    loading ? "opacity-70 cursor-not-allowed" : ""
-                  }`}
-                >
-                  {loading ? (
-                    <>
-                      <FiLoader className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" />
-                      Changing Password...
-                    </>
-                  ) : (
-                    <>
-                      <FiSave className="-ml-1 mr-3 h-5 w-5" />
-                      Change Password
-                    </>
-                  )}
-                </motion.button>
-              </form>
+              <motion.div
+                whileHover={{ scale: 1.05 }}
+                className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-[#165BF8] to-[#1C3991] rounded-3xl shadow-2xl mb-6"
+              >
+                <FiUser className="h-10 w-10 text-white" />
+              </motion.div>
+              <h1 className="text-4xl md:text-5xl font-black bg-gradient-to-r from-[#165BF8] to-[#1C3991] bg-clip-text text-transparent mb-4">
+                My Profile
+              </h1>
+              <p className="text-lg text-[#165BF8] font-medium max-w-2xl mx-auto">
+                Manage your personal information, security settings, and professional details
+              </p>
             </motion.div>
 
-          </motion.div>
+            {/* Profile Information Card */}
+            <motion.div
+              initial="hidden"
+              animate="visible"
+              variants={cardAnimation}
+              className="bg-white rounded-3xl shadow-2xl border border-[#165BF8]/10 overflow-hidden"
+            >
+              <div className="p-8 border-b border-[#165BF8]/10">
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-2 gap-6">
+                  <div className="flex items-center space-x-4">
+                    <div className="p-3 rounded-2xl bg-gradient-to-br from-[#165BF8] to-[#1C3991] text-white shadow-lg">
+                      <FiUser className="h-7 w-7" />
+                    </div>
+                    <div>
+                      <h2 className="text-2xl font-black text-[#1C3991]">Profile Information</h2>
+                      <p className="text-[#165BF8] font-medium">Update your personal and professional details</p>
+                    </div>
+                  </div>
+                  
+                  <motion.button
+                    whileHover={{ scale: 1.05, boxShadow: "0 8px 25px rgba(22, 91, 248, 0.2)" }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => setIsEditing(!isEditing)}
+                    className="flex items-center px-5 py-3 bg-[#165BF8]/10 text-[#1C3991] rounded-2xl hover:bg-[#165BF8]/20 transition-all duration-300 font-bold shadow-lg border-2 border-[#165BF8]/20"
+                  >
+                    {isEditing ? (
+                      <>
+                        <FiXCircle className="mr-2 w-5 h-5" /> Cancel Edit
+                      </>
+                    ) : (
+                      <>
+                        <FiEdit className="mr-2 w-5 h-5" /> Edit Profile
+                      </>
+                    )}
+                  </motion.button>
+                </div>
+              </div>
+
+              <div className="p-8">
+                <AnimatePresence>
+                  {error && (
+                    <motion.div
+                      initial={{ opacity: 0, y: -10, scale: 0.95 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: -10, scale: 0.95 }}
+                      className="p-4 bg-red-50 border-l-4 border-red-500 rounded-xl shadow-sm text-red-700 font-medium flex items-center space-x-3 mb-6"
+                    >
+                      <FiXCircle className="h-6 w-6 text-red-500 flex-shrink-0" />
+                      <span className="font-semibold">{error}</span>
+                    </motion.div>
+                  )}
+                  {message && (
+                    <motion.div
+                      initial={{ opacity: 0, y: -10, scale: 0.95 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: -10, scale: 0.95 }}
+                      className="p-4 bg-green-50 border-l-4 border-green-500 rounded-xl shadow-sm text-green-700 font-medium flex items-center space-x-3 mb-6"
+                    >
+                      <FiCheckCircle className="h-6 w-6 text-green-500 flex-shrink-0" />
+                      <span className="font-semibold">{message}</span>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
+                <form onSubmit={handleSaveProfile} className="space-y-8">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Username */}
+                    <motion.div variants={cardAnimation}>
+                      <label className="block text-sm font-bold text-[#1C3991] mb-3 uppercase tracking-wide">
+                        <FiUser className="inline-block mr-2 text-[#165BF8]" /> Username
+                      </label>
+                      <input
+                        type="text"
+                        name="username"
+                        value={formData.username}
+                        onChange={handleChange}
+                        readOnly={!isEditing}
+                        className={`block w-full px-4 py-3.5 text-lg border-2 rounded-2xl shadow-sm placeholder-[#165BF8]/50 focus:outline-none focus:ring-4 focus:ring-[#165BF8]/20 focus:border-[#165BF8] text-[#1C3991] transition-all duration-300 ${
+                          !isEditing 
+                            ? "bg-gray-100 border-gray-200 cursor-not-allowed" 
+                            : "bg-white border-[#165BF8]/20 hover:border-[#165BF8]/40"
+                        }`}
+                      />
+                    </motion.div>
+
+                    {/* Email */}
+                    <motion.div variants={cardAnimation}>
+                      <label className="block text-sm font-bold text-[#1C3991] mb-3 uppercase tracking-wide">
+                        <FiMail className="inline-block mr-2 text-[#165BF8]" /> Email
+                      </label>
+                      <input
+                        type="email"
+                        name="email"
+                        value={formData.email}
+                        readOnly={true}
+                        className="block w-full px-4 py-3.5 text-lg border-2 border-gray-200 rounded-2xl shadow-sm bg-gray-100 cursor-not-allowed text-[#1C3991] transition-all duration-300"
+                      />
+                    </motion.div>
+
+                    {/* Role */}
+                    <motion.div variants={cardAnimation}>
+                      <label className="block text-sm font-bold text-[#1C3991] mb-3 uppercase tracking-wide">
+                        <FiTag className="inline-block mr-2 text-[#165BF8]" /> Role
+                      </label>
+                      <div className="flex items-center space-x-3 p-3.5 bg-[#165BF8]/5 border-2 border-[#165BF8]/10 rounded-2xl">
+                        {getRoleIcon(currentUser.role)}
+                        <span className="text-[#1C3991] font-bold capitalize">
+                          {currentUser.role.replace('_', ' ')}
+                        </span>
+                      </div>
+                    </motion.div>
+                  </div>
+
+                  {shouldDisplayAdditionalFields && (
+                    <motion.div 
+                      variants={cardAnimation}
+                      className="pt-8 border-t border-[#165BF8]/10 mt-8 space-y-6"
+                    >
+                      <h3 className="text-xl font-black text-[#1C3991] flex items-center">
+                        <FiAward className="mr-3 text-[#165BF8]" />
+                        Additional Details
+                      </h3>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <motion.div variants={cardAnimation}>
+                          <label className="block text-sm font-bold text-[#1C3991] mb-3">
+                            <FiBookOpen className="inline-block mr-2 text-[#165BF8]" /> Milan/Shaka
+                          </label>
+                          <input
+                            type="text"
+                            name="milanShaka"
+                            value={formData.milanShaka}
+                            onChange={handleChange}
+                            readOnly={!isEditing}
+                            className={`block w-full px-4 py-3.5 border-2 rounded-2xl shadow-sm placeholder-[#165BF8]/50 focus:outline-none focus:ring-4 focus:ring-[#165BF8]/20 focus:border-[#165BF8] text-[#1C3991] transition-all duration-300 ${
+                              !isEditing 
+                                ? "bg-gray-100 border-gray-200 cursor-not-allowed" 
+                                : "bg-white border-[#165BF8]/20 hover:border-[#165BF8]/40"
+                            }`}
+                            placeholder="Enter Milan/Shaka"
+                          />
+                        </motion.div>
+
+                        <motion.div variants={cardAnimation}>
+                          <label className="block text-sm font-bold text-[#1C3991] mb-3">
+                            <FiMapPin className="inline-block mr-2 text-[#165BF8]" /> Valaya/Nagar
+                          </label>
+                          <input
+                            type="text"
+                            name="valayaNagar"
+                            value={formData.valayaNagar}
+                            onChange={handleChange}
+                            readOnly={!isEditing}
+                            className={`block w-full px-4 py-3.5 border-2 rounded-2xl shadow-sm placeholder-[#165BF8]/50 focus:outline-none focus:ring-4 focus:ring-[#165BF8]/20 focus:border-[#165BF8] text-[#1C3991] transition-all duration-300 ${
+                              !isEditing 
+                                ? "bg-gray-100 border-gray-200 cursor-not-allowed" 
+                                : "bg-white border-[#165BF8]/20 hover:border-[#165BF8]/40"
+                            }`}
+                            placeholder="Enter Valaya/Nagar"
+                          />
+                        </motion.div>
+
+                        <motion.div variants={cardAnimation} className="md:col-span-2">
+                          <label className="block text-sm font-bold text-[#1C3991] mb-3">
+                            <FiGlobe className="inline-block mr-2 text-[#165BF8]" /> Khanda/Bhaga
+                          </label>
+                          <input
+                            type="text"
+                            name="khandaBhaga"
+                            value={formData.khandaBhaga}
+                            onChange={handleChange}
+                            readOnly={!isEditing}
+                            className={`block w-full px-4 py-3.5 border-2 rounded-2xl shadow-sm placeholder-[#165BF8]/50 focus:outline-none focus:ring-4 focus:ring-[#165BF8]/20 focus:border-[#165BF8] text-[#1C3991] transition-all duration-300 ${
+                              !isEditing 
+                                ? "bg-gray-100 border-gray-200 cursor-not-allowed" 
+                                : "bg-white border-[#165BF8]/20 hover:border-[#165BF8]/40"
+                            }`}
+                            placeholder="Enter Khanda/Bhaga"
+                          />
+                        </motion.div>
+                      </div>
+                    </motion.div>
+                  )}
+
+                  {isEditing && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: 10 }}
+                      variants={cardAnimation}
+                      className="mt-8"
+                    >
+                      <motion.button
+                        type="submit"
+                        disabled={loading}
+                        whileHover={{ scale: 1.02, boxShadow: "0 15px 30px rgba(22, 91, 248, 0.3)" }}
+                        whileTap={{ scale: 0.98 }}
+                        className={`
+                          w-full flex justify-center items-center py-4 px-6 rounded-2xl shadow-xl text-lg font-black text-white
+                          bg-gradient-to-r from-[#165BF8] to-[#1C3991]
+                          hover:from-[#1a65ff] hover:to-[#2242a8]
+                          focus:outline-none focus:ring-4 focus:ring-[#165BF8]/30
+                          transition-all duration-300
+                          ${loading ? "opacity-70 cursor-not-allowed" : ""}
+                        `}
+                      >
+                        {loading ? (
+                          <>
+                            <FiLoader className="animate-spin mr-3 h-6 w-6" />
+                            Saving Profile...
+                          </>
+                        ) : (
+                          <>
+                            <FiSave className="mr-3 h-6 w-6" />
+                            Save Profile Changes
+                          </>
+                        )}
+                      </motion.button>
+                    </motion.div>
+                  )}
+                </form>
+              </div>
+            </motion.div>
+
+            {/* Resume Management Section */}
+            {currentUser.role === 'job_seeker' && (
+              <motion.div
+                initial="hidden"
+                animate="visible"
+                variants={fadeIn}
+                transition={{ delay: 0.2 }}
+                className="bg-white rounded-3xl shadow-2xl border border-[#165BF8]/10 overflow-hidden"
+              >
+                <div className="p-8 border-b border-[#165BF8]/10">
+                  <div className="flex items-center space-x-4">
+                    <div className="p-3 rounded-2xl bg-gradient-to-br from-[#165BF8] to-[#1C3991] text-white shadow-lg">
+                      <FiFileText className="h-7 w-7" />
+                    </div>
+                    <div>
+                      <h2 className="text-2xl font-black text-[#1C3991]">Resume Management</h2>
+                      <p className="text-[#165BF8] font-medium">Upload and manage your professional resume</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-8">
+                  <form onSubmit={handleResumeUpload} className="space-y-6">
+                    <motion.div variants={cardAnimation}>
+                      <label className="block text-sm font-bold text-[#1C3991] mb-3">
+                        <FiUploadCloud className="inline-block mr-2 text-[#165BF8]" /> Upload New Resume
+                      </label>
+                      <input
+                        type="file"
+                        onChange={handleFileChange}
+                        className="block w-full text-sm text-[#1C3991] font-medium
+                          file:mr-4 file:py-3 file:px-6
+                          file:rounded-2xl file:border-0
+                          file:text-sm file:font-bold
+                          file:bg-[#165BF8]/10 file:text-[#165BF8]
+                          hover:file:bg-[#165BF8]/20 transition-all duration-300"
+                        disabled={isUploading}
+                      />
+                    </motion.div>
+
+                    {resume && resume.resumeId && (
+                      <motion.div
+                        variants={cardAnimation}
+                        className="flex items-center justify-between p-5 bg-[#165BF8]/5 rounded-2xl border-2 border-[#165BF8]/10"
+                      >
+                        <span className="flex items-center text-[#1C3991] font-bold">
+                          <FiCheckCircle className="text-green-500 mr-3 h-5 w-5" />
+                          Current Resume:
+                        </span>
+                        <motion.button
+                          onClick={handleDownloadResume}
+                          disabled={isDownloading}
+                          whileHover={{ scale: 1.05 }}
+                          whileTap={{ scale: 0.95 }}
+                          className="text-sm font-bold text-[#165BF8] hover:underline flex items-center disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300"
+                        >
+                          {isDownloading ? (
+                            <>
+                              <FiLoader className="animate-spin mr-2" />
+                              Loading...
+                            </>
+                          ) : (
+                            <>
+                              {resume.fileName} <FiDownload className="ml-2" />
+                            </>
+                          )}
+                        </motion.button>
+                      </motion.div>
+                    )}
+
+                    <motion.button
+                      type="submit"
+                      disabled={isUploading || !resumeFile}
+                      whileHover={{ scale: 1.02, boxShadow: "0 15px 30px rgba(22, 91, 248, 0.2)" }}
+                      whileTap={{ scale: 0.98 }}
+                      className={`
+                        w-full flex justify-center items-center py-4 px-6 rounded-2xl shadow-xl text-lg font-black text-white
+                        bg-gradient-to-r from-[#165BF8] to-[#1C3991]
+                        hover:from-[#1a65ff] hover:to-[#2242a8]
+                        focus:outline-none focus:ring-4 focus:ring-[#165BF8]/30
+                        transition-all duration-300
+                        ${isUploading ? "opacity-70 cursor-not-allowed" : ""}
+                      `}
+                    >
+                      {isUploading ? (
+                        <>
+                          <FiLoader className="animate-spin mr-3 h-6 w-6" />
+                          Uploading Resume...
+                        </>
+                      ) : (
+                        <>
+                          <FiUploadCloud className="mr-3 h-6 w-6" />
+                          Upload Resume
+                        </>
+                      )}
+                    </motion.button>
+                  </form>
+                </div>
+              </motion.div>
+            )}
+
+            {/* Password Change Section */}
+            <motion.div
+              initial="hidden"
+              animate="visible"
+              variants={fadeIn}
+              transition={{ delay: 0.3 }}
+              className="bg-white rounded-3xl shadow-2xl border border-[#165BF8]/10 overflow-hidden"
+            >
+              <div className="p-8 border-b border-[#165BF8]/10">
+                <div className="flex items-center space-x-4">
+                  <div className="p-3 rounded-2xl bg-gradient-to-br from-[#165BF8] to-[#1C3991] text-white shadow-lg">
+                    <FiKey className="h-7 w-7" />
+                  </div>
+                  <div>
+                    <h2 className="text-2xl font-black text-[#1C3991]">Security Settings</h2>
+                    <p className="text-[#165BF8] font-medium">Update your password and security preferences</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-8">
+                <form onSubmit={handleChangePassword} className="space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <motion.div variants={cardAnimation}>
+                      <label className="block text-sm font-bold text-[#1C3991] mb-3">
+                        <FiLock className="inline-block mr-2 text-[#165BF8]" /> Current Password
+                      </label>
+                      <input
+                        type="password"
+                        name="currentPassword"
+                        value={currentPassword}
+                        onChange={handlePasswordChangeInput}
+                        className="block w-full px-4 py-3.5 border-2 border-[#165BF8]/20 rounded-2xl shadow-sm placeholder-[#165BF8]/50 focus:outline-none focus:ring-4 focus:ring-[#165BF8]/20 focus:border-[#165BF8] text-[#1C3991] transition-all duration-300 hover:border-[#165BF8]/40"
+                        placeholder="Enter current password"
+                        required
+                        disabled={loading}
+                      />
+                    </motion.div>
+
+                    <motion.div variants={cardAnimation}>
+                      <label className="block text-sm font-bold text-[#1C3991] mb-3">
+                        <FiLock className="inline-block mr-2 text-[#165BF8]" /> New Password
+                      </label>
+                      <input
+                        type="password"
+                        name="newPassword"
+                        value={newPassword}
+                        onChange={handlePasswordChangeInput}
+                        className="block w-full px-4 py-3.5 border-2 border-[#165BF8]/20 rounded-2xl shadow-sm placeholder-[#165BF8]/50 focus:outline-none focus:ring-4 focus:ring-[#165BF8]/20 focus:border-[#165BF8] text-[#1C3991] transition-all duration-300 hover:border-[#165BF8]/40"
+                        placeholder="Enter new password"
+                        required
+                        disabled={loading}
+                      />
+                    </motion.div>
+
+                    <motion.div variants={cardAnimation}>
+                      <label className="block text-sm font-bold text-[#1C3991] mb-3">
+                        <FiLock className="inline-block mr-2 text-[#165BF8]" /> Confirm Password
+                      </label>
+                      <input
+                        type="password"
+                        name="confirmNewPassword"
+                        value={confirmNewPassword}
+                        onChange={handlePasswordChangeInput}
+                        className="block w-full px-4 py-3.5 border-2 border-[#165BF8]/20 rounded-2xl shadow-sm placeholder-[#165BF8]/50 focus:outline-none focus:ring-4 focus:ring-[#165BF8]/20 focus:border-[#165BF8] text-[#1C3991] transition-all duration-300 hover:border-[#165BF8]/40"
+                        placeholder="Confirm new password"
+                        required
+                        disabled={loading}
+                      />
+                    </motion.div>
+                  </div>
+
+                  <motion.button
+                    type="submit"
+                    disabled={loading}
+                    whileHover={{ scale: 1.02, boxShadow: "0 15px 30px rgba(22, 91, 248, 0.3)" }}
+                    whileTap={{ scale: 0.98 }}
+                    className={`
+                      w-full flex justify-center items-center py-4 px-6 rounded-2xl shadow-xl text-lg font-black text-white
+                      bg-gradient-to-r from-[#165BF8] to-[#1C3991]
+                      hover:from-[#1a65ff] hover:to-[#2242a8]
+                      focus:outline-none focus:ring-4 focus:ring-[#165BF8]/30
+                      transition-all duration-300
+                      ${loading ? "opacity-70 cursor-not-allowed" : ""}
+                    `}
+                  >
+                    {loading ? (
+                      <>
+                        <FiLoader className="animate-spin mr-3 h-6 w-6" />
+                        Changing Password...
+                      </>
+                    ) : (
+                      <>
+                        <FiKey className="mr-3 h-6 w-6" />
+                        Change Password
+                      </>
+                    )}
+                  </motion.button>
+                </form>
+              </div>
+            </motion.div>
+          </div>
         </div>
       </div>
     </div>
