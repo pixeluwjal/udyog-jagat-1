@@ -5,320 +5,455 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/app/context/AuthContext';
 import Sidebar from '@/app/components/Sidebar';
 import Link from 'next/link';
-import { FiMapPin, FiBriefcase, FiCalendar, FiUsers, FiXCircle, FiCheckCircle, FiMenu, FiTrash2 } from 'react-icons/fi'; // FiDollarSign removed from import
+import { 
+  FiMapPin, 
+  FiBriefcase, 
+  FiCalendar, 
+  FiUsers, 
+  FiXCircle, 
+  FiCheckCircle, 
+  FiMenu, 
+  FiTrash2,
+  FiArrowLeft,
+  FiBookmark,
+  FiEye,
+  FiStar,
+  FiRefreshCcw 
+} from 'react-icons/fi';
+import { IoSparkles, IoRocket } from 'react-icons/io5';
 
-// Define interfaces for data structure
+// Enhanced color theme with gradients
+const colorTheme = {
+  primary: "#1938A8",
+  primaryLight: "#2D4FD8",
+  primaryDark: "#12287A",
+  secondary: "#182E78",
+  accent: "#E9F2FF",
+  accentDark: "#D4E5FF",
+  background: "bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50",
+  cardGradient: "bg-gradient-to-br from-white to-blue-50",
+  success: "#10B981",
+  warning: "#F59E0B",
+  error: "#EF4444",
+};
+
 interface Job {
-    _id: string;
-    title: string;
-    description: string;
-    location: string;
-    // ✅ FIX: Changed to match the actual data structure
-    salaryOriginal?: string;
-    salaryMin?: number;
-    salaryMax?: number | null;
-    company?: string;
-    companyLogo?: string;
-    jobType?: string;
-    createdAt: string;
-    numberOfOpenings?: number; // Added for number of openings
+  _id: string;
+  title: string;
+  description: string;
+  location: string;
+  salaryOriginal?: string;
+  salaryMin?: number;
+  salaryMax?: number | null;
+  company?: string;
+  companyLogo?: string;
+  jobType?: string;
+  createdAt: string;
+  numberOfOpenings?: number;
 }
 
 interface SavedJobDisplay {
-    _id: string;
-    job: Job; // Populated job details
-    savedAt: string;
+  _id: string;
+  job: Job;
+  savedAt: string;
 }
 
-// Define a simple color theme for consistency
-const colorTheme = {
-    job_seeker: {
-        primary: '#1938A8', // Primary blue for main elements
-        hover: 'hover:bg-[#182E78]', // Darker blue on hover
-        text: 'text-white', // Text color for active elements
-        secondaryBg: 'bg-indigo-600', // For buttons/accents
-        secondaryHover: 'hover:bg-indigo-700',
-    },
-};
-
 export default function SeekerSavedJobsPage() {
-    const { user, loading: authLoading, isAuthenticated, logout, token } = useAuth();
-    const router = useRouter();
+  const { user, loading: authLoading, isAuthenticated, logout, token } = useAuth();
+  const router = useRouter();
 
-    const [savedJobs, setSavedJobs] = useState<SavedJobDisplay[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
-    const [message, setMessage] = useState<string | null>(null);
-    const [isSidebarOpen, setIsSidebarOpen] = useState(false); // State for mobile sidebar
+  const [savedJobs, setSavedJobs] = useState<SavedJobDisplay[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [animatePulse, setAnimatePulse] = useState(false);
 
-    // Redirection Logic
-    useEffect(() => {
-        if (authLoading) return;
+  // Redirection Logic
+  useEffect(() => {
+    if (authLoading) return;
 
-        if (!isAuthenticated || !user) {
-            console.warn('SeekerSavedJobsPage: Not authenticated or user missing. Redirecting to /login.');
-            router.push('/login');
-            return;
-        }
-
-        if (user.firstLogin) {
-            console.warn('SeekerSavedJobsPage: User is firstLogin. Redirecting to /change-password.');
-            router.push('/change-password');
-            return;
-        }
-
-        if (user.role !== 'job_seeker') {
-            console.warn(`SeekerSavedJobsPage: User role is ${user.role}, not job_seeker. Redirecting.`);
-            if (user.role === 'admin') router.push('/admin/dashboard');
-            else if (user.role === 'job_poster') router.push('/poster/dashboard');
-            else router.push('/'); // Default fallback
-            return;
-        }
-
-        if (user.role === 'job_seeker' && user.onboardingStatus !== 'completed') {
-            console.warn('SeekerSavedJobsPage: Job Seeker, onboarding pending. Redirecting to /seeker/onboarding.');
-            router.push('/seeker/onboarding');
-            return;
-        }
-    }, [authLoading, isAuthenticated, user, router]);
-
-    // Fetch Saved Jobs
-    const fetchSavedJobs = useCallback(async () => {
-        setLoading(true);
-        setError(null);
-        setMessage(null);
-        try {
-            if (!token) {
-                throw new Error('Authentication token missing. Please log in again.');
-            }
-            const response = await fetch('/api/seeker/saved-jobs', {
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                }
-            });
-
-            const data = await response.json();
-
-            if (!response.ok) {
-                throw new Error(data.error || 'Failed to fetch saved jobs');
-            }
-
-            setSavedJobs(Array.isArray(data.savedJobs) ? data.savedJobs : []);
-        } catch (err: any) {
-            console.error('Failed to fetch saved jobs:', err);
-            setError(err.message || 'Failed to load saved jobs.');
-            setSavedJobs([]);
-        } finally {
-            setLoading(false);
-        }
-    }, [token]);
-
-    // Handle Unsave Job
-    const handleUnsaveJob = async (savedJobId: string, jobId: string) => {
-        setMessage(null);
-        setError(null);
-        if (!token) {
-            setError('Authentication token missing. Please log in again.');
-            return;
-        }
-
-        // Optimistically update UI
-        setSavedJobs(prevJobs => prevJobs.filter(job => job._id !== savedJobId));
-        setMessage('Unsaving job...');
-
-        try {
-            const response = await fetch(`/api/seeker/saved-jobs?jobId=${jobId}`, {
-                method: 'DELETE',
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                }
-            });
-
-            const data = await response.json();
-
-            if (!response.ok) {
-                // If unsave fails, revert UI and show error
-                fetchSavedJobs(); // Re-fetch to ensure data consistency
-                throw new Error(data.error || 'Failed to unsave job');
-            }
-
-            setMessage(data.message || 'Job unsaved successfully!');
-        } catch (err: any) {
-            console.error('Error unsaving job:', err);
-            setError(err.message || 'An unexpected error occurred while unsaving.');
-            fetchSavedJobs(); // Re-fetch to ensure data consistency
-        }
-    };
-
-    useEffect(() => {
-        if (!authLoading && isAuthenticated && user && user.role === 'job_seeker' && user.onboardingStatus === 'completed') {
-            fetchSavedJobs();
-        }
-    }, [authLoading, isAuthenticated, user, fetchSavedJobs]);
-
-    // Show loading spinner if auth is still loading or user is not authorized/onboarded
-    if (
-        authLoading ||
-        !isAuthenticated ||
-        !user ||
-        user.firstLogin ||
-        (user.role === 'job_seeker' && user.onboardingStatus !== 'completed')
-    ) {
-        return (
-            <div className="flex h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
-                <div className="m-auto flex flex-col items-center">
-                    <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500"></div>
-                    <p className="mt-4 text-gray-700">Loading saved jobs...</p>
-                </div>
-            </div>
-        );
+    if (!isAuthenticated || !user) {
+      router.push('/login');
+      return;
     }
 
-    return (
-        <div className="flex h-screen bg-gradient-to-br from-blue-50 to-indigo-100 overflow-hidden font-inter">
-            <Sidebar userRole={user.role} onLogout={logout} isOpen={isSidebarOpen} toggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)} />
+    if (user.firstLogin) {
+      router.push('/change-password');
+      return;
+    }
 
-            <div className="flex-1 flex flex-col overflow-hidden">
-                {/* Mobile Header - centered and white background with Hamburger icon */}
-                <div className="md:hidden bg-white shadow-sm p-4 flex items-center justify-between relative z-20">
-                    <button
-                        onClick={() => setIsSidebarOpen(true)} // Toggles main sidebar
-                        className="p-2 text-gray-600 hover:text-gray-800 rounded-md focus:outline-none focus:ring-2 focus:ring-inset focus:ring-indigo-500 transition-colors duration-200"
-                        aria-label="Open navigation"
-                    >
-                        <FiMenu className="h-6 w-6" />
-                    </button>
-                    <span className="text-lg font-bold text-[#1938A8]">Saved Jobs</span>
-                    {/* Placeholder for spacing on the right */}
-                    <div className="w-6 h-6"></div>
+    if (user.role !== 'job_seeker') {
+      if (user.role === 'admin') router.push('/admin/dashboard');
+      else if (user.role === 'job_poster') router.push('/poster/dashboard');
+      else router.push('/');
+      return;
+    }
+
+    if (user.role === 'job_seeker' && user.onboardingStatus !== 'completed') {
+      router.push('/seeker/onboarding');
+      return;
+    }
+  }, [authLoading, isAuthenticated, user, router]);
+
+  // Fetch Saved Jobs
+  const fetchSavedJobs = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    setMessage(null);
+    setAnimatePulse(true);
+    
+    try {
+      if (!token) {
+        throw new Error('Authentication token missing. Please log in again.');
+      }
+      const response = await fetch('/api/seeker/saved-jobs', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to fetch saved jobs');
+      }
+
+      setSavedJobs(Array.isArray(data.savedJobs) ? data.savedJobs : []);
+    } catch (err: any) {
+      console.error('Failed to fetch saved jobs:', err);
+      setError(err.message || 'Failed to load saved jobs.');
+      setSavedJobs([]);
+    } finally {
+      setLoading(false);
+      setTimeout(() => setAnimatePulse(false), 1000);
+    }
+  }, [token]);
+
+  // Handle Unsave Job
+  const handleUnsaveJob = async (savedJobId: string, jobId: string) => {
+    setMessage(null);
+    setError(null);
+    if (!token) {
+      setError('Authentication token missing. Please log in again.');
+      return;
+    }
+
+    // Optimistically update UI
+    setSavedJobs(prevJobs => prevJobs.filter(job => job._id !== savedJobId));
+    setMessage('Removing from saved jobs...');
+
+    try {
+      const response = await fetch(`/api/seeker/saved-jobs?jobId=${jobId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        fetchSavedJobs();
+        throw new Error(data.error || 'Failed to unsave job');
+      }
+
+      setMessage('Job removed from saved list successfully!');
+    } catch (err: any) {
+      console.error('Error unsaving job:', err);
+      setError(err.message || 'An unexpected error occurred while removing.');
+      fetchSavedJobs();
+    }
+  };
+
+  useEffect(() => {
+    if (!authLoading && isAuthenticated && user && user.role === 'job_seeker' && user.onboardingStatus === 'completed') {
+      fetchSavedJobs();
+    }
+  }, [authLoading, isAuthenticated, user, fetchSavedJobs]);
+
+  // Format salary display
+  const formatSalary = (job: Job) => {
+    if (job.salaryOriginal) return job.salaryOriginal;
+    if (job.salaryMin && job.salaryMax) {
+      return `₹${(job.salaryMin / 100000).toFixed(1)} - ${(job.salaryMax / 100000).toFixed(1)} LPA`;
+    }
+    if (job.salaryMin) {
+      return `₹${(job.salaryMin / 100000).toFixed(1)}+ LPA`;
+    }
+    return 'Salary not specified';
+  };
+
+  if (
+    authLoading ||
+    !isAuthenticated ||
+    !user ||
+    user.firstLogin ||
+    (user.role === 'job_seeker' && user.onboardingStatus !== 'completed')
+  ) {
+    return (
+      <div className={`flex h-screen ${colorTheme.background} justify-center items-center font-inter`}>
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-indigo-500 mx-auto mb-4"></div>
+          <p className="text-gray-700 text-lg font-medium">Loading your saved jobs...</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className={`flex h-screen ${colorTheme.background} overflow-hidden font-inter`}>
+      <Sidebar userRole={user.role} onLogout={logout} isOpen={isSidebarOpen} setIsOpen={setIsSidebarOpen} />
+
+      <div className="flex-1 flex flex-col overflow-hidden">
+        {/* Enhanced Mobile Header */}
+        <div className="md:hidden bg-gradient-to-r from-[#1938A8] to-[#2D4FD8] shadow-xl p-4 flex items-center justify-between relative z-20">
+          <button
+            onClick={() => setIsSidebarOpen(true)}
+            className="p-2 text-white hover:bg-white/20 rounded-xl focus:outline-none focus:ring-2 focus:ring-white/50 transition-all duration-200 backdrop-blur-sm"
+            aria-label="Open navigation"
+          >
+            <FiMenu className="h-6 w-6" />
+          </button>
+          
+          <div className="flex items-center gap-2">
+            <IoSparkles className="h-5 w-5 text-yellow-300" />
+            <span className="text-lg font-bold text-white">Saved Jobs</span>
+          </div>
+          
+          <div className="w-10 h-6"></div>
+        </div>
+
+        <main className="flex-1 overflow-y-auto p-4 md:p-8">
+          <div className="max-w-7xl mx-auto space-y-8">
+            {/* Enhanced Header Section */}
+            <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 mb-8">
+              <div className="flex-1">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="p-3 bg-gradient-to-br from-[#1938A8] to-[#2D4FD8] rounded-2xl shadow-lg">
+                    <FiBookmark className="h-8 w-8 text-white" />
+                  </div>
+                  <div>
+                    <h1 className="text-4xl md:text-5xl font-extrabold bg-gradient-to-r from-[#1938A8] to-[#2D4FD8] bg-clip-text text-transparent">
+                      Saved Jobs
+                    </h1>
+                    <p className="text-gray-600 text-lg md:text-xl mt-2">
+                      Your curated list of favorite opportunities
+                    </p>
+                  </div>
                 </div>
 
-                <main className="flex-1 overflow-y-auto p-4 md:p-8">
-                    <div className="max-w-7xl mx-auto space-y-8">
-                        {/* Header Section */}
-                        <div className="flex flex-col space-y-4 md:space-y-0 md:flex-row md:items-center md:justify-between mb-6">
-                            <div>
-                                <h1 className="text-3xl md:text-4xl font-extrabold text-gray-800">
-                                    My Saved Jobs
-                                </h1>
-                                <p className="text-gray-500 text-lg">Manage your favorite job postings</p>
-                            </div>
-                            <Link href="/seeker/jobs" passHref>
-                                <button className={`inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md shadow-lg ${colorTheme.job_seeker.text} ${colorTheme.job_seeker.secondaryBg} ${colorTheme.job_seeker.secondaryHover} focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all duration-200`}>
-                                    <svg className="-ml-1 mr-2 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 13.255A23.55 23.55 0 0112 15c-1.606 0-3.14-.153-4.59-.445M21 4.87V11m0 0h-7.5M21 11l-3.25-3.25M12 3a9 9 0 100 18 9 9 0 000-18z" />
-                                    </svg>
-                                    Browse More Jobs
-                                </button>
-                            </Link>
-                        </div>
-
-                        {error && (
-                            <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-6 rounded-r-lg shadow-md">
-                                <div className="flex">
-                                    <div className="flex-shrink-0">
-                                        <FiXCircle className="h-5 w-5 text-red-500" />
-                                    </div>
-                                    <div className="ml-3">
-                                        <p className="text-sm text-red-700 font-medium">{error}</p>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-                        {message && (
-                            <div className="bg-green-50 border-l-4 border-green-500 p-4 mb-6 rounded-r-lg shadow-md">
-                                <div className="flex">
-                                    <div className="flex-shrink-0">
-                                        <FiCheckCircle className="h-5 w-5 text-green-500" />
-                                    </div>
-                                    <div className="ml-3">
-                                        <p className="text-sm text-green-700 font-medium">{message}</p>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-
-                        {loading ? (
-                            <div className="flex justify-center items-center py-12 bg-white rounded-xl shadow-md">
-                                <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-indigo-500"></div>
-                                <p className="ml-4 text-gray-700">Loading your saved jobs...</p>
-                            </div>
-                        ) : savedJobs.length === 0 ? (
-                            <div className="bg-white rounded-xl shadow-md p-8 text-center border border-gray-100">
-                                <svg className="mx-auto h-16 w-16 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
-                                </svg>
-                                <h3 className="mt-2 text-xl font-semibold text-gray-900">No saved jobs found</h3>
-                                <p className="mt-1 text-base text-gray-500">Start browsing jobs and save the ones you like!</p>
-                                <div className="mt-6">
-                                    <Link
-                                        href="/seeker/jobs"
-                                        className={`inline-flex items-center px-6 py-3 border border-transparent shadow-sm text-base font-medium rounded-md ${colorTheme.job_seeker.text} ${colorTheme.job_seeker.secondaryBg} ${colorTheme.job_seeker.secondaryHover} focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all duration-200`}
-                                    >
-                                        <svg className="-ml-1 mr-2 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 13.255A23.55 23.55 0 0112 15c-1.606 0-3.14-.153-4.59-.445M21 4.87V11m0 0h-7.5M21 11l-3.25-3.25M12 3a9 9 0 100 18 9 9 0 000-18z" />
-                                        </svg>
-                                        Browse Jobs
-                                    </Link>
-                                </div>
-                            </div>
-                        ) : (
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                {savedJobs.map((savedJob) => (
-                                    <div key={savedJob._id} className="bg-white rounded-xl shadow-lg border border-gray-200 p-6 flex flex-col justify-between hover:shadow-xl transition-shadow duration-200 transform hover:-translate-y-1">
-                                        <div>
-                                            <div className="flex items-start gap-3 mb-3">
-                                                {savedJob.job.companyLogo ? (
-                                                    <img src={savedJob.job.companyLogo} alt={savedJob.job.company} className="h-12 w-12 object-contain rounded-md flex-shrink-0" />
-                                                ) : (
-                                                    <div className="h-12 w-12 bg-indigo-100 rounded-md flex items-center justify-center text-indigo-600 font-bold text-xl flex-shrink-0">
-                                                        {savedJob.job.company?.charAt(0) || 'J'}
-                                                    </div>
-                                                )}
-                                                <div>
-                                                    <h3 className="text-xl font-bold text-gray-900 leading-tight">{savedJob.job.title}</h3>
-                                                    <p className="text-sm text-gray-600">{savedJob.job.company || 'N/A'}</p>
-                                                </div>
-                                            </div>
-
-                                            <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-gray-500 mb-3">
-                                                <span className="flex items-center"><FiMapPin className="mr-1" size={14} />{savedJob.job.location}</span>
-                                                <span className="flex items-center"><FiBriefcase className="mr-1" size={14} />{savedJob.job.jobType || 'Full-time'}</span>
-                                                {savedJob.job.numberOfOpenings !== undefined && savedJob.job.numberOfOpenings > 0 && (
-                                                    <span className="flex items-center"><FiUsers className="mr-1" size={14} />{savedJob.job.numberOfOpenings} Openings</span>
-                                                )}
-                                            </div>
-
-                                            {/* ✅ FIX: Use salaryOriginal if it exists */}
-                                            <p className="text-lg text-gray-800 font-bold mb-3 flex items-center">
-                                                {savedJob.job.salaryOriginal || 'Salary Not Specified'}
-                                            </p>
-                                            <p className="text-sm text-gray-700 line-clamp-3 mb-4">{savedJob.job.description}</p>
-                                        </div>
-
-                                        <div className="flex items-center justify-between text-sm text-gray-500 mt-auto pt-4 border-t border-gray-100">
-                                            <span className="flex items-center"><FiCalendar className="mr-1" size={14} />Saved on: {new Date(savedJob.savedAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
-                                            <div className="flex gap-2">
-                                                <Link href={`/seeker/job/${savedJob.job._id}`} passHref>
-                                                    <button className={`px-4 py-2 rounded-md font-medium text-sm ${colorTheme.job_seeker.secondaryBg} ${colorTheme.job_seeker.secondaryHover} ${colorTheme.job_seeker.text} transition-colors duration-200 shadow-sm`}>
-                                                        View
-                                                    </button>
-                                                </Link>
-                                                <button
-                                                    onClick={() => handleUnsaveJob(savedJob._id, savedJob.job._id)}
-                                                    className="px-4 py-2 rounded-md font-medium text-sm bg-red-500 hover:bg-red-600 text-white transition-colors duration-200 shadow-sm flex items-center gap-1"
-                                                >
-                                                    <FiTrash2 className="w-4 h-4" /> Unsave
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
+                {/* Saved Jobs Stats */}
+                {savedJobs.length > 0 && (
+                  <div className="flex flex-wrap gap-4 mt-6">
+                    <div className="flex items-center gap-3 bg-white/80 backdrop-blur-sm px-4 py-3 rounded-xl border border-blue-100 shadow-sm">
+                      <div className="w-3 h-3 bg-[#1938A8] rounded-full animate-pulse"></div>
+                      <span className="text-sm font-medium text-gray-700">
+                        {savedJobs.length} Saved Jobs
+                      </span>
                     </div>
-                </main>
+                    <div className="flex items-center gap-3 bg-yellow-50/80 backdrop-blur-sm px-4 py-3 rounded-xl border border-yellow-200 shadow-sm">
+                      <FiStar className="w-4 h-4 text-yellow-600" />
+                      <span className="text-sm font-medium text-yellow-700">
+                        {savedJobs.filter(job => new Date(job.savedAt) > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)).length} New this week
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+              
+              <div className="flex flex-col sm:flex-row gap-4">
+                <Link href="/seeker/dashboard" passHref>
+                  <button className="inline-flex items-center px-6 py-3 border border-gray-300 text-base font-medium rounded-xl shadow-lg text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition-all duration-200 transform hover:scale-105 backdrop-blur-sm">
+                    <FiArrowLeft className="-ml-1 mr-2 h-5 w-5" />
+                    Dashboard
+                  </button>
+                </Link>
+                <Link href="/seeker/jobs" passHref>
+                  <button className={`inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-xl shadow-lg text-white bg-gradient-to-r from-[#1938A8] to-[#2D4FD8] hover:from-[#182E78] hover:to-[#1938A8] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#1938A8] transition-all duration-200 transform hover:scale-105 backdrop-blur-sm ${animatePulse ? 'animate-pulse' : ''}`}>
+                    <IoRocket className="-ml-1 mr-2 h-5 w-5" />
+                    Browse More Jobs
+                  </button>
+                </Link>
+              </div>
             </div>
-        </div>
-    );
+
+            {/* Enhanced Messages */}
+            {error && (
+              <div className="bg-gradient-to-r from-red-50 to-red-100 border-l-4 border-red-500 p-6 rounded-2xl shadow-lg backdrop-blur-sm">
+                <div className="flex items-center gap-3">
+                  <FiXCircle className="h-6 w-6 text-red-500 flex-shrink-0" />
+                  <div>
+                    <p className="text-base text-red-700 font-medium">{error}</p>
+                    <button
+                      onClick={fetchSavedJobs}
+                      className="text-sm text-red-600 hover:text-red-800 font-medium mt-1 transition-colors duration-200"
+                    >
+                      Try again
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            {message && (
+              <div className="bg-gradient-to-r from-green-50 to-green-100 border-l-4 border-green-500 p-6 rounded-2xl shadow-lg backdrop-blur-sm">
+                <div className="flex items-center gap-3">
+                  <FiCheckCircle className="h-6 w-6 text-green-500 flex-shrink-0" />
+                  <div>
+                    <p className="text-base text-green-700 font-medium">{message}</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Enhanced Loading State */}
+            {loading ? (
+              <div className="flex flex-col justify-center items-center py-16 bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-blue-100">
+                <div className="relative">
+                  <div className="animate-spin rounded-full h-20 w-20 border-t-4 border-b-4 border-[#1938A8]"></div>
+                  <FiBookmark className="absolute inset-0 m-auto h-10 w-10 text-[#1938A8] animate-bounce" />
+                </div>
+                <p className="text-gray-700 text-xl mt-6 font-medium">
+                  Loading your saved jobs...
+                </p>
+                <p className="text-gray-500 mt-2">We're gathering all your favorite opportunities</p>
+              </div>
+            ) : savedJobs.length === 0 ? (
+              /* Enhanced Empty State */
+              <div className="bg-gradient-to-br from-white to-blue-50 rounded-2xl shadow-xl p-12 text-center border border-blue-100 backdrop-blur-sm">
+                <div className="max-w-md mx-auto">
+                  <div className="w-24 h-24 bg-gradient-to-br from-blue-100 to-indigo-200 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg">
+                    <FiBookmark className="h-12 w-12 text-[#1938A8]" />
+                  </div>
+                  <h3 className="text-2xl font-bold text-gray-900 mb-3">
+                    No saved jobs yet
+                  </h3>
+                  <p className="text-gray-600 mb-6 leading-relaxed">
+                    Start exploring opportunities and save the ones that catch your eye. 
+                    Your saved jobs will appear here for easy access.
+                  </p>
+                  <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                    <Link
+                      href="/seeker/jobs"
+                      className="inline-flex items-center px-6 py-3 border border-transparent shadow-lg text-base font-medium rounded-xl text-white bg-gradient-to-r from-[#1938A8] to-[#2D4FD8] hover:from-[#182E78] hover:to-[#1938A8] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#1938A8] transition-all duration-200 transform hover:scale-105"
+                    >
+                      <IoRocket className="-ml-1 mr-2 h-5 w-5" />
+                      Explore Jobs
+                    </Link>
+                    <button
+                      onClick={fetchSavedJobs}
+                      className="inline-flex items-center px-6 py-3 border border-gray-300 shadow-lg text-base font-medium rounded-xl text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition-all duration-200"
+                    >
+                      <FiRefreshCcw className="-ml-1 mr-2 h-5 w-5" />
+                      Refresh
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              /* Enhanced Saved Jobs Grid */
+              <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+                {savedJobs.map((savedJob, index) => (
+                  <div
+                    key={savedJob._id}
+                    className="bg-gradient-to-br from-white to-blue-50 rounded-2xl shadow-lg border border-blue-100 hover:shadow-2xl transition-all duration-500 transform hover:-translate-y-2 flex flex-col backdrop-blur-sm group"
+                    style={{ animationDelay: `${index * 100}ms` }}
+                  >
+                    <div className="p-6 flex-1">
+                      {/* Company Header */}
+                      <div className="flex items-start gap-4 mb-4">
+                        <div className="flex-shrink-0">
+                          {savedJob.job.companyLogo ? (
+                            <img
+                              src={savedJob.job.companyLogo}
+                              alt={savedJob.job.company}
+                              className="h-14 w-14 object-contain rounded-2xl shadow-lg border border-blue-200 group-hover:scale-110 transition-transform duration-300"
+                            />
+                          ) : (
+                            <div className="h-14 w-14 bg-gradient-to-br from-[#1938A8] to-[#2D4FD8] rounded-2xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-300">
+                              <span className="text-white font-bold text-lg">
+                                {savedJob.job.company?.charAt(0) || 'J'}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h3 className="text-xl font-bold text-gray-900 leading-tight group-hover:text-[#1938A8] transition-colors duration-200 line-clamp-2">
+                            {savedJob.job.title}
+                          </h3>
+                          <p className="text-sm font-semibold text-gray-600 mt-1">
+                            {savedJob.job.company}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Job Details */}
+                      <div className="space-y-3 mb-4">
+                        <div className="flex items-center text-sm text-gray-600">
+                          <FiMapPin className="mr-3 text-[#1938A8] flex-shrink-0" size={16} />
+                          <span className="truncate">{savedJob.job.location}</span>
+                        </div>
+                        <div className="flex items-center text-sm text-gray-600">
+                          <FiBriefcase className="mr-3 text-[#1938A8] flex-shrink-0" size={16} />
+                          <span>{savedJob.job.jobType || 'Full-time'}</span>
+                        </div>
+                        {savedJob.job.numberOfOpenings && (
+                          <div className="flex items-center text-sm text-gray-600">
+                            <FiUsers className="mr-3 text-[#1938A8] flex-shrink-0" size={16} />
+                            <span>{savedJob.job.numberOfOpenings} Openings</span>
+                          </div>
+                        )}
+                        
+                        {/* Salary */}
+                        <div className="mt-3">
+                          <p className="text-lg font-bold bg-gradient-to-r from-[#1938A8] to-[#2D4FD8] bg-clip-text text-transparent">
+                            {formatSalary(savedJob.job)}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Job Description */}
+                      <p className="text-sm text-gray-700 line-clamp-3 leading-relaxed">
+                        {savedJob.job.description}
+                      </p>
+                    </div>
+                    
+                    {/* Footer with Actions */}
+                    <div className="p-6 pt-0 flex items-center justify-between mt-4">
+                      {/* Saved Date */}
+                      <div className="flex items-center text-sm text-gray-500">
+                        <FiCalendar className="mr-2 text-[#1938A8]" size={14} />
+                        <span>Saved {new Date(savedJob.savedAt).toLocaleDateString('en-US', { 
+                          month: 'short', 
+                          day: 'numeric' 
+                        })}</span>
+                      </div>
+                      
+                      {/* Action Buttons */}
+                      <div className="flex gap-2">
+                        <Link href={`/seeker/job/${savedJob.job._id}`} passHref>
+                          <button className="inline-flex items-center px-4 py-2 text-sm font-medium rounded-xl shadow-lg text-white bg-gradient-to-r from-[#1938A8] to-[#2D4FD8] hover:from-[#182E78] hover:to-[#1938A8] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#1938A8] transition-all duration-200 transform hover:scale-105 backdrop-blur-sm">
+                            <FiEye className="mr-2 h-4 w-4" />
+                            View
+                          </button>
+                        </Link>
+                        <button
+                          onClick={() => handleUnsaveJob(savedJob._id, savedJob.job._id)}
+                          className="inline-flex items-center px-4 py-2 text-sm font-medium rounded-xl shadow-lg text-white bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-all duration-200 transform hover:scale-105 backdrop-blur-sm"
+                        >
+                          <FiTrash2 className="mr-2 h-4 w-4" />
+                          Remove
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </main>
+      </div>
+    </div>
+  );
 }

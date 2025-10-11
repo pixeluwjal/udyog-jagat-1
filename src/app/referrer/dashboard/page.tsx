@@ -20,7 +20,6 @@ import {
     FiClipboard,
     FiMessageSquare,
 } from 'react-icons/fi';
-import ChatModal from '../../seeker/find-referrer/ChatModal';
 
 interface RecentReferral {
     id: string;
@@ -470,13 +469,6 @@ export default function ReferrerDashboardPage() {
                     </motion.div>
                 )}
             </AnimatePresence>
-            <ChatModal 
-                isOpen={isChatOpen} 
-                onClose={handleCloseChat} 
-                referrer={chatPartner} 
-                currentUserId={currentUser._id} 
-                currentUsername={currentUser.username || 'Referrer'}
-            />
         </div>
     );
 }

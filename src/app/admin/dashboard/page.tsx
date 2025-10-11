@@ -5,12 +5,13 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/app/context/AuthContext';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FiUsers, FiActivity, FiClock, FiSearch, FiPlus, FiZap, FiEdit, FiMail, FiMenu, FiCheckCircle, FiXCircle, FiFilter, FiLoader, FiChevronDown, FiTag, FiRefreshCw, FiTrendingUp, FiUserCheck } from 'react-icons/fi';
+import { FiUsers, FiActivity, FiClock, FiSearch, FiPlus, FiZap, FiEdit, FiMail, FiMenu, FiCheckCircle, FiXCircle, FiFilter, FiLoader, FiChevronDown, FiTag, FiRefreshCw, FiTrendingUp, FiUserCheck, FiAward, FiTarget, FiBarChart2 } from 'react-icons/fi';
 import Sidebar from '@/app/components/Sidebar';
 
-// Brand colors
-const primaryBlue = "#165BF8";
-const darkBlue = "#1C3991";
+// Updated brand colors with #2245ae
+const primaryBlue = "#2245ae";
+const darkBlue = "#1a3a9c";
+const lightBlue = "#eef2ff";
 
 // Type definitions
 interface UserDisplay {
@@ -46,6 +47,16 @@ const fadeIn = {
   },
 };
 
+const staggerContainer = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.1
+    }
+  }
+};
+
 const cardAnimation = {
   hidden: { opacity: 0, y: 20, scale: 0.98 },
   visible: {
@@ -53,10 +64,21 @@ const cardAnimation = {
     y: 0,
     scale: 1,
     transition: {
-      duration: 0.6,
-      ease: [0.16, 1, 0.3, 1],
-      staggerChildren: 0.1
+      type: "spring",
+      stiffness: 100,
+      damping: 15
     }
+  }
+};
+
+const hoverEffect = {
+  y: -8,
+  scale: 1.02,
+  boxShadow: "0 20px 40px rgba(34, 69, 174, 0.15)",
+  transition: {
+    type: "spring",
+    stiffness: 300,
+    damping: 20
   }
 };
 
@@ -213,17 +235,28 @@ export default function AdminDashboardPage() {
     fetchUsers(true);
   };
 
+  const getRoleColor = (role: string) => {
+    switch (role) {
+      case 'admin':
+        return 'bg-gradient-to-r from-[#2245ae] to-[#1a3a9c] text-white';
+      case 'job_poster':
+        return 'bg-gradient-to-r from-purple-500 to-purple-600 text-white';
+      case 'job_seeker':
+        return 'bg-gradient-to-r from-green-500 to-emerald-600 text-white';
+      default:
+        return 'bg-gradient-to-r from-gray-500 to-gray-600 text-white';
+    }
+  };
+
   const renderStatsCards = () => {
     if (statsLoading) {
       return (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {[1, 2, 3].map((item) => (
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 md:gap-6">
+          {[1, 2, 3, 4].map((item) => (
             <motion.div
               key={item}
-              initial="hidden"
-              animate="visible"
-              variants={fadeIn}
-              className="bg-white p-6 rounded-2xl shadow-sm border border-[#165BF8]/10"
+              variants={cardAnimation}
+              className="bg-white p-6 rounded-2xl shadow-lg border border-[#2245ae]/10"
             >
               <div className="animate-pulse">
                 <div className="h-4 bg-gray-200 rounded w-3/4 mb-4"></div>
@@ -238,25 +271,40 @@ export default function AdminDashboardPage() {
 
     const statCards = [
       {
-        title: `Total Users (${filterStatus === 'all' ? 'All' : filterStatus})`,
+        title: 'Total Users',
         value: stats.totalUsers,
         description: 'All registered users',
         icon: FiUsers,
-        color: 'blue'
+        color: 'from-[#2245ae] to-[#1a3a9c]',
+        bgColor: 'bg-gradient-to-br from-[#2245ae]/10 to-[#1a3a9c]/10',
+        textColor: 'text-[#2245ae]'
       },
       {
-        title: 'Active Today',
+        title: 'Active Users',
         value: stats.activeUsers,
         description: 'Currently active users',
         icon: FiActivity,
-        color: 'green'
+        color: 'from-green-500 to-emerald-600',
+        bgColor: 'bg-gradient-to-br from-green-100 to-emerald-50',
+        textColor: 'text-green-600'
       },
       {
         title: 'New This Week',
         value: stats.newUsersThisWeek,
-        description: stats.userGrowth !== 0 ? `${stats.userGrowth > 0 ? '+' : ''}${stats.userGrowth}% from last week` : 'Growth Data',
-        icon: FiClock,
-        color: 'indigo'
+        description: stats.userGrowth !== 0 ? `${stats.userGrowth > 0 ? '+' : ''}${stats.userGrowth}% from last week` : 'New registrations',
+        icon: FiTrendingUp,
+        color: 'from-purple-500 to-purple-600',
+        bgColor: 'bg-gradient-to-br from-purple-100 to-purple-50',
+        textColor: 'text-purple-600'
+      },
+      {
+        title: 'User Growth',
+        value: `${stats.userGrowth > 0 ? '+' : ''}${stats.userGrowth}%`,
+        description: 'Weekly growth rate',
+        icon: FiBarChart2,
+        color: 'from-amber-500 to-amber-600',
+        bgColor: 'bg-gradient-to-br from-amber-100 to-amber-50',
+        textColor: 'text-amber-600'
       }
     ];
 
@@ -264,36 +312,28 @@ export default function AdminDashboardPage() {
       <motion.div
         initial="hidden"
         animate="visible"
-        variants={cardAnimation}
-        className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6"
+        variants={staggerContainer}
+        className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 md:gap-6"
       >
         {statCards.map((stat, index) => (
           <motion.div
             key={stat.title}
-            variants={fadeIn}
-            whileHover={{ 
-              y: -5, 
-              scale: 1.02,
-              boxShadow: `0 20px 40px -10px ${primaryBlue}1A` 
-            }}
-            className="bg-white p-6 rounded-2xl shadow-sm border border-[#165BF8]/10 flex flex-col justify-between transition-all duration-300 group cursor-pointer"
+            variants={cardAnimation}
+            whileHover={hoverEffect}
+            className="bg-white p-6 rounded-2xl shadow-lg border border-[#2245ae]/10 transition-all duration-300"
           >
             <div className="flex items-center justify-between">
-              <div className="flex-1">
-                <p className="text-gray-500 text-sm font-medium mb-2">{stat.title}</p>
-                <h3 className="text-3xl font-bold text-[#1C3991] mb-1">
-                  {stat.value.toLocaleString()}
+              <div>
+                <p className="text-gray-600 text-sm font-medium mb-2">{stat.title}</p>
+                <h3 className="text-3xl font-bold text-[#1a3a9c] mb-1">
+                  {stat.value}
                 </h3>
                 <p className="text-gray-500 text-xs">
                   {stat.description}
                 </p>
               </div>
-              <div className={`p-4 rounded-2xl ${
-                stat.color === 'blue' ? 'bg-[#165BF8]/10 text-[#165BF8]' :
-                stat.color === 'green' ? 'bg-green-100 text-green-600' :
-                'bg-indigo-100 text-indigo-600'
-              } group-hover:scale-110 transition-transform duration-300`}>
-                <stat.icon className="w-6 h-6" />
+              <div className={`p-4 rounded-2xl ${stat.bgColor}`}>
+                <stat.icon className={`w-7 h-7 ${stat.textColor}`} />
               </div>
             </div>
           </motion.div>
@@ -307,7 +347,7 @@ export default function AdminDashboardPage() {
       return (
         <div className="space-y-4">
           {[1, 2, 3, 4, 5].map((item) => (
-            <div key={item} className="animate-pulse bg-white p-6 rounded-xl border border-gray-200">
+            <div key={item} className="animate-pulse bg-white p-6 rounded-2xl border border-[#2245ae]/10">
               <div className="flex items-center space-x-4">
                 <div className="w-12 h-12 bg-gray-200 rounded-full"></div>
                 <div className="flex-1 space-y-2">
@@ -334,13 +374,13 @@ export default function AdminDashboardPage() {
           animate={{ opacity: 1, scale: 1 }}
           className="text-center py-16 px-4"
         >
-          <div className="mx-auto w-24 h-24 bg-[#165BF8]/5 rounded-full flex items-center justify-center mb-4">
-            <FiUsers className="h-10 w-10 text-[#165BF8]/70" />
+          <div className="mx-auto w-20 h-20 bg-gradient-to-br from-[#2245ae]/10 to-[#1a3a9c]/10 rounded-2xl flex items-center justify-center mb-6">
+            <FiUsers className="h-10 w-10 text-[#2245ae]" />
           </div>
-          <h3 className="text-lg font-medium text-[#1C3991]">
+          <h3 className="text-xl font-bold text-[#1a3a9c] mb-2">
             {searchQuery || filterStatus !== 'all' ? 'No matches found' : 'No users yet'}
           </h3>
-          <p className="text-gray-600 max-w-md mx-auto mb-8 leading-relaxed">
+          <p className="text-[#2245ae] text-base mb-6 max-w-md mx-auto">
             {noUsersMessage}
           </p>
           {!searchQuery && filterStatus === 'all' && (
@@ -348,7 +388,7 @@ export default function AdminDashboardPage() {
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
-                className="inline-flex items-center px-6 py-3 bg-[#165BF8] text-white font-semibold rounded-xl shadow-lg hover:bg-[#1C3991] transition-colors duration-200"
+                className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-[#2245ae] to-[#1a3a9c] text-white rounded-xl font-medium hover:from-[#2a55cc] hover:to-[#2242a8] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#2245ae] transition-all duration-200 shadow-lg hover:shadow-xl"
               >
                 <FiPlus className="w-5 h-5 mr-2" />
                 Create First User
@@ -360,7 +400,7 @@ export default function AdminDashboardPage() {
     }
 
     return (
-      <div className="space-y-3">
+      <div className="space-y-4">
         <AnimatePresence>
           {users.map((user) => (
             <motion.div
@@ -368,24 +408,21 @@ export default function AdminDashboardPage() {
               initial={{ opacity: 0, y: 20, scale: 0.95 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: -20, scale: 0.95 }}
-              whileHover={{ 
-                x: 4,
-                boxShadow: '0 10px 30px -10px rgba(22, 91, 248, 0.2)'
-              }}
+              whileHover={hoverEffect}
               transition={{ 
                 type: "spring", 
                 stiffness: 400, 
                 damping: 25 
               }}
-              className="bg-white rounded-xl border border-[#165BF8]/10 p-6 hover:border-[#165BF8]/30 transition-all duration-200 group"
+              className="bg-white rounded-2xl border border-[#2245ae]/10 p-6 transition-all duration-300 group"
             >
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
                 <div className="flex items-center space-x-4 flex-1 min-w-0">
                   <motion.div
                     whileHover={{ scale: 1.1, rotate: 5 }}
                     className="relative"
                   >
-                    <div className="w-12 h-12 rounded-full bg-[#165BF8]/10 flex items-center justify-center text-[#165BF8] font-bold text-base">
+                    <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-[#2245ae]/10 to-[#1a3a9c]/10 flex items-center justify-center text-[#2245ae] font-bold text-lg">
                       {user.username?.charAt(0).toUpperCase() || user.email.charAt(0).toUpperCase()}
                     </div>
                     {user.status === 'active' && (
@@ -394,41 +431,44 @@ export default function AdminDashboardPage() {
                   </motion.div>
 
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center space-x-3 mb-2">
-                      <h4 className="text-lg font-semibold text-[#1C3991] truncate">
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-2 mb-3">
+                      <h4 className="text-lg font-bold text-[#1a3a9c] truncate">
                         {user.username || 'Unnamed User'}
                       </h4>
-                      {user.isSuperAdmin && (
-                        <span className="px-2 py-1 bg-gradient-to-r from-yellow-500 to-orange-500 text-white text-xs font-bold rounded-full">
-                          SUPER ADMIN
-                        </span>
-                      )}
-                      {user.firstLogin && (
-                        <span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs font-medium rounded-full">
-                          First Login
-                        </span>
-                      )}
+                      <div className="flex flex-wrap gap-2">
+                        {user.isSuperAdmin && (
+                          <span className="px-3 py-1 bg-gradient-to-r from-yellow-500 to-amber-500 text-white text-xs font-bold rounded-full flex items-center gap-1">
+                            <FiAward className="w-3 h-3" />
+                            SUPER ADMIN
+                          </span>
+                        )}
+                        {user.firstLogin && (
+                          <span className="px-3 py-1 bg-blue-100 text-blue-700 text-xs font-medium rounded-full">
+                            First Login
+                          </span>
+                        )}
+                      </div>
                     </div>
-                    <p className="text-gray-600 text-sm mb-1 flex items-center">
-                      <FiMail className="w-4 h-4 mr-2" />
-                      {user.email}
-                    </p>
-                    <div className="flex items-center space-x-4 text-sm">
-                      <span className={`inline-flex items-center px-3 py-1 rounded-full font-medium ${
-                        user.role === 'admin' ? 'bg-blue-100 text-blue-700' :
-                        user.role === 'job_poster' ? 'bg-indigo-100 text-indigo-700' :
-                        user.role === 'job_seeker' ? 'bg-green-100 text-green-700' :
-                        'bg-gray-100 text-gray-700'
-                      }`}>
+                    
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-4 text-sm">
+                      <p className="text-gray-600 flex items-center">
+                        <FiMail className="w-4 h-4 mr-2 text-[#2245ae]" />
+                        {user.email}
+                      </p>
+                      
+                      <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${getRoleColor(user.role)}`}>
                         {user.role.replace('_', ' ')}
                       </span>
-                      <span className={`inline-flex items-center ${
-                        user.status === 'active' ? 'text-green-600' : 'text-red-600'
+                      
+                      <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${
+                        user.status === 'active' 
+                          ? 'bg-green-100 text-green-700' 
+                          : 'bg-red-100 text-red-700'
                       }`}>
                         {user.status === 'active' ? (
-                          <FiCheckCircle className="w-4 h-4 mr-1" />
+                          <FiCheckCircle className="w-3 h-3 mr-1" />
                         ) : (
-                          <FiXCircle className="w-4 h-4 mr-1" />
+                          <FiXCircle className="w-3 h-3 mr-1" />
                         )}
                         {user.status}
                       </span>
@@ -436,13 +476,13 @@ export default function AdminDashboardPage() {
                   </div>
                 </div>
 
-                <div className="flex items-center space-x-3">
+                <div className="flex items-center gap-3">
                   <motion.div
                     whileHover={{ scale: 1.1 }}
                     whileTap={{ scale: 0.9 }}
                   >
                     <Link href={`/admin/edit-user/${user._id}`} passHref>
-                      <button className="p-3 bg-[#165BF8]/10 text-[#165BF8] rounded-xl hover:bg-[#165BF8]/20 transition-colors duration-200">
+                      <button className="p-3 bg-[#2245ae]/10 text-[#2245ae] rounded-xl hover:bg-[#2245ae]/20 transition-all duration-200 group" title="Edit User">
                         <FiEdit className="w-5 h-5" />
                       </button>
                     </Link>
@@ -458,7 +498,7 @@ export default function AdminDashboardPage() {
 
   if (authLoading || !isAuthenticated || !user || user.firstLogin || user.role !== 'admin') {
     return (
-      <div className="flex h-screen bg-gradient-to-br from-[#f6f9ff] to-[#eef2ff] justify-center items-center">
+      <div className={`flex h-screen bg-gradient-to-br from-[#f6f9ff] to-[${lightBlue}] justify-center items-center font-inter`}>
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -466,11 +506,11 @@ export default function AdminDashboardPage() {
         >
           <motion.div
             animate={pulseEffect}
-            className="rounded-full p-4 bg-[#165BF8]/10 shadow-inner"
+            className="rounded-full p-4 bg-[#2245ae]/10 shadow-inner"
           >
-            <FiLoader className="text-[#165BF8] h-12 w-12 animate-spin" />
+            <FiLoader className="text-[#2245ae] h-12 w-12 animate-spin" />
           </motion.div>
-          <p className="mt-6 text-lg font-medium text-[#1C3991]">
+          <p className="mt-6 text-lg font-medium text-[#1a3a9c]">
             Loading admin panel...
           </p>
         </motion.div>
@@ -479,70 +519,81 @@ export default function AdminDashboardPage() {
   }
 
   return (
-    <div className="flex h-screen bg-gradient-to-br from-[#f6f9ff] to-[#eef2ff] overflow-hidden font-inter">
+    <div className={`flex h-screen bg-gradient-to-br from-[#f6f9ff] to-[${lightBlue}] overflow-hidden font-inter`}>
       <Sidebar userRole={user.role} onLogout={logout} isOpen={mobileSidebarOpen} setIsOpen={setMobileSidebarOpen} userEmail={user?.email}/>
 
       <div className="flex-1 flex flex-col overflow-y-auto">
         {/* Mobile Header */}
-        <div className="md:hidden bg-white/95 backdrop-blur-md shadow-sm p-4 flex justify-between items-center z-10 sticky top-0">
+        <div className="md:hidden bg-white/95 backdrop-blur-md shadow-sm p-4 flex items-center justify-between sticky top-0 z-10 border-b border-[#2245ae]/10">
           <motion.button
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
             onClick={() => setMobileSidebarOpen(true)}
-            className="p-2 rounded-lg text-[#165BF8] hover:bg-[#165BF8]/10 focus:outline-none"
+            className="p-2 rounded-xl text-[#2245ae] hover:bg-[#2245ae]/10 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-[#2245ae] transition-all duration-200"
+            aria-label="Open sidebar"
           >
             <FiMenu className="h-6 w-6" />
           </motion.button>
-          <h1 className="text-2xl font-bold bg-gradient-to-r from-[#165BF8] to-[#1C3991] bg-clip-text text-transparent">
+          <h1 className="text-2xl font-bold bg-gradient-to-r from-[#2245ae] to-[#1a3a9c] bg-clip-text text-transparent">
             Admin Panel
           </h1>
           <motion.button
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
             onClick={handleRefresh}
-            className="p-2 rounded-lg text-[#165BF8] hover:bg-[#165BF8]/10"
+            className="p-2 rounded-xl text-[#2245ae] hover:bg-[#2245ae]/10 transition-all duration-200"
           >
             <FiRefreshCw className={`h-5 w-5 ${refreshing ? 'animate-spin' : ''}`} />
           </motion.button>
         </div>
 
         {/* Main Content */}
-        <div className="flex-1 overflow-y-auto p-4 md:p-8">
-          <div className="max-w-6xl mx-auto space-y-8">
+        <div className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8">
+          <div className="max-w-7xl mx-auto space-y-6 md:space-y-8">
             {/* Header Section */}
             <motion.div
               initial="hidden"
               animate="visible"
               variants={fadeIn}
-              className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4"
+              className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6"
             >
-              <div>
-                <h1 className="text-3xl md:text-4xl font-bold text-[#1C3991] leading-tight">
-                  <span className="bg-gradient-to-r from-[#165BF8] to-[#1C3991] bg-clip-text text-transparent">
+              <div className="flex-1">
+                <motion.h1 
+                  className="text-3xl md:text-4xl lg:text-5xl font-bold text-[#1a3a9c] leading-tight"
+                  initial={{ opacity: 0, y: -20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.2 }}
+                >
+                  <span className="bg-gradient-to-r from-[#2245ae] to-[#1a3a9c] bg-clip-text text-transparent">
                     Welcome back, {user.username || 'Admin'}!
                   </span>
-                </h1>
-                <p className="text-[#165BF8] mt-2">
-                  Manage your users and platform settings with ease.
-                </p>
+                </motion.h1>
+                <motion.p 
+                  className="text-[#2245ae] text-lg md:text-xl mt-2 md:mt-4"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: 0.3 }}
+                >
+                  Manage your users and platform settings with ease
+                </motion.p>
               </div>
               
-              <div className="flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-4 w-full md:w-auto">
+              <div className="flex flex-col sm:flex-row gap-4 w-full lg:w-auto">
                 <motion.button
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
                   onClick={handleRefresh}
-                  className="flex items-center justify-center px-6 py-3 bg-white text-[#1C3991] rounded-xl font-semibold shadow-md border border-[#165BF8]/20 hover:border-[#165BF8]/40 transition-all duration-300"
+                  className="flex items-center justify-center px-6 py-3 bg-white border border-[#2245ae]/20 rounded-xl shadow-sm text-base font-medium text-[#1a3a9c] hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#2245ae] transition-all duration-200"
                 >
                   <FiRefreshCw className={`w-5 h-5 mr-3 ${refreshing ? 'animate-spin' : ''}`} />
-                  Refresh
+                  Refresh Data
                 </motion.button>
                 
                 <Link href="/admin/create-user" passHref>
                   <motion.button
-                    whileHover={{ scale: 1.02, boxShadow: `0 8px 16px ${primaryBlue}20` }}
+                    whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
-                    className="flex items-center justify-center px-6 py-3 bg-[#165BF8] text-white rounded-xl font-semibold shadow-md transition-all duration-300"
+                    className="flex items-center justify-center px-6 py-3 bg-gradient-to-r from-[#2245ae] to-[#1a3a9c] text-white rounded-xl font-semibold shadow-lg hover:shadow-xl hover:from-[#2a55cc] hover:to-[#2242a8] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#2245ae] transition-all duration-200"
                   >
                     <FiPlus className="w-5 h-5 mr-3" />
                     New User
@@ -551,11 +602,11 @@ export default function AdminDashboardPage() {
 
                 <Link href="/admin/generate-referral" passHref>
                   <motion.button
-                    whileHover={{ scale: 1.02, boxShadow: `0 8px 16px ${darkBlue}20` }}
+                    whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
-                    className="flex items-center justify-center px-6 py-3 bg-white text-[#1C3991] rounded-xl font-semibold shadow-md border border-[#165BF8]/20 hover:border-[#165BF8]/40 transition-all duration-300"
+                    className="flex items-center justify-center px-6 py-3 bg-white border border-[#2245ae]/20 rounded-xl shadow-sm text-base font-medium text-[#1a3a9c] hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#2245ae] transition-all duration-200"
                   >
-                    <FiZap className="w-5 h-5 mr-3 text-[#165BF8]" />
+                    <FiZap className="w-5 h-5 mr-3 text-[#2245ae]" />
                     Referral Codes
                   </motion.button>
                 </Link>
@@ -571,42 +622,62 @@ export default function AdminDashboardPage() {
               animate="visible"
               variants={fadeIn}
               transition={{ delay: 0.2 }}
-              className="bg-white rounded-2xl shadow-lg border border-[#165BF8]/10 p-6 md:p-8"
+              className="bg-white rounded-2xl shadow-lg border border-[#2245ae]/10 overflow-hidden"
             >
-              <div className="flex flex-col md:flex-row justify-between items-center gap-4 mb-6">
-                <div className="relative w-full md:w-80">
-                  <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-[#165BF8]">
-                    <FiSearch className="w-5 h-5" />
+              {/* Section Header */}
+              <div className="px-6 py-5 border-b border-[#2245ae]/10 bg-gradient-to-r from-[#2245ae]/5 to-transparent">
+                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                  <div className="flex-1">
+                    <h2 className="text-xl font-semibold text-[#1a3a9c] flex items-center">
+                      <FiUsers className="mr-3 text-[#2245ae]" />
+                      User Management
+                    </h2>
+                    <p className="text-[#2245ae] text-sm mt-1">
+                      Manage all platform users and their permissions
+                    </p>
                   </div>
-                  <input
-                    type="text"
-                    className="block w-full p-3 pl-10 text-base text-[#1C3991] border border-[#165BF8]/20 rounded-xl bg-white focus:ring-[#165BF8] focus:border-[#165BF8] shadow-sm transition-all duration-200"
-                    placeholder="Search users by email or username..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                  />
-                </div>
-                
-                <div className="relative w-full md:w-48">
-                  <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-[#165BF8]">
-                    <FiFilter className="h-5 w-5" />
-                  </div>
-                  <select
-                    value={filterStatus}
-                    onChange={(e) => setFilterStatus(e.target.value as 'all' | 'active' | 'inactive')}
-                    className="block appearance-none w-full bg-white border border-[#165BF8]/20 text-[#1C3991] py-3 px-4 pl-10 pr-8 rounded-xl leading-tight focus:outline-none focus:ring-2 focus:ring-[#165BF8]/30 focus:border-[#165BF8] transition-all shadow-sm cursor-pointer"
-                  >
-                    <option value="all">All Statuses</option>
-                    <option value="active">Active</option>
-                    <option value="inactive">Inactive</option>
-                  </select>
-                  <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-[#165BF8]">
-                    <FiChevronDown className="h-5 w-5" />
+                  
+                  <div className="flex flex-col sm:flex-row gap-4">
+                    {/* Search Input */}
+                    <div className="relative w-full sm:w-80">
+                      <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-[#2245ae]">
+                        <FiSearch className="w-5 h-5" />
+                      </div>
+                      <input
+                        type="text"
+                        className="block w-full p-3 pl-10 text-base text-[#1a3a9c] border border-[#2245ae]/20 rounded-xl bg-white focus:ring-2 focus:ring-[#2245ae] focus:border-[#2245ae] shadow-sm transition-all duration-200"
+                        placeholder="Search users..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                      />
+                    </div>
+                    
+                    {/* Status Filter */}
+                    <div className="relative w-full sm:w-48">
+                      <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-[#2245ae]">
+                        <FiFilter className="h-5 w-5" />
+                      </div>
+                      <select
+                        value={filterStatus}
+                        onChange={(e) => setFilterStatus(e.target.value as 'all' | 'active' | 'inactive')}
+                        className="block appearance-none w-full bg-white border border-[#2245ae]/20 text-[#1a3a9c] py-3 px-4 pl-10 pr-8 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2245ae] focus:border-[#2245ae] transition-all shadow-sm cursor-pointer"
+                      >
+                        <option value="all">All Statuses</option>
+                        <option value="active">Active</option>
+                        <option value="inactive">Inactive</option>
+                      </select>
+                      <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-[#2245ae]">
+                        <FiChevronDown className="h-5 w-5" />
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
 
-              {renderUsersList()}
+              {/* Users List */}
+              <div className="p-6">
+                {renderUsersList()}
+              </div>
             </motion.div>
           </div>
         </div>

@@ -8,14 +8,12 @@ import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 import Head from 'next/head';
 
-import { FiBriefcase, FiMapPin, FiUsers, FiMenu, FiXCircle, FiSave, FiChevronLeft, FiLoader, FiCheckCircle, FiChevronDown } from 'react-icons/fi';
+import { FiBriefcase, FiMapPin, FiUsers, FiMenu, FiXCircle, FiSave, FiChevronLeft, FiLoader, FiCheckCircle, FiChevronDown, FiDollarSign, FiEdit3, FiType, FiBuilding } from 'react-icons/fi';
 
-// Brand colors
-const primaryBlue = "#165BF8";
-const darkBlue = "#1C3991";
-const lightBlue = "#E9F2FF";
-const blueGray900 = "#1F2937";
-const blueGray600 = "#4B5563";
+// Updated brand colors with #2245ae
+const primaryBlue = "#2245ae";
+const darkBlue = "#1a3a9c";
+const lightBlue = "#eef2ff";
 
 // Interface for job data - should match IJob from models/Job.ts
 interface JobData {
@@ -49,6 +47,30 @@ const fadeIn = {
     },
 };
 
+const staggerContainer = {
+    hidden: { opacity: 0 },
+    visible: {
+        opacity: 1,
+        transition: {
+            staggerChildren: 0.1
+        }
+    }
+};
+
+const cardAnimation = {
+    hidden: { opacity: 0, y: 20, scale: 0.98 },
+    visible: {
+        opacity: 1,
+        y: 0,
+        scale: 1,
+        transition: {
+            type: "spring",
+            stiffness: 100,
+            damping: 15
+        }
+    }
+};
+
 const pulseEffect = {
     scale: [1, 1.03, 1],
     opacity: [0.8, 1, 0.8],
@@ -56,6 +78,17 @@ const pulseEffect = {
         duration: 1.2, 
         repeat: Infinity, 
         ease: "easeInOut" 
+    }
+};
+
+const hoverEffect = {
+    y: -4,
+    scale: 1.02,
+    boxShadow: "0 20px 40px rgba(34, 69, 174, 0.15)",
+    transition: {
+        type: "spring",
+        stiffness: 300,
+        damping: 20
     }
 };
 
@@ -98,7 +131,7 @@ export default function EditJobPage() {
         }
 
         if (user.role !== 'job_poster' && user.role !== 'admin') {
-            router.push('/'); // Redirect if not authorized
+            router.push('/');
             return;
         }
     }, [authLoading, isAuthenticated, user, router]);
@@ -183,7 +216,7 @@ export default function EditJobPage() {
             jobType,
             skills: updatedSkills,
             numberOfOpenings: Number(numberOfOpenings),
-            status, // Now always included in the payload
+            status,
         };
         
         if (salary !== '') {
@@ -222,7 +255,7 @@ export default function EditJobPage() {
 
     if (authLoading || !isAuthenticated || !user || user.firstLogin || (user.role !== 'job_poster' && user.role !== 'admin')) {
         return (
-            <div className="flex h-screen bg-gradient-to-br from-[#f6f9ff] to-[#eef2ff] justify-center items-center font-inter">
+            <div className={`flex h-screen bg-gradient-to-br from-[#f6f9ff] to-[${lightBlue}] justify-center items-center font-inter`}>
                 <motion.div
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
@@ -230,11 +263,11 @@ export default function EditJobPage() {
                 >
                     <motion.div
                         animate={pulseEffect}
-                        className="rounded-full p-4 bg-[#165BF8]/10 shadow-inner"
+                        className="rounded-full p-4 bg-[#2245ae]/10 shadow-inner"
                     >
-                        <FiLoader className="text-[#165BF8] h-12 w-12 animate-spin" />
+                        <FiLoader className="text-[#2245ae] h-12 w-12 animate-spin" />
                     </motion.div>
-                    <p className="mt-6 text-lg font-medium text-[#1C3991]">
+                    <p className="mt-6 text-lg font-medium text-[#1a3a9c]">
                         Loading page...
                     </p>
                 </motion.div>
@@ -244,7 +277,7 @@ export default function EditJobPage() {
 
     if (loading) {
         return (
-            <div className="flex h-screen bg-gradient-to-br from-[#f6f9ff] to-[#eef2ff] justify-center items-center font-inter">
+            <div className={`flex h-screen bg-gradient-to-br from-[#f6f9ff] to-[${lightBlue}] justify-center items-center font-inter`}>
                 <motion.div
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
@@ -252,11 +285,11 @@ export default function EditJobPage() {
                 >
                     <motion.div
                         animate={pulseEffect}
-                        className="rounded-full p-4 bg-[#165BF8]/10 shadow-inner"
+                        className="rounded-full p-4 bg-[#2245ae]/10 shadow-inner"
                     >
-                        <FiLoader className="text-[#165BF8] h-12 w-12 animate-spin" />
+                        <FiLoader className="text-[#2245ae] h-12 w-12 animate-spin" />
                     </motion.div>
-                    <p className="mt-6 text-lg font-medium text-[#1C3991]">
+                    <p className="mt-6 text-lg font-medium text-[#1a3a9c]">
                         Fetching job details...
                     </p>
                 </motion.div>
@@ -266,30 +299,46 @@ export default function EditJobPage() {
 
     if (error && !job) {
         return (
-            <div className="flex h-screen bg-gradient-to-br from-[#f6f9ff] to-[#eef2ff] justify-center items-center font-inter">
-                <div className="text-center bg-white p-8 rounded-2xl shadow-lg border border-red-200">
-                    <FiXCircle className="mx-auto h-16 w-16 text-red-500 mb-4" />
-                    <h3 className="mt-2 text-xl font-semibold text-[#1C3991]">Error Loading Job</h3>
-                    <p className="mt-1 text-base text-gray-600">{error}</p>
-                    <div className="mt-6">
+            <div className={`flex h-screen bg-gradient-to-br from-[#f6f9ff] to-[${lightBlue}] justify-center items-center font-inter`}>
+                <motion.div
+                    initial="hidden"
+                    animate="visible"
+                    variants={fadeIn}
+                    className="text-center bg-white p-8 rounded-2xl shadow-lg border border-[#2245ae]/10 max-w-md w-full mx-4"
+                >
+                    <div className="mx-auto w-16 h-16 bg-red-100 rounded-2xl flex items-center justify-center mb-4">
+                        <FiXCircle className="h-8 w-8 text-red-500" />
+                    </div>
+                    <h3 className="text-xl font-bold text-[#1a3a9c] mb-2">Error Loading Job</h3>
+                    <p className="text-gray-600 mb-6">{error}</p>
+                    <div className="flex flex-col sm:flex-row gap-3 justify-center">
                         <Link href="/poster/posted-jobs" passHref>
                             <motion.button
-                                whileHover={{ scale: 1.02 }}
-                                whileTap={{ scale: 0.98 }}
-                                className="inline-flex items-center px-6 py-3 border border-transparent shadow-sm text-base font-medium rounded-xl text-white bg-[#165BF8] hover:bg-[#1a65ff] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#165BF8]/50 transition-all duration-200"
+                                whileHover={{ scale: 1.05 }}
+                                whileTap={{ scale: 0.95 }}
+                                className="inline-flex items-center px-6 py-3 border border-[#2245ae] text-[#2245ae] rounded-xl font-medium hover:bg-[#2245ae] hover:text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#2245ae] transition-all duration-200"
                             >
-                                <FiChevronLeft className="-ml-1 mr-2 h-5 w-5" />
-                                Back to Posted Jobs
+                                <FiChevronLeft className="mr-2 h-5 w-5" />
+                                Back to Jobs
                             </motion.button>
                         </Link>
+                        <motion.button
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
+                            onClick={fetchJob}
+                            className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-[#2245ae] to-[#1a3a9c] text-white rounded-xl font-medium hover:from-[#2a55cc] hover:to-[#2242a8] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#2245ae] transition-all duration-200 shadow-lg"
+                        >
+                            <FiLoader className="mr-2 h-5 w-5" />
+                            Try Again
+                        </motion.button>
                     </div>
-                </div>
+                </motion.div>
             </div>
         );
     }
 
     return (
-        <div className="flex h-screen bg-gradient-to-br from-[#f6f9ff] to-[#eef2ff] overflow-hidden font-inter">
+        <div className={`flex h-screen bg-gradient-to-br from-[#f6f9ff] to-[${lightBlue}] overflow-hidden font-inter`}>
             <Head>
                 <title>Edit Job - {job?.title || 'JobConnect'}</title>
             </Head>
@@ -297,59 +346,77 @@ export default function EditJobPage() {
 
             <div className="flex-1 flex flex-col overflow-y-auto">
                 {/* Mobile Header */}
-                <div className="md:hidden bg-white/95 backdrop-blur-md shadow-sm p-4 flex items-center justify-between relative z-10">
-                    <button
+                <div className="md:hidden bg-white/95 backdrop-blur-md shadow-sm p-4 flex items-center justify-between sticky top-0 z-10 border-b border-[#2245ae]/10">
+                    <motion.button
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
                         onClick={toggleSidebar}
-                        className="p-2 rounded-lg text-[#165BF8] hover:bg-[#165BF8]/10 focus:outline-none"
+                        className="p-2 rounded-xl text-[#2245ae] hover:bg-[#2245ae]/10 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-[#2245ae] transition-all duration-200"
                         aria-label="Open sidebar"
                     >
                         <FiMenu className="h-6 w-6" />
-                    </button>
-                    <h1 className="text-2xl font-bold bg-gradient-to-r from-[#165BF8] to-[#1C3991] bg-clip-text text-transparent text-center absolute left-1/2 -translate-x-1/2">
+                    </motion.button>
+                    <h1 className="text-2xl font-bold bg-gradient-to-r from-[#2245ae] to-[#1a3a9c] bg-clip-text text-transparent">
                         Edit Job
                     </h1>
-                    <div className="h-6 w-6"></div>
+                    <div className="w-6 h-6"></div>
                 </div>
 
-                <div className="flex-1 overflow-y-auto p-4 md:p-8">
+                <div className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8">
                     <div className="max-w-4xl mx-auto">
+                        {/* Header Section */}
                         <motion.div
                             initial="hidden"
                             animate="visible"
                             variants={fadeIn}
-                            className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4"
+                            className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-8 gap-6"
                         >
-                            <div>
-                                <h1 className="text-3xl md:text-4xl font-extrabold text-[#1F2937] leading-tight">
-                                    <span className="bg-gradient-to-r from-[#165BF8] to-[#1C3991] bg-clip-text text-transparent">
+                            <div className="flex-1">
+                                <motion.h1 
+                                    className="text-3xl md:text-4xl lg:text-5xl font-bold text-[#1a3a9c] leading-tight"
+                                    initial={{ opacity: 0, y: -20 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    transition={{ delay: 0.2 }}
+                                >
+                                    <span className="bg-gradient-to-r from-[#2245ae] to-[#1a3a9c] bg-clip-text text-transparent">
                                         Edit Job
                                     </span>
-                                </h1>
-                                <p className="text-gray-500 text-lg mt-1">Update the details of your job posting</p>
-                            </div>
-                            <Link href="/poster/posted-jobs" passHref>
-                                <motion.button
-                                    whileHover={{ scale: 1.02, boxShadow: `0 8px 16px ${primaryBlue}20` }}
-                                    whileTap={{ scale: 0.98 }}
-                                    className="inline-flex items-center px-6 py-3 border border-transparent shadow-sm text-base font-medium rounded-xl text-white bg-gradient-to-r from-[#165BF8] to-[#1C3991] hover:from-[#1a65ff] hover:to-[#2242a8] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#165BF8]/50 transition-all duration-200 w-full sm:w-auto"
+                                </motion.h1>
+                                <motion.p 
+                                    className="text-[#2245ae] text-lg md:text-xl mt-2 md:mt-4"
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: 1 }}
+                                    transition={{ delay: 0.3 }}
                                 >
-                                    <FiChevronLeft className="-ml-1 mr-2 h-5 w-5" />
-                                    Back to Posted Jobs
-                                </motion.button>
-                            </Link>
+                                    Update the details of your job posting
+                                </motion.p>
+                            </div>
+                            <motion.div
+                                whileHover={{ scale: 1.02 }}
+                                whileTap={{ scale: 0.98 }}
+                                className="w-full lg:w-auto"
+                            >
+                                <Link href="/poster/posted-jobs" passHref>
+                                    <button className="inline-flex items-center justify-center w-full lg:w-auto px-6 py-3 bg-white border border-[#2245ae]/20 rounded-xl shadow-sm text-base font-medium text-[#1a3a9c] hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#2245ae] transition-all duration-200 group">
+                                        <FiChevronLeft className="w-5 h-5 mr-2 group-hover:-translate-x-1 transition-transform" />
+                                        Back to Posted Jobs
+                                    </button>
+                                </Link>
+                            </motion.div>
                         </motion.div>
 
+                        {/* Messages */}
                         <AnimatePresence>
                             {successMessage && (
                                 <motion.div
                                     initial={{ opacity: 0, y: -10 }}
                                     animate={{ opacity: 1, y: 0 }}
                                     exit={{ opacity: 0, y: -10 }}
-                                    className="bg-green-50 border-l-4 border-green-400 p-4 mb-6 rounded-lg text-green-700 font-medium"
+                                    className="bg-green-50 border-l-4 border-green-500 p-4 mb-6 rounded-r-lg shadow-sm"
                                 >
                                     <div className="flex items-center">
-                                        <FiCheckCircle className="h-5 w-5 text-green-400 mr-2" />
-                                        <p className="text-sm">{successMessage}</p>
+                                        <FiCheckCircle className="h-5 w-5 text-green-500 mr-3" />
+                                        <p className="text-green-700 font-medium">{successMessage}</p>
                                     </div>
                                 </motion.div>
                             )}
@@ -358,11 +425,11 @@ export default function EditJobPage() {
                                     initial={{ opacity: 0, y: -10 }}
                                     animate={{ opacity: 1, y: 0 }}
                                     exit={{ opacity: 0, y: -10 }}
-                                    className="bg-red-50 border-l-4 border-red-400 p-4 mb-6 rounded-lg text-red-700 font-medium"
+                                    className="bg-red-50 border-l-4 border-red-500 p-4 mb-6 rounded-r-lg shadow-sm"
                                 >
                                     <div className="flex items-center">
-                                        <FiXCircle className="h-5 w-5 text-red-400 mr-2" />
-                                        <p className="text-sm">{error}</p>
+                                        <FiXCircle className="h-5 w-5 text-red-500 mr-3" />
+                                        <p className="text-red-700 font-medium">{error}</p>
                                     </div>
                                 </motion.div>
                             )}
@@ -373,16 +440,23 @@ export default function EditJobPage() {
                                 onSubmit={handleSubmit}
                                 initial="hidden"
                                 animate="visible"
-                                variants={fadeIn}
-                                className="bg-white shadow-lg rounded-2xl p-6 md:p-8 border border-[#165BF8]/10"
+                                variants={staggerContainer}
+                                className="bg-white shadow-lg rounded-2xl p-6 md:p-8 border border-[#2245ae]/10"
                             >
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8">
                                     {/* Job Title */}
-                                    <div className="space-y-2">
-                                        <label htmlFor="title" className="block text-sm font-medium text-gray-700">Job Title</label>
+                                    <motion.div
+                                        variants={cardAnimation}
+                                        whileHover={hoverEffect}
+                                        className="space-y-3 bg-gray-50/50 p-4 rounded-xl border border-gray-200/50"
+                                    >
+                                        <label htmlFor="title" className="block text-sm font-semibold text-[#1a3a9c] flex items-center">
+                                            <FiType className="mr-2 text-[#2245ae]" />
+                                            Job Title
+                                        </label>
                                         <div className="relative">
                                             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                                <FiBriefcase className="h-5 w-5 text-gray-400" />
+                                                <FiBriefcase className="h-5 w-5 text-[#2245ae]/70" />
                                             </div>
                                             <input
                                                 type="text"
@@ -391,17 +465,25 @@ export default function EditJobPage() {
                                                 value={title}
                                                 onChange={(e) => setTitle(e.target.value)}
                                                 required
-                                                className="block w-full pl-10 pr-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-[#165BF8] focus:border-[#165BF8] placeholder-gray-400 transition duration-200 shadow-sm"
+                                                className="block w-full pl-10 pr-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-[#2245ae] focus:border-[#2245ae] placeholder-gray-400 transition-all duration-200 bg-white shadow-sm"
+                                                placeholder="Enter job title"
                                             />
                                         </div>
-                                    </div>
+                                    </motion.div>
 
                                     {/* Company Name */}
-                                    <div className="space-y-2">
-                                        <label htmlFor="company" className="block text-sm font-medium text-gray-700">Company Name</label>
+                                    <motion.div
+                                        variants={cardAnimation}
+                                        whileHover={hoverEffect}
+                                        className="space-y-3 bg-gray-50/50 p-4 rounded-xl border border-gray-200/50"
+                                    >
+                                        <label htmlFor="company" className="block text-sm font-semibold text-[#1a3a9c] flex items-center">
+                                            <FiBuilding className="mr-2 text-[#2245ae]" />
+                                            Company Name
+                                        </label>
                                         <div className="relative">
                                             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                                <FiUsers className="h-5 w-5 text-gray-400" />
+                                                <FiUsers className="h-5 w-5 text-[#2245ae]/70" />
                                             </div>
                                             <input
                                                 type="text"
@@ -410,17 +492,25 @@ export default function EditJobPage() {
                                                 value={company}
                                                 onChange={(e) => setCompany(e.target.value)}
                                                 required
-                                                className="block w-full pl-10 pr-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-[#165BF8] focus:border-[#165BF8] placeholder-gray-400 transition duration-200 shadow-sm"
+                                                className="block w-full pl-10 pr-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-[#2245ae] focus:border-[#2245ae] placeholder-gray-400 transition-all duration-200 bg-white shadow-sm"
+                                                placeholder="Enter company name"
                                             />
                                         </div>
-                                    </div>
+                                    </motion.div>
                                     
                                     {/* Location */}
-                                    <div className="space-y-2">
-                                        <label htmlFor="location" className="block text-sm font-medium text-gray-700">Location</label>
+                                    <motion.div
+                                        variants={cardAnimation}
+                                        whileHover={hoverEffect}
+                                        className="space-y-3 bg-gray-50/50 p-4 rounded-xl border border-gray-200/50"
+                                    >
+                                        <label htmlFor="location" className="block text-sm font-semibold text-[#1a3a9c] flex items-center">
+                                            <FiMapPin className="mr-2 text-[#2245ae]" />
+                                            Location
+                                        </label>
                                         <div className="relative">
                                             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                                <FiMapPin className="h-5 w-5 text-gray-400" />
+                                                <FiMapPin className="h-5 w-5 text-[#2245ae]/70" />
                                             </div>
                                             <input
                                                 type="text"
@@ -429,14 +519,22 @@ export default function EditJobPage() {
                                                 value={location}
                                                 onChange={(e) => setLocation(e.target.value)}
                                                 required
-                                                className="block w-full pl-10 pr-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-[#165BF8] focus:border-[#165BF8] placeholder-gray-400 transition duration-200 shadow-sm"
+                                                className="block w-full pl-10 pr-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-[#2245ae] focus:border-[#2245ae] placeholder-gray-400 transition-all duration-200 bg-white shadow-sm"
+                                                placeholder="Enter job location"
                                             />
                                         </div>
-                                    </div>
+                                    </motion.div>
 
                                     {/* Job Type */}
-                                    <div className="space-y-2">
-                                        <label htmlFor="jobType" className="block text-sm font-medium text-gray-700">Job Type</label>
+                                    <motion.div
+                                        variants={cardAnimation}
+                                        whileHover={hoverEffect}
+                                        className="space-y-3 bg-gray-50/50 p-4 rounded-xl border border-gray-200/50"
+                                    >
+                                        <label htmlFor="jobType" className="block text-sm font-semibold text-[#1a3a9c] flex items-center">
+                                            <FiBriefcase className="mr-2 text-[#2245ae]" />
+                                            Job Type
+                                        </label>
                                         <div className="relative">
                                             <select
                                                 id="jobType"
@@ -444,7 +542,7 @@ export default function EditJobPage() {
                                                 value={jobType}
                                                 onChange={(e) => setJobType(e.target.value as JobData['jobType'])}
                                                 required
-                                                className="block w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-[#165BF8] focus:border-[#165BF8] placeholder-gray-400 transition duration-200 shadow-sm appearance-none pr-10"
+                                                className="block w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-[#2245ae] focus:border-[#2245ae] placeholder-gray-400 transition-all duration-200 bg-white shadow-sm appearance-none pr-10"
                                             >
                                                 <option value="Full-time">Full-time</option>
                                                 <option value="Part-time">Part-time</option>
@@ -452,18 +550,25 @@ export default function EditJobPage() {
                                                 <option value="Temporary">Temporary</option>
                                                 <option value="Internship">Internship</option>
                                             </select>
-                                            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-400">
+                                            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-[#2245ae]">
                                                 <FiChevronDown className="h-5 w-5" />
                                             </div>
                                         </div>
-                                    </div>
+                                    </motion.div>
                                     
                                     {/* Salary */}
-                                    <div className="space-y-2">
-                                        <label htmlFor="salary" className="block text-sm font-medium text-gray-700">Salary (INR, optional)</label>
+                                    <motion.div
+                                        variants={cardAnimation}
+                                        whileHover={hoverEffect}
+                                        className="space-y-3 bg-gray-50/50 p-4 rounded-xl border border-gray-200/50"
+                                    >
+                                        <label htmlFor="salary" className="block text-sm font-semibold text-[#1a3a9c] flex items-center">
+                                            <FiDollarSign className="mr-2 text-[#2245ae]" />
+                                            Salary (INR, optional)
+                                        </label>
                                         <div className="relative">
                                             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                                <span className="text-gray-400">₹</span>
+                                                <span className="text-[#2245ae]/70 font-medium">₹</span>
                                             </div>
                                             <input
                                                 type="number"
@@ -472,17 +577,25 @@ export default function EditJobPage() {
                                                 value={salary}
                                                 onChange={(e) => setSalary(e.target.value === '' ? '' : Number(e.target.value))}
                                                 min="0"
-                                                className="block w-full pl-8 pr-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-[#165BF8] focus:border-[#165BF8] placeholder-gray-400 transition duration-200 shadow-sm"
+                                                className="block w-full pl-10 pr-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-[#2245ae] focus:border-[#2245ae] placeholder-gray-400 transition-all duration-200 bg-white shadow-sm"
+                                                placeholder="Enter salary amount"
                                             />
                                         </div>
-                                    </div>
+                                    </motion.div>
 
                                     {/* Number of Openings */}
-                                    <div className="space-y-2">
-                                        <label htmlFor="numberOfOpenings" className="block text-sm font-medium text-gray-700">No. of Openings</label>
+                                    <motion.div
+                                        variants={cardAnimation}
+                                        whileHover={hoverEffect}
+                                        className="space-y-3 bg-gray-50/50 p-4 rounded-xl border border-gray-200/50"
+                                    >
+                                        <label htmlFor="numberOfOpenings" className="block text-sm font-semibold text-[#1a3a9c] flex items-center">
+                                            <FiUsers className="mr-2 text-[#2245ae]" />
+                                            Number of Openings
+                                        </label>
                                         <div className="relative">
                                             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                                <FiUsers className="h-5 w-5 text-gray-400" />
+                                                <FiUsers className="h-5 w-5 text-[#2245ae]/70" />
                                             </div>
                                             <input
                                                 type="number"
@@ -492,49 +605,72 @@ export default function EditJobPage() {
                                                 onChange={(e) => setNumberOfOpenings(e.target.value === '' ? '' : Number(e.target.value))}
                                                 required
                                                 min="0"
-                                                className="block w-full pl-10 pr-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-[#165BF8] focus:border-[#165BF8] placeholder-gray-400 transition duration-200 shadow-sm"
+                                                className="block w-full pl-10 pr-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-[#2245ae] focus:border-[#2245ae] placeholder-gray-400 transition-all duration-200 bg-white shadow-sm"
+                                                placeholder="Enter number of openings"
                                             />
                                         </div>
-                                    </div>
-                                    
-                                    {/* Skills */}
-                                    <div className="space-y-2 col-span-1 md:col-span-2">
-                                        <label htmlFor="skills" className="block text-sm font-medium text-gray-700">Skills (comma-separated)</label>
-                                        <textarea
-                                            name="skills"
-                                            id="skills"
-                                            rows={2}
-                                            value={skills}
-                                            onChange={(e) => setSkills(e.target.value)}
-                                            placeholder="e.g., JavaScript, React, Node.js"
-                                            className="block w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-[#165BF8] focus:border-[#165BF8] placeholder-gray-400 transition duration-200 shadow-sm"
-                                        ></textarea>
-                                    </div>
+                                    </motion.div>
 
-                                    {/* Job Status - Now editable for all users */}
-                                    <div className="space-y-2 col-span-1 md:col-span-2">
-                                        <label htmlFor="status" className="block text-sm font-medium text-gray-700">Job Status</label>
+                                    {/* Job Status */}
+                                    <motion.div
+                                        variants={cardAnimation}
+                                        whileHover={hoverEffect}
+                                        className="space-y-3 bg-gray-50/50 p-4 rounded-xl border border-gray-200/50"
+                                    >
+                                        <label htmlFor="status" className="block text-sm font-semibold text-[#1a3a9c] flex items-center">
+                                            <FiEdit3 className="mr-2 text-[#2245ae]" />
+                                            Job Status
+                                        </label>
                                         <div className="relative">
                                             <select
                                                 id="status"
                                                 name="status"
                                                 value={status}
                                                 onChange={(e) => setStatus(e.target.value as JobData['status'])}
-                                                className="block w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-[#165BF8] focus:border-[#165BF8] placeholder-gray-400 transition duration-200 shadow-sm appearance-none pr-10"
+                                                className="block w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-[#2245ae] focus:border-[#2245ae] placeholder-gray-400 transition-all duration-200 bg-white shadow-sm appearance-none pr-10"
                                             >
                                                 <option value="active">Active</option>
                                                 <option value="inactive">Inactive</option>
                                                 <option value="closed">Closed</option>
                                             </select>
-                                            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-400">
+                                            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-[#2245ae]">
                                                 <FiChevronDown className="h-5 w-5" />
                                             </div>
                                         </div>
-                                    </div>
+                                    </motion.div>
+                                    
+                                    {/* Skills */}
+                                    <motion.div
+                                        variants={cardAnimation}
+                                        whileHover={hoverEffect}
+                                        className="space-y-3 bg-gray-50/50 p-4 rounded-xl border border-gray-200/50 lg:col-span-2"
+                                    >
+                                        <label htmlFor="skills" className="block text-sm font-semibold text-[#1a3a9c]">
+                                            Required Skills (comma-separated)
+                                        </label>
+                                        <textarea
+                                            name="skills"
+                                            id="skills"
+                                            rows={3}
+                                            value={skills}
+                                            onChange={(e) => setSkills(e.target.value)}
+                                            placeholder="e.g., JavaScript, React, Node.js, Python"
+                                            className="block w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-[#2245ae] focus:border-[#2245ae] placeholder-gray-400 transition-all duration-200 bg-white shadow-sm resize-none"
+                                        ></textarea>
+                                        <p className="text-xs text-gray-500 mt-1">
+                                            Separate multiple skills with commas
+                                        </p>
+                                    </motion.div>
                                     
                                     {/* Description */}
-                                    <div className="mt-6 col-span-1 md:col-span-2">
-                                        <label htmlFor="description" className="block text-sm font-medium text-gray-700">Job Description</label>
+                                    <motion.div
+                                        variants={cardAnimation}
+                                        whileHover={hoverEffect}
+                                        className="space-y-3 bg-gray-50/50 p-4 rounded-xl border border-gray-200/50 lg:col-span-2"
+                                    >
+                                        <label htmlFor="description" className="block text-sm font-semibold text-[#1a3a9c]">
+                                            Job Description
+                                        </label>
                                         <textarea
                                             name="description"
                                             id="description"
@@ -542,18 +678,23 @@ export default function EditJobPage() {
                                             value={description}
                                             onChange={(e) => setDescription(e.target.value)}
                                             required
-                                            className="block w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-[#165BF8] focus:border-[#165BF8] placeholder-gray-400 transition duration-200 shadow-sm"
+                                            className="block w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-[#2245ae] focus:border-[#2245ae] placeholder-gray-400 transition-all duration-200 bg-white shadow-sm resize-none"
+                                            placeholder="Describe the job responsibilities, requirements, and what you're looking for in a candidate..."
                                         ></textarea>
-                                    </div>
+                                    </motion.div>
                                 </div>
 
-                                <div className="mt-8 flex flex-col sm:flex-row justify-end space-y-3 sm:space-y-0 sm:space-x-4 border-t border-gray-100 pt-6">
-                                    <Link href="/poster/posted-jobs" passHref>
+                                {/* Action Buttons */}
+                                <motion.div
+                                    variants={fadeIn}
+                                    className="mt-8 pt-6 border-t border-gray-200 flex flex-col sm:flex-row justify-end gap-4"
+                                >
+                                    <Link href="/poster/posted-jobs" passHref className="w-full sm:w-auto">
                                         <motion.button
                                             type="button"
                                             whileHover={{ scale: 1.02 }}
                                             whileTap={{ scale: 0.98 }}
-                                            className="px-6 py-3 border border-gray-300 rounded-xl font-medium text-gray-700 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#165BF8]/50 transition-all duration-200 w-full sm:w-auto"
+                                            className="w-full flex items-center justify-center px-6 py-3 border border-[#2245ae] text-[#2245ae] rounded-xl font-medium hover:bg-[#2245ae] hover:text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#2245ae] transition-all duration-200"
                                         >
                                             Cancel
                                         </motion.button>
@@ -561,23 +702,23 @@ export default function EditJobPage() {
                                     <motion.button
                                         type="submit"
                                         disabled={submitting}
-                                        whileHover={{ scale: 1.02 }}
-                                        whileTap={{ scale: 0.98 }}
-                                        className={`inline-flex items-center justify-center px-6 py-3 border border-transparent rounded-xl font-medium text-white bg-gradient-to-r from-[#165BF8] to-[#1C3991] hover:from-[#1a65ff] hover:to-[#2242a8] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#165BF8]/50 shadow-sm transition-all duration-200 w-full sm:w-auto disabled:opacity-50 disabled:cursor-not-allowed`}
+                                        whileHover={submitting ? {} : { scale: 1.02 }}
+                                        whileTap={submitting ? {} : { scale: 0.98 }}
+                                        className={`w-full sm:w-auto flex items-center justify-center px-8 py-3 border border-transparent rounded-xl font-medium text-white bg-gradient-to-r from-[#2245ae] to-[#1a3a9c] hover:from-[#2a55cc] hover:to-[#2242a8] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#2245ae] shadow-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:from-[#2245ae] disabled:hover:to-[#1a3a9c]`}
                                     >
                                         {submitting ? (
                                             <>
-                                                <FiLoader className="animate-spin -ml-1 mr-3 h-5 w-5" />
-                                                Saving...
+                                                <FiLoader className="animate-spin mr-3 h-5 w-5" />
+                                                Saving Changes...
                                             </>
                                         ) : (
                                             <>
-                                                <FiSave className="-ml-1 mr-3 h-5 w-5" />
+                                                <FiSave className="mr-3 h-5 w-5" />
                                                 Save Changes
                                             </>
                                         )}
                                     </motion.button>
-                                </div>
+                                </motion.div>
                             </motion.form>
                         )}
                     </div>

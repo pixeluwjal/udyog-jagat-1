@@ -18,12 +18,17 @@ import {
   FiPlus,
   FiZap,
   FiLoader,
+  FiEye,
+  FiTrendingUp,
+  FiAward,
+  FiTarget,
 } from "react-icons/fi";
 import { motion, AnimatePresence } from "framer-motion";
 
-// Brand colors
-const primaryBlue = "#165BF8";
-const darkBlue = "#1C3991";
+// Updated brand colors with #2245ae
+const primaryBlue = "#2245ae";
+const darkBlue = "#1a3a9c";
+const lightBlue = "#eef2ff";
 
 // Type definition for a user in the display list
 interface UserDisplay {
@@ -37,13 +42,13 @@ interface UserDisplay {
   createdAt: string;
 }
 
-// Updated Interface for displaying job data - now includes all fields
+// Updated Interface for displaying job data
 interface JobDisplay {
   _id: string;
   title: string;
   description: string;
   location: string;
-  salary?: string | number; // Made optional and flexible for number or string
+  salary?: string | number;
   status: "active" | "inactive" | "closed";
   numberOfOpenings: number;
   company: string;
@@ -53,6 +58,9 @@ interface JobDisplay {
   postedBy: string;
   createdAt: string;
   updatedAt: string;
+  salaryMin?: number;
+  salaryMax?: number;
+  salaryOriginal?: string;
 }
 
 // Framer Motion animation variants
@@ -69,6 +77,16 @@ const fadeIn = {
   },
 };
 
+const staggerContainer = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.1,
+    },
+  },
+};
+
 const cardAnimation = {
   hidden: { opacity: 0, y: 20, scale: 0.98 },
   visible: {
@@ -76,9 +94,9 @@ const cardAnimation = {
     y: 0,
     scale: 1,
     transition: {
-      duration: 0.6,
-      ease: [0.16, 1, 0.3, 1],
-      staggerChildren: 0.1,
+      type: "spring",
+      stiffness: 100,
+      damping: 15,
     },
   },
 };
@@ -90,6 +108,17 @@ const pulseEffect = {
     duration: 1.2,
     repeat: Infinity,
     ease: "easeInOut",
+  },
+};
+
+const hoverEffect = {
+  y: -8,
+  scale: 1.02,
+  boxShadow: "0 20px 40px rgba(34, 69, 174, 0.15)",
+  transition: {
+    type: "spring",
+    stiffness: 300,
+    damping: 20,
   },
 };
 
@@ -105,6 +134,7 @@ export default function PosterDashboardPage() {
 
   const [recentJobs, setRecentJobs] = useState<JobDisplay[]>([]);
   const [applicationsCount, setApplicationsCount] = useState<number>(0);
+  const [activeJobsCount, setActiveJobsCount] = useState<number>(0);
   const [dataLoading, setDataLoading] = useState(true);
   const [dataError, setDataError] = useState<string | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -113,25 +143,16 @@ export default function PosterDashboardPage() {
     if (authLoading) return;
 
     if (!isAuthenticated || !user) {
-      console.warn(
-        "PosterDashboardPage: Not authenticated. Redirecting to /login."
-      );
       router.push("/login");
       return;
     }
 
     if (user.firstLogin) {
-      console.warn(
-        "PosterDashboardPage: User is firstLogin. Redirecting to /change-password."
-      );
       router.push("/change-password");
       return;
     }
 
     if (user.role !== "job_poster") {
-      console.warn(
-        `PosterDashboardPage: Incorrect role (${user.role}). Redirecting.`
-      );
       if (user.role === "admin") {
         router.push("/admin/dashboard");
       } else if (user.role === "job_seeker") {
@@ -171,10 +192,9 @@ export default function PosterDashboardPage() {
 
       if (Array.isArray(data.jobs)) {
         setRecentJobs(data.jobs);
+        setActiveJobsCount(data.jobs.filter((job: JobDisplay) => job.status === "active").length);
       } else {
-        setDataError(
-          "Failed to fetch recent jobs: Invalid data format from server."
-        );
+        setDataError("Failed to fetch recent jobs: Invalid data format from server.");
         setRecentJobs([]);
       }
     } catch (err: any) {
@@ -225,6 +245,29 @@ export default function PosterDashboardPage() {
     fetchApplicationsCount,
   ]);
 
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case "active":
+        return "bg-gradient-to-r from-green-500 to-emerald-600 text-white";
+      case "closed":
+        return "bg-gradient-to-r from-red-500 to-red-600 text-white";
+      default:
+        return "bg-gradient-to-r from-gray-500 to-gray-600 text-white";
+    }
+  };
+
+  const getSalaryDisplay = (job: JobDisplay) => {
+    if (job.salaryOriginal) {
+      return job.salaryOriginal;
+    } else if (job.salaryMin && job.salaryMax) {
+      return `${job.salaryMin / 100000} - ${job.salaryMax / 100000} LPA`;
+    } else if (job.salaryMin) {
+      return `${job.salaryMin / 100000}+ LPA`;
+    } else {
+      return "Not Specified";
+    }
+  };
+
   if (
     authLoading ||
     !isAuthenticated ||
@@ -233,7 +276,7 @@ export default function PosterDashboardPage() {
     user.role !== "job_poster"
   ) {
     return (
-      <div className="flex h-screen bg-gradient-to-br from-[#f6f9ff] to-[#eef2ff] justify-center items-center">
+      <div className={`flex h-screen bg-gradient-to-br from-[#f6f9ff] to-[${lightBlue}] justify-center items-center font-inter`}>
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -241,11 +284,11 @@ export default function PosterDashboardPage() {
         >
           <motion.div
             animate={pulseEffect}
-            className="rounded-full p-4 bg-[#165BF8]/10 shadow-inner"
+            className="rounded-full p-4 bg-[#2245ae]/10 shadow-inner"
           >
-            <FiLoader className="text-[#165BF8] h-12 w-12 animate-spin" />
+            <FiLoader className="text-[#2245ae] h-12 w-12 animate-spin" />
           </motion.div>
-          <p className="mt-6 text-lg font-medium text-[#1C3991]">
+          <p className="mt-6 text-lg font-medium text-[#1a3a9c]">
             Loading dashboard...
           </p>
         </motion.div>
@@ -254,7 +297,7 @@ export default function PosterDashboardPage() {
   }
 
   return (
-    <div className="flex h-screen bg-gradient-to-br from-[#f6f9ff] to-[#eef2ff] overflow-hidden font-inter">
+    <div className={`flex h-screen bg-gradient-to-br from-[#f6f9ff] to-[${lightBlue}] overflow-hidden font-inter`}>
       <Sidebar
         userRole={user.role}
         onLogout={logout}
@@ -263,72 +306,79 @@ export default function PosterDashboardPage() {
       />
 
       <div className="flex-1 flex flex-col overflow-y-auto">
-        {/* Mobile Header (visible only on small screens) */}
-        <div className="md:hidden bg-white/95 backdrop-blur-md shadow-sm p-4 flex items-center justify-between z-10 sticky top-0">
-          {/* Hamburger Icon */}
+        {/* Mobile Header */}
+        <div className="md:hidden bg-white/95 backdrop-blur-md shadow-sm p-4 flex items-center justify-between sticky top-0 z-10 border-b border-[#2245ae]/10">
           <motion.button
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
             onClick={() => setIsSidebarOpen(true)}
-            className="p-2 -ml-2 rounded-lg text-[#165BF8] hover:bg-[#165BF8]/10 focus:outline-none"
+            className="p-2 rounded-xl text-[#2245ae] hover:bg-[#2245ae]/10 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-[#2245ae] transition-all duration-200"
+            aria-label="Open sidebar"
           >
             <FiMenu className="w-6 h-6" />
           </motion.button>
-          {/* Centered Title */}
-          <h1 className="text-2xl font-bold bg-gradient-to-r from-[#165BF8] to-[#1C3991] bg-clip-text text-transparent">
-            Job Poster Panel
+          <h1 className="text-2xl font-bold bg-gradient-to-r from-[#2245ae] to-[#1a3a9c] bg-clip-text text-transparent">
+            Dashboard
           </h1>
-          {/* Empty div for spacing on the right to balance the hamburger */}
           <div className="w-6 h-6"></div>
         </div>
 
-        <main className="flex-1 overflow-y-auto p-4 md:p-8">
-          <div className="max-w-6xl mx-auto space-y-8">
+        <main className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8">
+          <div className="max-w-7xl mx-auto space-y-6 md:space-y-8">
             {/* Header Section */}
             <motion.div
               initial="hidden"
               animate="visible"
               variants={fadeIn}
-              className="flex flex-col space-y-4 md:space-y-0 md:flex-row md:items-center md:justify-between mb-6"
+              className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6"
             >
-              <div>
-                <h1 className="text-3xl md:text-4xl font-bold text-[#1C3991] leading-tight">
-                  <span className="bg-gradient-to-r from-[#165BF8] to-[#1C3991] bg-clip-text text-transparent">
+              <div className="flex-1">
+                <motion.h1 
+                  className="text-3xl md:text-4xl lg:text-5xl font-bold text-[#1a3a9c] leading-tight"
+                  initial={{ opacity: 0, y: -20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.2 }}
+                >
+                  <span className="bg-gradient-to-r from-[#2245ae] to-[#1a3a9c] bg-clip-text text-transparent">
                     Welcome back, {user.username || "Job Poster"}!
                   </span>
-                </h1>
-                <p className="text-[#165BF8] mt-2">
-                  Your Job Posting Dashboard
-                </p>
+                </motion.h1>
+                <motion.p 
+                  className="text-[#2245ae] text-lg md:text-xl mt-2 md:mt-4"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: 0.3 }}
+                >
+                  Manage your job postings and track applications
+                </motion.p>
               </div>
-
-              <div className="flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-4 w-full md:w-auto">
-                <Link href="/poster/new-job" passHref>
-                  <motion.button
-                    whileHover={{
-                      scale: 1.02,
-                      boxShadow: `0 8px 16px ${primaryBlue}20`,
-                    }}
-                    whileTap={{ scale: 0.98 }}
-                    className="flex items-center px-6 py-3 bg-[#165BF8] text-white rounded-xl font-semibold shadow-md transition-all duration-300 w-full justify-center"
-                  >
-                    <FiBriefcase className="w-5 h-5 mr-3" />
-                    <span>Post New Job</span>
-                  </motion.button>
-                </Link>
-                <Link href="/poster/posted-jobs" passHref>
-                  <motion.button
-                    whileHover={{
-                      scale: 1.02,
-                      boxShadow: `0 8px 16px ${darkBlue}20`,
-                    }}
-                    whileTap={{ scale: 0.98 }}
-                    className="flex items-center px-6 py-3 bg-white text-[#1C3991] rounded-xl font-semibold shadow-md transition-all duration-300 w-full justify-center border border-[#165BF8]/20"
-                  >
-                    <FiBriefcase className="w-5 h-5 mr-3 text-[#165BF8]" />
-                    <span>View All Jobs</span>
-                  </motion.button>
-                </Link>
+              
+              <div className="flex flex-col sm:flex-row gap-4 w-full lg:w-auto">
+                <motion.div
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  className="w-full sm:w-auto"
+                >
+                  <Link href="/poster/new-job" passHref>
+                    <button className="flex items-center justify-center w-full sm:w-auto px-6 py-3 bg-gradient-to-r from-[#2245ae] to-[#1a3a9c] text-white rounded-xl font-semibold shadow-lg hover:shadow-xl hover:from-[#2a55cc] hover:to-[#2242a8] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#2245ae] transition-all duration-200 group">
+                      <FiPlus className="w-5 h-5 mr-3 group-hover:scale-110 transition-transform" />
+                      <span>Post New Job</span>
+                    </button>
+                  </Link>
+                </motion.div>
+                
+                <motion.div
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  className="w-full sm:w-auto"
+                >
+                  <Link href="/poster/posted-jobs" passHref>
+                    <button className="flex items-center justify-center w-full sm:w-auto px-6 py-3 bg-white text-[#1a3a9c] rounded-xl font-semibold shadow-md border border-[#2245ae]/20 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#2245ae] transition-all duration-200 group">
+                      <FiEye className="w-5 h-5 mr-3 text-[#2245ae] group-hover:scale-110 transition-transform" />
+                      <span>View All Jobs</span>
+                    </button>
+                  </Link>
+                </motion.div>
               </div>
             </motion.div>
 
@@ -336,28 +386,26 @@ export default function PosterDashboardPage() {
             <motion.div
               initial="hidden"
               animate="visible"
-              variants={cardAnimation}
-              className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6"
+              variants={staggerContainer}
+              className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 md:gap-6"
             >
               {/* Total Posted Jobs Card */}
               <motion.div
-                variants={fadeIn}
-                whileHover={{
-                  y: -5,
-                  boxShadow: `0 10px 25px -5px ${primaryBlue}1A`,
-                }}
-                className="bg-white p-6 rounded-2xl shadow-sm border border-[#165BF8]/10 flex flex-col justify-between transition-all duration-300"
+                variants={cardAnimation}
+                whileHover={hoverEffect}
+                className="bg-white p-6 rounded-2xl shadow-lg border border-[#2245ae]/10 transition-all duration-300"
               >
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-gray-500 text-sm font-medium">
+                    <p className="text-gray-600 text-sm font-medium mb-2">
                       Total Posted Jobs
                     </p>
-                    <h3 className="text-3xl font-bold mt-1 text-[#1C3991]">
+                    <h3 className="text-3xl font-bold text-[#1a3a9c]">
                       {recentJobs.length}
                     </h3>
+                    <p className="text-xs text-gray-500 mt-1">All time</p>
                   </div>
-                  <div className="p-4 rounded-full bg-[#165BF8]/10 text-[#165BF8]">
+                  <div className="p-4 rounded-2xl bg-gradient-to-br from-[#2245ae]/10 to-[#1a3a9c]/10 text-[#2245ae]">
                     <FiBriefcase className="w-7 h-7" />
                   </div>
                 </div>
@@ -365,216 +413,335 @@ export default function PosterDashboardPage() {
 
               {/* Active Jobs Card */}
               <motion.div
-                variants={fadeIn}
-                whileHover={{
-                  y: -5,
-                  boxShadow: `0 10px 25px -5px ${primaryBlue}1A`,
-                }}
-                className="bg-white p-6 rounded-2xl shadow-sm border border-[#165BF8]/10 flex flex-col justify-between transition-all duration-300"
+                variants={cardAnimation}
+                whileHover={hoverEffect}
+                className="bg-white p-6 rounded-2xl shadow-lg border border-[#2245ae]/10 transition-all duration-300"
               >
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-gray-500 text-sm font-medium">
+                    <p className="text-gray-600 text-sm font-medium mb-2">
                       Active Jobs
                     </p>
-                    <h3 className="text-3xl font-bold mt-1 text-[#1C3991]">
-                      {
-                        recentJobs.filter((job) => job.status === "active")
-                          .length
-                      }
+                    <h3 className="text-3xl font-bold text-[#1a3a9c]">
+                      {activeJobsCount}
                     </h3>
+                    <p className="text-xs text-gray-500 mt-1">Currently live</p>
                   </div>
-                  <div className="p-4 rounded-full bg-green-100/30 text-green-600">
+                  <div className="p-4 rounded-2xl bg-gradient-to-br from-green-100 to-green-50 text-green-600">
                     <FiActivity className="w-7 h-7" />
                   </div>
                 </div>
               </motion.div>
 
-              {/* Total Applications Card (Placeholder) */}
+              {/* Total Applications Card */}
               <motion.div
-                variants={fadeIn}
-                whileHover={{
-                  y: -5,
-                  boxShadow: `0 10px 25px -5px ${primaryBlue}1A`,
-                }}
-                className="bg-white p-6 rounded-2xl shadow-sm border border-[#165BF8]/10 flex flex-col justify-between transition-all duration-300"
+                variants={cardAnimation}
+                whileHover={hoverEffect}
+                className="bg-white p-6 rounded-2xl shadow-lg border border-[#2245ae]/10 transition-all duration-300"
               >
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-gray-500 text-sm font-medium">
+                    <p className="text-gray-600 text-sm font-medium mb-2">
                       Total Applications
                     </p>
-                    <h3 className="text-3xl font-bold mt-1 text-[#1C3991]">
+                    <h3 className="text-3xl font-bold text-[#1a3a9c]">
                       {applicationsCount}
                     </h3>
+                    <p className="text-xs text-gray-500 mt-1">All applications</p>
                   </div>
-                  <div className="p-4 rounded-full bg-indigo-100/30 text-indigo-600">
+                  <div className="p-4 rounded-2xl bg-gradient-to-br from-purple-100 to-purple-50 text-purple-600">
                     <FiUsers className="w-7 h-7" />
+                  </div>
+                </div>
+              </motion.div>
+
+              {/* Quick Actions Card */}
+              <motion.div
+                variants={cardAnimation}
+                whileHover={hoverEffect}
+                className="bg-white p-6 rounded-2xl shadow-lg border border-[#2245ae]/10 transition-all duration-300"
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-gray-600 text-sm font-medium mb-2">
+                      Quick Actions
+                    </p>
+                    <h3 className="text-xl font-bold text-[#1a3a9c]">
+                      Manage
+                    </h3>
+                    <p className="text-xs text-gray-500 mt-1">Your listings</p>
+                  </div>
+                  <div className="p-4 rounded-2xl bg-gradient-to-br from-amber-100 to-amber-50 text-amber-600">
+                    <FiZap className="w-7 h-7" />
                   </div>
                 </div>
               </motion.div>
             </motion.div>
 
             {/* Recent Jobs Section */}
-            <div className="bg-white rounded-2xl shadow-lg overflow-hidden border border-[#165BF8]/10">
-              <div className="px-6 py-5 border-b border-[#165BF8]/10 flex flex-col sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex-1">
-                  <h2 className="text-xl font-semibold text-[#1C3991]">
-                    Your Recent Job Listings
-                  </h2>
-                  <p className="mt-1 text-sm text-[#165BF8]">
-                    A quick overview of your latest job postings.
-                  </p>
-                </div>
-                <div className="mt-4 sm:mt-0">
-                  <Link href="/poster/posted-jobs" passHref>
-                    <button className="flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-blue-100 bg-[#165BF8] hover:bg-[#1a65ff] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#165BF8]/50 transition-all duration-200">
-                      <FiBriefcase className="w-5 h-5 mr-2" />
-                      View All Jobs
-                    </button>
-                  </Link>
-                </div>
-              </div>
-
-              {dataError && (
-                <div className="bg-red-50 border-l-4 border-red-400 p-4 mx-6 mt-4 rounded-r-lg">
-                  <div className="flex">
-                    <div className="flex-shrink-0">
-                      <FiXCircle className="h-5 w-5 text-red-400" />
-                    </div>
-                    <div className="ml-3">
-                      <p className="text-sm text-red-700">{dataError}</p>
-                    </div>
+            <motion.div
+              initial="hidden"
+              animate="visible"
+              variants={fadeIn}
+              className="bg-white rounded-2xl shadow-lg border border-[#2245ae]/10 overflow-hidden"
+            >
+              {/* Section Header */}
+              <div className="px-6 py-5 border-b border-[#2245ae]/10 bg-gradient-to-r from-[#2245ae]/5 to-transparent">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                  <div className="flex-1">
+                    <h2 className="text-xl font-semibold text-[#1a3a9c] flex items-center">
+                      <FiBriefcase className="mr-3 text-[#2245ae]" />
+                      Your Recent Job Listings
+                    </h2>
+                    <p className="mt-1 text-sm text-[#2245ae]">
+                      Overview of your latest job postings and their status
+                    </p>
                   </div>
-                </div>
-              )}
-
-              {dataLoading ? (
-                <div className="flex justify-center items-center py-12">
-                  <motion.div
-                    animate={pulseEffect}
-                    className="p-3 bg-[#165BF8]/10 rounded-full"
-                  >
-                    <FiLoader className="text-[#165BF8] h-10 w-10 animate-spin" />
-                  </motion.div>
-                </div>
-              ) : recentJobs.length === 0 ? (
-                <div className="text-center py-12">
-                  <div className="mx-auto w-24 h-24 bg-[#165BF8]/5 rounded-full flex items-center justify-center mb-4">
-                    <FiBriefcase className="h-10 w-10 text-[#165BF8]/70" />
-                  </div>
-                  <h3 className="mt-2 text-lg font-medium text-[#1C3991]">
-                    No jobs posted yet
-                  </h3>
-                  <p className="mt-1 text-sm text-[#165BF8]">
-                    Get started by posting your first job.
-                  </p>
-                  <div className="mt-6">
+                  <div className="flex gap-3">
+                    <Link href="/poster/posted-jobs" passHref>
+                      <motion.button
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        className="flex items-center px-4 py-2 border border-[#2245ae] text-[#2245ae] rounded-xl text-sm font-medium hover:bg-[#2245ae] hover:text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#2245ae] transition-all duration-200"
+                      >
+                        <FiEye className="w-4 h-4 mr-2" />
+                        View All
+                      </motion.button>
+                    </Link>
                     <Link href="/poster/new-job" passHref>
-                      <button className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-blue-100 bg-[#165BF8] hover:bg-[#1a65ff] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#165BF8]/50 transition-all duration-200">
-                        <FiPlus className="w-5 h-5 mr-2" />
-                        Post New Job
-                      </button>
+                      <motion.button
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        className="flex items-center px-4 py-2 bg-gradient-to-r from-[#2245ae] to-[#1a3a9c] text-white rounded-xl text-sm font-medium hover:from-[#2a55cc] hover:to-[#2242a8] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#2245ae] transition-all duration-200 shadow-lg"
+                      >
+                        <FiPlus className="w-4 h-4 mr-2" />
+                        New Job
+                      </motion.button>
                     </Link>
                   </div>
                 </div>
-              ) : (
-                <div className="px-6 py-4 grid grid-cols-1 gap-6">
-                  {recentJobs.map((job) => (
+              </div>
+
+              {/* Error State */}
+              <AnimatePresence>
+                {dataError && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    className="mx-6 mt-4 bg-red-50 border-l-4 border-red-500 p-4 rounded-r-lg"
+                  >
+                    <div className="flex items-center">
+                      <FiXCircle className="h-5 w-5 text-red-500 mr-3" />
+                      <p className="text-sm text-red-700 font-medium">{dataError}</p>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              {/* Loading State */}
+              {dataLoading ? (
+                <div className="flex justify-center items-center py-16">
+                  <div className="text-center">
                     <motion.div
-                      key={job._id}
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.3 }}
-                      whileHover={{
-                        y: -3,
-                        boxShadow: `0 8px 16px ${primaryBlue}15`,
-                      }}
-                      className="bg-white border border-[#165BF8]/10 rounded-xl overflow-hidden shadow-sm transition-all duration-200"
+                      animate={pulseEffect}
+                      className="p-4 bg-[#2245ae]/10 rounded-full inline-block"
                     >
-                      <div className="p-6">
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1">
-                            <h3 className="text-xl font-semibold text-[#1C3991] mb-2">
-                              {job.title}
-                            </h3>
-                            <p className="text-gray-600 line-clamp-2 mb-4">
-                              {job.description}
-                            </p>
-
-                            <div className="flex flex-wrap gap-4 mb-4">
-                              <div className="flex items-center text-sm text-gray-600">
-                                <FiMapPin className="flex-shrink-0 mr-1.5 h-5 w-5 text-[#165BF8]/70" />
-                                {job.location}
-                              </div>
-
-                              <div className="flex items-center text-sm text-gray-600">
-                                {job.salaryOriginal ? (
-                                  <span className="text-green-600/80 font-medium">
-                                    {job.salaryOriginal}
-                                  </span>
-                                ) : job.salaryMin && job.salaryMax ? (
-                                  <span className="text-green-600/80 font-medium">
-                                    {job.salaryMin / 100000} -{" "}
-                                    {job.salaryMax / 100000} LPA
-                                  </span>
-                                ) : job.salaryMin ? (
-                                  <span className="text-green-600/80 font-medium">
-                                    {job.salaryMin / 100000}+ LPA
-                                  </span>
-                                ) : (
-                                  <span className="text-gray-400 italic">
-                                    Not Specified
-                                  </span>
-                                )}
-                              </div>
-
-                              <div className="flex items-center text-sm text-gray-600">
-                                <FiUsers className="flex-shrink-0 mr-1.5 h-5 w-5 text-[#165BF8]/70" />
-                                Openings: {job.numberOfOpenings}
-                              </div>
-
-                              <div className="flex items-center text-sm text-gray-600">
-                                <FiClock className="flex-shrink-0 mr-1.5 h-5 w-5 text-[#165BF8]/70" />
-                                Posted{" "}
-                                {new Date(job.createdAt).toLocaleDateString(
-                                  "en-GB"
-                                )}
-                              </div>
+                      <FiLoader className="text-[#2245ae] h-12 w-12 animate-spin" />
+                    </motion.div>
+                    <p className="mt-4 text-lg font-medium text-[#1a3a9c]">
+                      Loading your job listings...
+                    </p>
+                  </div>
+                </div>
+              ) : recentJobs.length === 0 ? (
+                /* Empty State */
+                <motion.div
+                  initial="hidden"
+                  animate="visible"
+                  variants={fadeIn}
+                  className="text-center py-12 px-6"
+                >
+                  <div className="mx-auto w-20 h-20 bg-gradient-to-br from-[#2245ae]/10 to-[#1a3a9c]/10 rounded-2xl flex items-center justify-center mb-6">
+                    <FiBriefcase className="h-10 w-10 text-[#2245ae]" />
+                  </div>
+                  <h3 className="text-xl font-bold text-[#1a3a9c] mb-2">
+                    No jobs posted yet
+                  </h3>
+                  <p className="text-[#2245ae] text-base mb-6 max-w-md mx-auto">
+                    Start posting jobs to attract talented candidates and grow your team.
+                  </p>
+                  <Link href="/poster/new-job" passHref>
+                    <motion.button
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-[#2245ae] to-[#1a3a9c] text-white rounded-xl font-medium hover:from-[#2a55cc] hover:to-[#2242a8] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#2245ae] transition-all duration-200 shadow-lg hover:shadow-xl"
+                    >
+                      <FiPlus className="w-5 h-5 mr-2" />
+                      Post Your First Job
+                    </motion.button>
+                  </Link>
+                </motion.div>
+              ) : (
+                /* Jobs List - Mobile Cards & Desktop Table */
+                <div className="p-6">
+                  {/* Mobile Cards View */}
+                  <div className="lg:hidden space-y-4">
+                    {recentJobs.map((job) => (
+                      <motion.div
+                        key={job._id}
+                        variants={cardAnimation}
+                        whileHover={{ y: -4, scale: 1.01 }}
+                        className="bg-white border border-[#2245ae]/10 rounded-2xl p-6 shadow-lg hover:shadow-xl transition-all duration-300"
+                      >
+                        <div className="space-y-4">
+                          {/* Header */}
+                          <div className="flex justify-between items-start">
+                            <div className="flex-1">
+                              <h3 className="text-lg font-bold text-[#1a3a9c] line-clamp-2">
+                                {job.title}
+                              </h3>
+                              <p className="text-gray-600 text-sm mt-1 line-clamp-2">
+                                {job.description}
+                              </p>
+                            </div>
+                            <div className={`ml-3 px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(job.status)} flex items-center gap-1`}>
+                              {job.status.charAt(0).toUpperCase() + job.status.slice(1)}
                             </div>
                           </div>
 
-                          <span
-                            className={`ml-4 inline-flex items-center px-3 py-1 rounded-full text-sm font-medium 
-                            ${
-                              job.status === "active"
-                                ? "bg-green-100/30 text-green-800"
-                                : job.status === "closed"
-                                ? "bg-red-100/30 text-red-800"
-                                : "bg-gray-100/30 text-gray-800"
-                            }`}
-                          >
-                            {(job.status || "inactive")
-                              .charAt(0)
-                              .toUpperCase() +
-                              (job.status || "inactive").slice(1)}
-                          </span>
-                        </div>
+                          {/* Details */}
+                          <div className="grid grid-cols-1 gap-3">
+                            <div className="flex items-center text-sm text-gray-600">
+                              <FiMapPin className="mr-2 text-[#2245ae]" />
+                              {job.location}
+                            </div>
+                            <div className="flex items-center text-sm text-gray-600">
+                              <FiDollarSign className="mr-2 text-[#2245ae]" />
+                              <span className="text-green-600 font-medium">
+                                {getSalaryDisplay(job)}
+                              </span>
+                            </div>
+                            <div className="flex items-center text-sm text-gray-600">
+                              <FiUsers className="mr-2 text-[#2245ae]" />
+                              {job.numberOfOpenings} openings
+                            </div>
+                            <div className="flex items-center text-sm text-gray-600">
+                              <FiClock className="mr-2 text-[#2245ae]" />
+                              Posted {new Date(job.createdAt).toLocaleDateString()}
+                            </div>
+                          </div>
 
-                        <div className="mt-6 flex justify-end space-x-3">
-                          <Link href={`/poster/jobs/${job._id}/edit`} passHref>
-                            <button className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-blue-100 bg-[#165BF8] hover:bg-[#1a65ff] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#165BF8]/50 transition-all duration-200">
-                              <FiEdit className="w-5 h-5 mr-2" />
-                              Edit
-                            </button>
-                          </Link>
+                          {/* Actions */}
+                          <div className="flex gap-3 pt-4 border-t border-gray-200">
+                            <Link href={`/poster/jobs/${job._id}/edit`} passHref className="flex-1">
+                              <motion.button
+                                whileHover={{ scale: 1.02 }}
+                                whileTap={{ scale: 0.98 }}
+                                className="w-full flex items-center justify-center gap-2 px-4 py-2 border border-[#2245ae] text-[#2245ae] rounded-xl text-sm font-medium hover:bg-[#2245ae] hover:text-white transition-all duration-200"
+                              >
+                                <FiEdit className="w-4 h-4" />
+                                Edit
+                              </motion.button>
+                            </Link>
+                            <Link href={`/poster/applications?job=${job._id}`} passHref className="flex-1">
+                              <motion.button
+                                whileHover={{ scale: 1.02 }}
+                                whileTap={{ scale: 0.98 }}
+                                className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-gradient-to-r from-[#2245ae] to-[#1a3a9c] text-white rounded-xl text-sm font-medium hover:from-[#2a55cc] hover:to-[#2242a8] transition-all duration-200"
+                              >
+                                <FiEye className="w-4 h-4" />
+                                View Apps
+                              </motion.button>
+                            </Link>
+                          </div>
                         </div>
-                      </div>
-                    </motion.div>
-                  ))}
+                      </motion.div>
+                    ))}
+                  </div>
+
+                  {/* Desktop Table View */}
+                  <div className="hidden lg:block overflow-x-auto">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="border-b border-[#2245ae]/10">
+                          <th className="text-left py-4 px-6 text-sm font-semibold text-[#1a3a9c]">Job Title</th>
+                          <th className="text-left py-4 px-6 text-sm font-semibold text-[#1a3a9c]">Location</th>
+                          <th className="text-left py-4 px-6 text-sm font-semibold text-[#1a3a9c]">Salary</th>
+                          <th className="text-left py-4 px-6 text-sm font-semibold text-[#1a3a9c]">Openings</th>
+                          <th className="text-left py-4 px-6 text-sm font-semibold text-[#1a3a9c]">Status</th>
+                          <th className="text-left py-4 px-6 text-sm font-semibold text-[#1a3a9c]">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {recentJobs.map((job) => (
+                          <motion.tr
+                            key={job._id}
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            whileHover={{ backgroundColor: "rgba(34, 69, 174, 0.03)" }}
+                            className="border-b border-[#2245ae]/5 transition-all duration-200"
+                          >
+                            <td className="py-4 px-6">
+                              <div>
+                                <div className="font-semibold text-[#1a3a9c]">{job.title}</div>
+                                <div className="text-sm text-gray-600 mt-1 line-clamp-1">{job.description}</div>
+                              </div>
+                            </td>
+                            <td className="py-4 px-6">
+                              <div className="flex items-center text-sm text-gray-600">
+                                <FiMapPin className="mr-2 text-[#2245ae]" />
+                                {job.location}
+                              </div>
+                            </td>
+                            <td className="py-4 px-6">
+                              <div className="text-green-600 font-medium text-sm">
+                                {getSalaryDisplay(job)}
+                              </div>
+                            </td>
+                            <td className="py-4 px-6">
+                              <div className="flex items-center text-sm text-gray-600">
+                                <FiUsers className="mr-2 text-[#2245ae]" />
+                                {job.numberOfOpenings}
+                              </div>
+                            </td>
+                            <td className="py-4 px-6">
+                              <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(job.status)}`}>
+                                {job.status.charAt(0).toUpperCase() + job.status.slice(1)}
+                              </span>
+                            </td>
+                            <td className="py-4 px-6">
+                              <div className="flex items-center gap-2">
+                                <Link href={`/poster/jobs/${job._id}/edit`} passHref>
+                                  <motion.button
+                                    whileHover={{ scale: 1.05 }}
+                                    whileTap={{ scale: 0.95 }}
+                                    className="flex items-center gap-2 px-3 py-2 border border-[#2245ae] text-[#2245ae] rounded-lg text-sm font-medium hover:bg-[#2245ae] hover:text-white transition-all duration-200"
+                                  >
+                                    <FiEdit className="w-4 h-4" />
+                                    Edit
+                                  </motion.button>
+                                </Link>
+                                <Link href={`/poster/applications?job=${job._id}`} passHref>
+                                  <motion.button
+                                    whileHover={{ scale: 1.05 }}
+                                    whileTap={{ scale: 0.95 }}
+                                    className="flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-[#2245ae] to-[#1a3a9c] text-white rounded-lg text-sm font-medium hover:from-[#2a55cc] hover:to-[#2242a8] transition-all duration-200"
+                                  >
+                                    <FiEye className="w-4 h-4" />
+                                    View
+                                  </motion.button>
+                                </Link>
+                              </div>
+                            </td>
+                          </motion.tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               )}
-            </div>
+            </motion.div>
           </div>
         </main>
       </div>
