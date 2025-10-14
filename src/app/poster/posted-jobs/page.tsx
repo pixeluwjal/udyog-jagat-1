@@ -354,6 +354,7 @@ export default function PostedJobsPage() {
       <Sidebar
         userRole={user.role}
         onLogout={logout}
+        userEmail={user.email}
         isOpen={isSidebarOpen}
         setIsOpen={setIsSidebarOpen}
       />

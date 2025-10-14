@@ -300,6 +300,7 @@ export default function PosterDashboardPage() {
     <div className={`flex h-screen bg-gradient-to-br from-[#f6f9ff] to-[${lightBlue}] overflow-hidden font-inter`}>
       <Sidebar
         userRole={user.role}
+        userEmail={user.email}
         onLogout={logout}
         isOpen={isSidebarOpen}
         setIsOpen={setIsSidebarOpen}

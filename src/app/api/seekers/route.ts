@@ -1,61 +1,77 @@
 // app/api/seekers/route.ts
 import { NextRequest, NextResponse } from 'next/server';
+import UserModel from '@/models/User';
 import dbConnect from '@/lib/dbConnect';
-import User from '@/models/User';
-import { authMiddleware } from '@/lib/authMiddleware';
 
 export async function GET(request: NextRequest) {
+  try {
+    console.log('🔍 Starting seekers API...');
+    
     await dbConnect();
-    console.log('\n--- API: /api/seekers GET - Request received ---');
+    console.log('✅ Database connected');
 
-    // Only referrers and admins can view seekers
-    const authResult = await authMiddleware(request, ['job_referrer', 'admin']);
-    if (!authResult.success || !authResult.user) {
-        console.warn(`API: Fetch seekers list failed auth: ${authResult.message}`);
-        return NextResponse.json({ error: authResult.message || 'Authentication failed' }, { status: authResult.status || 401 });
+    // Get job seekers (users with role 'job_seeker')
+    const seekers = await UserModel.find(
+      { 
+        role: 'job_seeker',
+        status: 'active'
+      },
+      {
+        username: 1,
+        email: 1,
+        role: 1,
+        candidateDetails: 1,
+        onboardingStatus: 1
+      }
+    ).lean();
+
+    console.log(`✅ Found ${seekers.length} job seekers`);
+
+    // Only create Stream users if we have seekers
+    if (seekers.length > 0) {
+      try {
+        const { default: StreamChat } = await import('stream-chat');
+        const streamClient = StreamChat.getInstance(
+          process.env.NEXT_PUBLIC_STREAM_KEY!,
+          process.env.STREAM_SECRET!
+        );
+
+        for (const seeker of seekers) {
+          try {
+            // Create or update user in Stream Chat
+            await streamClient.upsertUser({
+              id: seeker._id.toString(),
+              name: seeker.candidateDetails?.fullName || seeker.username,
+              role: 'seeker',
+              image: `https://ui-avatars.com/api/?name=${encodeURIComponent(seeker.candidateDetails?.fullName || seeker.username)}&background=10B981&color=fff`,
+            });
+            console.log(`✅ Created Stream user for: ${seeker.candidateDetails?.fullName || seeker.username}`);
+          } catch (error) {
+            console.error(`❌ Failed to upsert Stream user for seeker ${seeker._id}:`, error);
+          }
+        }
+      } catch (streamError) {
+        console.error('❌ Stream Chat initialization failed:', streamError);
+        // Continue without Stream - don't break the API
+      }
     }
 
-    try {
-        // Find all users with the 'job_seeker' role
-        const seekers = await User.find({ role: 'job_seeker' })
-            .select('_id username email firstName lastName phone currentPosition experience skills profileImage isOnline lastSeen candidateDetails')
-            .lean();
+    return NextResponse.json({ 
+      success: true,
+      seekers: seekers.map(seeker => ({
+        ...seeker,
+        _id: seeker._id.toString()
+      }))
+    });
 
-        console.log(`API: Found ${seekers.length} seekers`);
-
-        if (!seekers || seekers.length === 0) {
-            console.log('API: No seekers found in the database.');
-            return NextResponse.json({ message: 'No seekers found.' }, { status: 404 });
-        }
-
-        // Transform the data to ensure all fields are present
-        const transformedSeekers = seekers.map(seeker => ({
-            _id: seeker._id.toString(),
-            username: seeker.username || '',
-            email: seeker.email || '',
-            firstName: seeker.firstName || seeker.candidateDetails?.fullName || '',
-            lastName: seeker.lastName || '',
-            phone: seeker.phone || seeker.candidateDetails?.phone || '',
-            currentPosition: seeker.candidateDetails?.experience || '',
-            experience: seeker.candidateDetails?.experience || '',
-            skills: seeker.candidateDetails?.skills || [],
-            profileImage: seeker.profileImage || '',
-            isOnline: seeker.isOnline || false,
-            lastSeen: seeker.lastSeen || null
-        }));
-
-        console.log('API: Successfully fetched seekers with transformed data');
-        return NextResponse.json({ 
-            message: 'Seekers fetched successfully.',
-            seekers: transformedSeekers
-        }, { status: 200 });
-        
-    } catch (error: unknown) {
-        console.error('API: Fetch seekers list error:', error);
-        let errorMessage = 'Server error fetching seekers list.';
-        if (error instanceof Error) {
-            errorMessage = error.message;
-        }
-        return NextResponse.json({ error: errorMessage }, { status: 500 });
-    }
+  } catch (error: any) {
+    console.error('❌ API Error:', error);
+    return NextResponse.json(
+      { 
+        success: false,
+        error: error.message || 'Failed to fetch job seekers' 
+      },
+      { status: 500 }
+    );
+  }
 }

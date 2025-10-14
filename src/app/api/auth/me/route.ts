@@ -2,7 +2,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/lib/dbConnect';
 import User from '@/models/User';
-import { authMiddleware, DecodedToken } from '@/lib/authMiddleware';
+import Referrer from '@/models/Referrer';
+import { authMiddleware } from '@/lib/authMiddleware';
 
 export async function GET(request: NextRequest) {
   await dbConnect();
@@ -19,20 +20,18 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    // Correct way to pass readPreference to findById when using .lean()
-    const user = await User.findById(
-      userId,
-      null, // projection (select) can be null or an object, we use .select() chaining instead
-      { readPreference: 'primary' } // Options object for findById
-    )
-      .select('-password')
-      .lean(); // Return a plain JavaScript object
+    // Check both collections
+    let user = await User.findById(userId).select('-password').lean();
+    
+    if (!user) {
+      user = await Referrer.findById(userId).select('-password').lean();
+    }
 
     if (!user) {
       return NextResponse.json({ error: 'User not found in database.' }, { status: 404 });
     }
 
-    console.log(`[API /auth/me] User ${user._id}: firstLogin from DB: ${user.firstLogin}`);
+    console.log(`[API /auth/me] User ${user._id}: firstLogin from DB: ${user.firstLogin}, role: ${user.role}`);
 
     return NextResponse.json({ user: user }, { status: 200 });
 

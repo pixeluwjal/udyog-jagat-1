@@ -1,7 +1,8 @@
 // app/api/auth/change-password/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/lib/dbConnect';
-import User from '@/models/User'; // fixed import
+import User from '@/models/User';
+import Referrer from '@/models/Referrer'; // Add Referrer import
 import { authMiddleware } from '@/lib/authMiddleware';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
@@ -27,9 +28,30 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const user = await User.findById(userId);
+    // Check if user is a referrer (from JWT token)
+    const isReferrer = authResult.user?.role === 'job_referrer';
+    
+    let user;
+    
+    if (isReferrer) {
+      // Look for user in Referrer collection
+      user = await Referrer.findById(userId);
+    } else {
+      // Look for user in User collection
+      user = await User.findById(userId);
+    }
+
     if (!user) {
-      return NextResponse.json({ error: 'User not found.' }, { status: 404 });
+      // If not found in the expected collection, try the other one as fallback
+      if (isReferrer) {
+        user = await User.findById(userId);
+      } else {
+        user = await Referrer.findById(userId);
+      }
+      
+      if (!user) {
+        return NextResponse.json({ error: 'User not found.' }, { status: 404 });
+      }
     }
 
     // Only check currentPassword if not firstLogin
@@ -60,6 +82,15 @@ export async function POST(request: NextRequest) {
       firstLogin: user.firstLogin,
       isSuperAdmin: user.isSuperAdmin,
       onboardingStatus: user.onboardingStatus,
+      // Add referrer-specific fields if user is a referrer
+      ...(user.role === 'job_referrer' && {
+        referralCode: user.referralCode,
+        milanShakaBhaga: user.milanShakaBhaga,
+        valayaNagar: user.valayaNagar,
+        khandaBhaga: user.khandaBhaga,
+        referrerDetails: user.referrerDetails,
+        workDetails: user.workDetails,
+      }),
     };
 
     const secret = process.env.JWT_SECRET;
@@ -67,7 +98,27 @@ export async function POST(request: NextRequest) {
 
     const newToken = jwt.sign(payload, secret, { expiresIn: '1h' });
 
-    return NextResponse.json({ message: 'Password changed successfully', token: newToken }, { status: 200 });
+    return NextResponse.json({ 
+      message: 'Password changed successfully', 
+      token: newToken,
+      user: {
+        _id: user._id,
+        email: user.email,
+        username: user.username,
+        role: user.role,
+        firstLogin: user.firstLogin,
+        onboardingStatus: user.onboardingStatus,
+        // Include referrer-specific fields in response
+        ...(user.role === 'job_referrer' && {
+          referralCode: user.referralCode,
+          milanShakaBhaga: user.milanShakaBhaga,
+          valayaNagar: user.valayaNagar,
+          khandaBhaga: user.khandaBhaga,
+          referrerDetails: user.referrerDetails,
+          workDetails: user.workDetails,
+        }),
+      }
+    }, { status: 200 });
   } catch (error: any) {
     console.error('API: /api/auth/change-password POST error:', error);
     return NextResponse.json({ error: error.message || 'Server error changing password.' }, { status: 500 });

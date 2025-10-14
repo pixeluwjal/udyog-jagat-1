@@ -9,7 +9,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   FiMail, FiUser, FiBriefcase, FiLink, FiShield,
   FiXCircle, FiCheckCircle, FiLoader, FiChevronLeft, FiMenu, 
-  FiBookOpen, FiMapPin, FiGlobe, FiPlus, FiAward, FiTarget
+  FiBookOpen, FiMapPin, FiGlobe, FiPlus, FiAward,
+  FiZap
 } from 'react-icons/fi';
 
 // Brand colors
@@ -18,7 +19,7 @@ const darkBlue = "#1C3991";
 
 export default function CreateUserPage() {
   const [email, setEmail] = useState('');
-  const [role, setRole] = useState<'job_poster' | 'job_seeker' | 'job_referrer' | 'admin'>('job_seeker');
+  const [role, setRole] = useState<'job_poster' | 'job_seeker' | 'job_referrer' | 'admin' | 'super_admin'>('job_seeker');
   const [milanShakaBhaga, setMilanShakaBhaga] = useState('');
   const [valayaNagar, setValayaNagar] = useState('');
   const [khandaBhaga, setKhandaBhaga] = useState('');
@@ -52,6 +53,60 @@ export default function CreateUserPage() {
     }
   }, [authLoading, isAuthenticated, currentUser, router]);
 
+  // Define role options based on current user's privileges
+  const getRoleOptions = () => {
+    const baseOptions = [
+      { 
+        value: 'job_seeker', 
+        label: 'Job Seeker', 
+        icon: <FiUser className="h-7 w-7" />,
+        description: 'Browse and apply for jobs',
+        gradient: 'from-blue-500 to-blue-600',
+        color: '#3B82F6'
+      },
+      { 
+        value: 'job_poster', 
+        label: 'Job Poster', 
+        icon: <FiBriefcase className="h-7 w-7" />,
+        description: 'Post and manage job listings',
+        gradient: 'from-green-500 to-green-600',
+        color: '#10B981'
+      },
+      { 
+        value: 'job_referrer', 
+        label: 'Referrer', 
+        icon: <FiLink className="h-7 w-7" />,
+        description: 'Refer candidates to jobs',
+        gradient: 'from-purple-500 to-purple-600',
+        color: '#8B5CF6'
+      },
+    ];
+
+    // Only show admin option for super admins
+    if (currentUser?.isSuperAdmin) {
+      baseOptions.push(
+        { 
+          value: 'admin', 
+          label: 'Admin', 
+          icon: <FiShield className="h-7 w-7" />,
+          description: 'Full system access',
+          gradient: 'from-red-500 to-red-600',
+          color: '#EF4444'
+        },
+        { 
+          value: 'super_admin', 
+          label: 'Super Admin', 
+          icon: <FiZap className="h-7 w-7" />,
+          description: 'Complete system control',
+          gradient: 'from-yellow-500 to-orange-600',
+          color: '#F59E0B'
+        }
+      );
+    }
+
+    return baseOptions;
+  };
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -76,19 +131,20 @@ export default function CreateUserPage() {
       return;
     }
 
-    if (role === 'admin' || role === 'job_referrer') {
+    // Validate additional fields for all roles except job_poster
+    if (role !== 'job_poster') {
       if (!milanShakaBhaga.trim()) {
-        setError('Milan/Shaka is required for Admin and Referrer roles.');
+        setError('Milan/Shaka is required for this role.');
         setIsLoading(false);
         return;
       }
       if (!valayaNagar.trim()) {
-        setError('Valaya/Nagar is required for Admin and Referrer roles.');
+        setError('Valaya/Nagar is required for this role.');
         setIsLoading(false);
         return;
       }
       if (!khandaBhaga.trim()) {
-        setError('Khanda/Bhaga is required for Admin and Referrer roles.');
+        setError('Khanda/Bhaga is required for this role.');
         setIsLoading(false);
         return;
       }
@@ -98,13 +154,19 @@ export default function CreateUserPage() {
       const payload: {
         email: string;
         role: string;
+        isSuperAdmin?: boolean;
         milanShakaBhaga?: string;
         valayaNagar?: string;
         khandaBhaga?: string;
       } = {
         email,
-        role,
+        role: role === 'super_admin' ? 'admin' : role,
       };
+
+      // Set super admin flag for super_admin role
+      if (role === 'super_admin') {
+        payload.isSuperAdmin = true;
+      }
 
       if (milanShakaBhaga.trim()) payload.milanShakaBhaga = milanShakaBhaga.trim();
       if (valayaNagar.trim()) payload.valayaNagar = valayaNagar.trim();
@@ -180,6 +242,9 @@ export default function CreateUserPage() {
     transition: { duration: 1.5, repeat: Infinity, ease: "easeInOut" },
   };
 
+  const isRequiredForNonPoster = role !== 'job_poster';
+  const roleOptions = getRoleOptions();
+
   if (authLoading || !isAuthenticated || !currentUser || currentUser.firstLogin || currentUser.role !== 'admin') {
     return (
       <div className="flex h-screen bg-gradient-to-br from-[#f6f9ff] to-[#eef2ff] justify-center items-center">
@@ -206,40 +271,6 @@ export default function CreateUserPage() {
       </div>
     );
   }
-
-  const roleOptions = [
-    { 
-      value: 'job_seeker', 
-      label: 'Job Seeker', 
-      icon: <FiUser className="h-7 w-7" />,
-      description: 'Browse and apply for jobs',
-      gradient: 'from-blue-500 to-blue-600'
-    },
-    { 
-      value: 'job_poster', 
-      label: 'Job Poster', 
-      icon: <FiBriefcase className="h-7 w-7" />,
-      description: 'Post and manage job listings',
-      gradient: 'from-green-500 to-green-600'
-    },
-    { 
-      value: 'job_referrer', 
-      label: 'Referrer', 
-      icon: <FiLink className="h-7 w-7" />,
-      description: 'Refer candidates to jobs',
-      gradient: 'from-purple-500 to-purple-600'
-    },
-    { 
-      value: 'admin', 
-      label: 'Admin', 
-      icon: <FiShield className="h-7 w-7" />,
-      description: 'Full system access',
-      gradient: 'from-red-500 to-red-600'
-    },
-  ];
-
-  const isRequiredForAdminOrReferrer = role === 'admin' || role === 'job_referrer';
-  const areAdditionalFieldsVisible = role === 'admin' || role === 'job_referrer' || role === 'job_seeker';
 
   return (
     <div className="flex h-screen bg-gradient-to-br from-[#f6f9ff] to-[#eef2ff] overflow-hidden font-inter">
@@ -285,44 +316,61 @@ export default function CreateUserPage() {
             {/* Header Section */}
             <motion.div
               variants={itemVariants}
-              className="text-center mb-8"
+              className="text-center mb-12"
             >
               <motion.div
                 whileHover={{ scale: 1.05 }}
-                className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-[#165BF8] to-[#1C3991] rounded-3xl shadow-2xl mb-6"
+                className="inline-flex items-center justify-center w-24 h-24 bg-gradient-to-br from-[#165BF8] to-[#1C3991] rounded-3xl shadow-2xl mb-6"
               >
-                <FiPlus className="h-10 w-10 text-white" />
+                <FiPlus className="h-12 w-12 text-white" />
               </motion.div>
               <h1 className="text-4xl md:text-5xl font-black bg-gradient-to-r from-[#165BF8] to-[#1C3991] bg-clip-text text-transparent mb-4">
                 Create New User
               </h1>
               <p className="text-lg text-[#165BF8] font-medium max-w-2xl mx-auto">
-                Add new members to your platform and assign them appropriate roles with customized permissions
+                {currentUser.isSuperAdmin 
+                  ? "Create user accounts with appropriate roles and permissions"
+                  : "Create Job Seekers, Job Posters, and Referrers for your platform"
+                }
               </p>
             </motion.div>
 
-            <div className="grid lg:grid-cols-3 gap-8">
-              {/* Left Side - Form */}
-              <motion.div
-                variants={itemVariants}
-                className="lg:col-span-2"
-              >
-                <div className="bg-white rounded-3xl shadow-2xl border border-[#165BF8]/10 overflow-hidden">
-                  <div className="p-8">
-                    <div className="flex items-center justify-between mb-8">
-                      <h2 className="text-2xl font-bold text-[#1C3991]">User Information</h2>
-                      <Link href="/admin/dashboard" passHref>
-                        <motion.button
-                          whileHover={{ scale: 1.05, boxShadow: "0 8px 25px rgba(22, 91, 248, 0.2)" }}
-                          whileTap={{ scale: 0.95 }}
-                          className="flex items-center px-5 py-2.5 bg-[#165BF8]/10 text-[#1C3991] rounded-xl hover:bg-[#165BF8]/20 transition-all duration-200 font-semibold shadow-sm"
-                        >
-                          <FiChevronLeft className="mr-2 w-5 h-5" /> Back
-                        </motion.button>
-                      </Link>
+            {/* Form Container */}
+            <motion.div
+              variants={itemVariants}
+              className="bg-white rounded-3xl shadow-2xl border border-[#165BF8]/10 overflow-hidden"
+            >
+              <div className="p-8">
+                <div className="flex items-center justify-between mb-8">
+                  <h2 className="text-2xl font-bold text-[#1C3991]">User Information</h2>
+                  <Link href="/admin/dashboard" passHref>
+                    <motion.button
+                      whileHover={{ scale: 1.05, boxShadow: "0 8px 25px rgba(22, 91, 248, 0.2)" }}
+                      whileTap={{ scale: 0.95 }}
+                      className="flex items-center px-5 py-2.5 bg-[#165BF8]/10 text-[#1C3991] rounded-xl hover:bg-[#165BF8]/20 transition-all duration-200 font-semibold shadow-sm"
+                    >
+                      <FiChevronLeft className="mr-2 w-5 h-5" /> Back to Dashboard
+                    </motion.button>
+                  </Link>
+                </div>
+
+                <form className="space-y-8" onSubmit={handleSubmit}>
+                  {/* Basic Information Section */}
+                  <motion.div
+                    variants={itemVariants}
+                    className="bg-gradient-to-br from-[#165BF8]/5 to-[#1C3991]/5 rounded-2xl p-6 border border-[#165BF8]/10"
+                  >
+                    <div className="flex items-center space-x-3 mb-6">
+                      <div className="p-3 bg-[#165BF8] rounded-xl">
+                        <FiUser className="h-6 w-6 text-white" />
+                      </div>
+                      <div>
+                        <h3 className="text-xl font-bold text-[#1C3991]">Basic Information</h3>
+                        <p className="text-[#165BF8] text-sm">Enter user's email and select their role</p>
+                      </div>
                     </div>
 
-                    <form className="space-y-8" onSubmit={handleSubmit}>
+                    <div className="grid lg:grid-cols-2 gap-8">
                       {/* Email Field */}
                       <motion.div variants={itemVariants}>
                         <label className="block text-sm font-bold text-[#1C3991] mb-3 uppercase tracking-wide">
@@ -349,7 +397,7 @@ export default function CreateUserPage() {
                         <label className="block text-sm font-bold text-[#1C3991] mb-4 uppercase tracking-wide">
                           Select Role
                         </label>
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                           {roleOptions.map((option) => (
                             <motion.div
                               key={option.value}
@@ -368,16 +416,17 @@ export default function CreateUserPage() {
                               />
                               <label
                                 htmlFor={`role-${option.value}`}
-                                className={`block p-5 border-2 rounded-2xl cursor-pointer transition-all duration-300 h-full
+                                className={`block p-4 border-2 rounded-xl cursor-pointer transition-all duration-300
                                   ${role === option.value
-                                    ? `border-[#165BF8] bg-gradient-to-br ${option.gradient} text-white shadow-xl`
+                                    ? `border-[${option.color}] bg-gradient-to-br ${option.gradient} text-white shadow-xl`
                                     : 'border-[#165BF8]/20 bg-white text-[#1C3991] hover:border-[#165BF8]/40 hover:shadow-lg'
                                   }
                                   ${isLoading ? 'opacity-60 cursor-not-allowed' : ''}`
                                 }
+                                style={role === option.value ? { borderColor: option.color } : {}}
                               >
                                 <div className="flex items-center space-x-3">
-                                  <div className={`p-2 rounded-xl ${role === option.value ? 'bg-white/20' : 'bg-[#165BF8]/10'}`}>
+                                  <div className={`p-2 rounded-lg ${role === option.value ? 'bg-white/20' : 'bg-[#165BF8]/10'}`}>
                                     {option.icon}
                                   </div>
                                   <div className="flex-1">
@@ -392,215 +441,135 @@ export default function CreateUserPage() {
                           ))}
                         </div>
                       </motion.div>
+                    </div>
+                  </motion.div>
 
-                      {/* Additional Fields */}
-                      {areAdditionalFieldsVisible && (
-                        <motion.div
-                          variants={itemVariants}
-                          className="pt-6 border-t border-[#165BF8]/10"
-                        >
-                          <div className="flex items-center space-x-3 mb-6">
-                            <div className="p-2 bg-[#165BF8]/10 rounded-xl">
-                              <FiAward className="h-6 w-6 text-[#165BF8]" />
-                            </div>
-                            <div>
-                              <h3 className="text-lg font-bold text-[#1C3991]">
-                                Additional Information
-                              </h3>
-                              <p className="text-sm text-[#165BF8]">
-                                {isRequiredForAdminOrReferrer ? 'Required for Admin/Referrer roles' : 'Optional for Job Seeker role'}
-                              </p>
-                            </div>
-                          </div>
+                  {/* Organization Details Section */}
+                  <motion.div
+                    variants={itemVariants}
+                    className="bg-gradient-to-br from-[#165BF8]/5 to-[#1C3991]/5 rounded-2xl p-6 border border-[#165BF8]/10"
+                  >
+                    <div className="flex items-center space-x-3 mb-6">
+                      <div className="p-3 bg-[#165BF8] rounded-xl">
+                        <FiAward className="h-6 w-6 text-white" />
+                      </div>
+                      <div>
+                        <h3 className="text-xl font-bold text-[#1C3991]">Organization Details</h3>
+                        <p className="text-[#165BF8] text-sm">
+                          {isRequiredForNonPoster ? 'Mandatory information' : 'Optional information'}
+                        </p>
+                      </div>
+                    </div>
 
-                          <div className="grid md:grid-cols-2 gap-6">
-                            <motion.div variants={itemVariants}>
-                              <label className="block text-sm font-semibold text-[#1C3991] mb-2">
-                                Milan/Shaka
-                              </label>
-                              <div className="relative group">
-                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                  <FiBookOpen className="h-5 w-5 text-[#165BF8]/70" />
-                                </div>
-                                <input
-                                  type="text"
-                                  required={isRequiredForAdminOrReferrer}
-                                  className="block w-full pl-10 pr-3 py-3 border-2 border-[#165BF8]/20 rounded-xl shadow-sm placeholder-[#165BF8]/50 focus:outline-none focus:ring-2 focus:ring-[#165BF8]/30 focus:border-[#165BF8] text-[#1C3991] transition-all duration-200 group-hover:border-[#165BF8]/40"
-                                  value={milanShakaBhaga}
-                                  onChange={(e) => setMilanShakaBhaga(e.target.value)}
-                                  disabled={isLoading}
-                                  placeholder="Enter Milan/Shaka"
-                                />
-                              </div>
-                            </motion.div>
-
-                            <motion.div variants={itemVariants}>
-                              <label className="block text-sm font-semibold text-[#1C3991] mb-2">
-                                Valaya/Nagar
-                              </label>
-                              <div className="relative group">
-                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                  <FiMapPin className="h-5 w-5 text-[#165BF8]/70" />
-                                </div>
-                                <input
-                                  type="text"
-                                  required={isRequiredForAdminOrReferrer}
-                                  className="block w-full pl-10 pr-3 py-3 border-2 border-[#165BF8]/20 rounded-xl shadow-sm placeholder-[#165BF8]/50 focus:outline-none focus:ring-2 focus:ring-[#165BF8]/30 focus:border-[#165BF8] text-[#1C3991] transition-all duration-200 group-hover:border-[#165BF8]/40"
-                                  value={valayaNagar}
-                                  onChange={(e) => setValayaNagar(e.target.value)}
-                                  disabled={isLoading}
-                                  placeholder="Enter Valaya/Nagar"
-                                />
-                              </div>
-                            </motion.div>
-
-                            <motion.div variants={itemVariants} className="md:col-span-2">
-                              <label className="block text-sm font-semibold text-[#1C3991] mb-2">
-                                Khanda/Bhaga
-                              </label>
-                              <div className="relative group">
-                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                  <FiGlobe className="h-5 w-5 text-[#165BF8]/70" />
-                                </div>
-                                <input
-                                  type="text"
-                                  required={isRequiredForAdminOrReferrer}
-                                  className="block w-full pl-10 pr-3 py-3 border-2 border-[#165BF8]/20 rounded-xl shadow-sm placeholder-[#165BF8]/50 focus:outline-none focus:ring-2 focus:ring-[#165BF8]/30 focus:border-[#165BF8] text-[#1C3991] transition-all duration-200 group-hover:border-[#165BF8]/40"
-                                  value={khandaBhaga}
-                                  onChange={(e) => setKhandaBhaga(e.target.value)}
-                                  disabled={isLoading}
-                                  placeholder="Enter Khanda/Bhaga"
-                                />
-                              </div>
-                            </motion.div>
-                          </div>
-                        </motion.div>
-                      )}
-
-                      {/* Messages */}
-                      <AnimatePresence>
-                        {error && (
-                          <motion.div
-                            initial={{ opacity: 0, y: -10, scale: 0.95 }}
-                            animate={{ opacity: 1, y: 0, scale: 1 }}
-                            exit={{ opacity: 0, y: -10, scale: 0.95 }}
-                            className="p-4 bg-red-50 border-l-4 border-red-500 rounded-xl shadow-sm text-red-700 font-medium flex items-center space-x-3"
-                          >
-                            <FiXCircle className="h-6 w-6 text-red-500 flex-shrink-0" />
-                            <span>{error}</span>
-                          </motion.div>
-                        )}
-                        {message && (
-                          <motion.div
-                            initial={{ opacity: 0, y: -10, scale: 0.95 }}
-                            animate={{ opacity: 1, y: 0, scale: 1 }}
-                            exit={{ opacity: 0, y: -10, scale: 0.95 }}
-                            className="p-4 bg-green-50 border-l-4 border-green-500 rounded-xl shadow-sm text-green-700 font-medium flex items-center space-x-3"
-                          >
-                            <FiCheckCircle className="h-6 w-6 text-green-500 flex-shrink-0" />
-                            <span>{message}</span>
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
-
-                      {/* Submit Button */}
+                    <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
                       <motion.div variants={itemVariants}>
-                        <motion.button
-                          type="submit"
+                        <label className="block text-sm font-semibold text-[#1C3991] mb-2 flex items-center space-x-2">
+                          <FiBookOpen className="h-4 w-4 text-[#165BF8]" />
+                          <span>Milan/Shaka</span>
+                          {isRequiredForNonPoster && <span className="text-red-500 ml-1">*</span>}
+                        </label>
+                        <input
+                          type="text"
+                          required={isRequiredForNonPoster}
+                          className="block w-full px-4 py-3 border-2 border-[#165BF8]/20 rounded-xl shadow-sm placeholder-[#165BF8]/50 focus:outline-none focus:ring-2 focus:ring-[#165BF8]/30 focus:border-[#165BF8] text-[#1C3991] transition-all duration-200 hover:border-[#165BF8]/40"
+                          value={milanShakaBhaga}
+                          onChange={(e) => setMilanShakaBhaga(e.target.value)}
                           disabled={isLoading}
-                          whileHover={{ scale: 1.02, boxShadow: "0 15px 30px rgba(22, 91, 248, 0.3)" }}
-                          whileTap={{ scale: 0.98 }}
-                          className={`w-full flex justify-center items-center py-4 px-6 border border-transparent rounded-2xl shadow-xl text-lg font-bold text-white bg-gradient-to-r from-[#165BF8] to-[#1C3991] hover:from-[#1a65ff] hover:to-[#2242a8] focus:outline-none focus:ring-4 focus:ring-[#165BF8]/30 transition-all duration-300 ${isLoading ? 'opacity-70 cursor-not-allowed' : ''}`}
-                        >
-                          {isLoading ? (
-                            <>
-                              <FiLoader className="animate-spin mr-3 h-6 w-6" />
-                              Creating User...
-                            </>
-                          ) : (
-                            <>
-                              <FiPlus className="mr-3 h-6 w-6" />
-                              Create User Account
-                            </>
-                          )}
-                        </motion.button>
+                          placeholder="Enter Milan/Shaka"
+                        />
                       </motion.div>
 
-                      <motion.p variants={itemVariants} className="text-center text-sm text-[#165BF8] font-medium">
-                        A secure temporary password will be generated and sent to the user's email address
-                      </motion.p>
-                    </form>
-                  </div>
-                </div>
-              </motion.div>
+                      <motion.div variants={itemVariants}>
+                        <label className="block text-sm font-semibold text-[#1C3991] mb-2 flex items-center space-x-2">
+                          <FiMapPin className="h-4 w-4 text-[#165BF8]" />
+                          <span>Valaya/Nagar</span>
+                          {isRequiredForNonPoster && <span className="text-red-500 ml-1">*</span>}
+                        </label>
+                        <input
+                          type="text"
+                          required={isRequiredForNonPoster}
+                          className="block w-full px-4 py-3 border-2 border-[#165BF8]/20 rounded-xl shadow-sm placeholder-[#165BF8]/50 focus:outline-none focus:ring-2 focus:ring-[#165BF8]/30 focus:border-[#165BF8] text-[#1C3991] transition-all duration-200 hover:border-[#165BF8]/40"
+                          value={valayaNagar}
+                          onChange={(e) => setValayaNagar(e.target.value)}
+                          disabled={isLoading}
+                          placeholder="Enter Valaya/Nagar"
+                        />
+                      </motion.div>
 
-              {/* Right Side - Info Card */}
-              <motion.div
-                variants={itemVariants}
-                className="lg:col-span-1"
-              >
-                <motion.div
-                  whileHover={cardHover}
-                  className="bg-gradient-to-br from-[#165BF8] to-[#1C3991] rounded-3xl shadow-2xl p-8 text-white h-full"
-                >
-                  <div className="text-center mb-6">
-                    <div className="inline-flex items-center justify-center w-16 h-16 bg-white/20 rounded-2xl mb-4">
-                      <FiTarget className="h-8 w-8 text-white" />
+                      <motion.div variants={itemVariants} className="md:col-span-2 lg:col-span-1">
+                        <label className="block text-sm font-semibold text-[#1C3991] mb-2 flex items-center space-x-2">
+                          <FiGlobe className="h-4 w-4 text-[#165BF8]" />
+                          <span>Khanda/Bhaga</span>
+                          {isRequiredForNonPoster && <span className="text-red-500 ml-1">*</span>}
+                        </label>
+                        <input
+                          type="text"
+                          required={isRequiredForNonPoster}
+                          className="block w-full px-4 py-3 border-2 border-[#165BF8]/20 rounded-xl shadow-sm placeholder-[#165BF8]/50 focus:outline-none focus:ring-2 focus:ring-[#165BF8]/30 focus:border-[#165BF8] text-[#1C3991] transition-all duration-200 hover:border-[#165BF8]/40"
+                          value={khandaBhaga}
+                          onChange={(e) => setKhandaBhaga(e.target.value)}
+                          disabled={isLoading}
+                          placeholder="Enter Khanda/Bhaga"
+                        />
+                      </motion.div>
                     </div>
-                    <h3 className="text-2xl font-black mb-2">Quick Guide</h3>
-                    <p className="text-white/80 text-sm">Creating user accounts made simple</p>
-                  </div>
+                  </motion.div>
 
-                  <div className="space-y-4">
-                    <div className="flex items-start space-x-3">
-                      <div className="w-6 h-6 bg-white/20 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-                        <span className="text-xs font-bold">1</span>
-                      </div>
-                      <div>
-                        <h4 className="font-bold text-white">Enter Email</h4>
-                        <p className="text-white/70 text-sm">Provide a valid email address for the user</p>
-                      </div>
-                    </div>
+                  {/* Messages */}
+                  <AnimatePresence>
+                    {error && (
+                      <motion.div
+                        initial={{ opacity: 0, y: -10, scale: 0.95 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: -10, scale: 0.95 }}
+                        className="p-4 bg-red-50 border-l-4 border-red-500 rounded-xl shadow-sm text-red-700 font-medium flex items-center space-x-3"
+                      >
+                        <FiXCircle className="h-6 w-6 text-red-500 flex-shrink-0" />
+                        <span>{error}</span>
+                      </motion.div>
+                    )}
+                    {message && (
+                      <motion.div
+                        initial={{ opacity: 0, y: -10, scale: 0.95 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: -10, scale: 0.95 }}
+                        className="p-4 bg-green-50 border-l-4 border-green-500 rounded-xl shadow-sm text-green-700 font-medium flex items-center space-x-3"
+                      >
+                        <FiCheckCircle className="h-6 w-6 text-green-500 flex-shrink-0" />
+                        <span>{message}</span>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
 
-                    <div className="flex items-start space-x-3">
-                      <div className="w-6 h-6 bg-white/20 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-                        <span className="text-xs font-bold">2</span>
-                      </div>
-                      <div>
-                        <h4 className="font-bold text-white">Select Role</h4>
-                        <p className="text-white/70 text-sm">Choose appropriate permissions and access level</p>
-                      </div>
-                    </div>
+                  {/* Submit Button */}
+                  <motion.div variants={itemVariants}>
+                    <motion.button
+                      type="submit"
+                      disabled={isLoading}
+                      whileHover={{ scale: 1.02, boxShadow: "0 15px 30px rgba(22, 91, 248, 0.3)" }}
+                      whileTap={{ scale: 0.98 }}
+                      className={`w-full flex justify-center items-center py-4 px-6 border border-transparent rounded-2xl shadow-xl text-lg font-bold text-white bg-gradient-to-r from-[#165BF8] to-[#1C3991] hover:from-[#1a65ff] hover:to-[#2242a8] focus:outline-none focus:ring-4 focus:ring-[#165BF8]/30 transition-all duration-300 ${isLoading ? 'opacity-70 cursor-not-allowed' : ''}`}
+                    >
+                      {isLoading ? (
+                        <>
+                          <FiLoader className="animate-spin mr-3 h-6 w-6" />
+                          Creating User...
+                        </>
+                      ) : (
+                        <>
+                          <FiPlus className="mr-3 h-6 w-6" />
+                          Create User Account
+                        </>
+                      )}
+                    </motion.button>
+                  </motion.div>
 
-                    <div className="flex items-start space-x-3">
-                      <div className="w-6 h-6 bg-white/20 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-                        <span className="text-xs font-bold">3</span>
-                      </div>
-                      <div>
-                        <h4 className="font-bold text-white">Add Details</h4>
-                        <p className="text-white/70 text-sm">Fill in organizational information if required</p>
-                      </div>
-                    </div>
-
-                    <div className="flex items-start space-x-3">
-                      <div className="w-6 h-6 bg-white/20 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-                        <span className="text-xs font-bold">4</span>
-                      </div>
-                      <div>
-                        <h4 className="font-bold text-white">Create Account</h4>
-                        <p className="text-white/70 text-sm">User receives temporary password via email</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="mt-8 p-4 bg-white/10 rounded-xl border border-white/20">
-                    <p className="text-sm text-white/90 font-medium text-center">
-                      💡 All users will be prompted to set a new password on first login
-                    </p>
-                  </div>
-                </motion.div>
-              </motion.div>
-            </div>
+                  <motion.p variants={itemVariants} className="text-center text-sm text-[#165BF8] font-medium">
+                    A secure temporary password will be generated and sent to the user's email address
+                  </motion.p>
+                </form>
+              </div>
+            </motion.div>
           </motion.div>
         </div>
       </div>

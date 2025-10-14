@@ -7,7 +7,7 @@ import React, {
     useState,
     useEffect,
     useCallback,
-    useRef, // Added useRef
+    useRef,
 } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { jwtDecode } from 'jwt-decode';
@@ -20,6 +20,22 @@ interface User {
     firstLogin: boolean;
     isSuperAdmin?: boolean;
     onboardingStatus?: 'not_started' | 'in_progress' | 'completed' | undefined;
+    // Referrer-specific fields
+    referralCode?: string;
+    milanShakaBhaga?: string;
+    valayaNagar?: string;
+    khandaBhaga?: string;
+    referrerDetails?: {
+        fullName: string;
+        mobileNumber: string;
+        personalEmail: string;
+        residentialAddress: string;
+    };
+    workDetails?: {
+        companyName: string;
+        workLocation: string;
+        designation: string;
+    };
     // New profile fields
     firstName?: string;
     lastName?: string;
@@ -49,7 +65,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const [token, setToken] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
     const [isAuthenticated, setIsAuthenticated] = useState(false);
-    const [isRedirecting, setIsRedirecting] = useState(false); // New state to prevent multiple redirects
     const router = useRouter();
     const pathname = usePathname();
 
@@ -67,7 +82,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         // Only redirect if not already on the login page or in a redirect state
         if (pathname !== '/login' && !redirectingRef.current) {
             console.log('AuthContext: User logged out. Redirecting to /login.');
-            redirectingRef.current = true; // Set ref to true
+            redirectingRef.current = true;
             router.push('/login');
         } else {
             console.log('AuthContext: User logged out, but already on login page or redirect initiated.');
@@ -98,6 +113,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
                     firstLogin: data.user.firstLogin,
                     isSuperAdmin: data.user.isSuperAdmin || false,
                     onboardingStatus: data.user.onboardingStatus,
+                    // Include referrer-specific fields
+                    referralCode: data.user.referralCode,
+                    milanShakaBhaga: data.user.milanShakaBhaga,
+                    valayaNagar: data.user.valayaNagar,
+                    khandaBhaga: data.user.khandaBhaga,
+                    referrerDetails: data.user.referrerDetails,
+                    workDetails: data.user.workDetails,
                     // Populate new profile fields from API response
                     firstName: data.user.firstName || '',
                     lastName: data.user.lastName || '',
@@ -138,7 +160,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
                     firstLogin: decoded.firstLogin,
                     isSuperAdmin: decoded.isSuperAdmin || false,
                     onboardingStatus: decoded.onboardingStatus,
-                    // Populate new profile fields from decoded token (if available in token payload)
+                    // Include referrer-specific fields from token
+                    referralCode: decoded.referralCode,
+                    milanShakaBhaga: decoded.milanShakaBhaga,
+                    valayaNagar: decoded.valayaNagar,
+                    khandaBhaga: decoded.khandaBhaga,
+                    referrerDetails: decoded.referrerDetails,
+                    workDetails: decoded.workDetails,
+                    // Populate new profile fields from decoded token
                     firstName: decoded.firstName || '',
                     lastName: decoded.lastName || '',
                     phone: decoded.phone || '',
@@ -178,7 +207,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
                                 : '/seeker/onboarding';
                             break;
                         case 'job_referrer':
-                            calculatedTargetPath = '/referrer/dashboard';
+                            // FIX: Check onboarding status for referrers
+                            calculatedTargetPath = fetchedUser.onboardingStatus === 'completed'
+                                ? '/referrer/dashboard'
+                                : '/referrer/onboarding';
                             break;
                         default:
                             calculatedTargetPath = '/';
@@ -187,7 +219,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
                 // Initiate redirection directly from login if not already on target path and not currently redirecting
                 if (pathname !== (redirectPath || calculatedTargetPath) && !redirectingRef.current) {
                     console.log(`AuthContext: Login complete. Redirecting from ${pathname} to ${redirectPath || calculatedTargetPath}`);
-                    redirectingRef.current = true; // Set ref to true
+                    redirectingRef.current = true;
                     router.push(redirectPath || calculatedTargetPath);
                 } else {
                     console.log(`AuthContext: Login complete, but already on target path or redirect initiated. Current: ${pathname}, Target: ${redirectPath || calculatedTargetPath}`);
@@ -197,7 +229,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
                 logout();
             }
         },
-        [router, logout, pathname] // Add pathname to dependencies
+        [router, logout, pathname]
     );
 
     const updateUser = useCallback((userData: Partial<User>) => {
@@ -236,8 +268,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         checkAuth();
     }, [checkAuth]);
 
-
-    // app/context/AuthContext.tsx
+    // Main redirection logic
     useEffect(() => {
         if (redirectingRef.current || loading || !isAuthenticated || !user) {
             return;
@@ -255,12 +286,17 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
         // Handle role-based redirects (only for non-firstLogin users)
         let targetPath: string | null = null;
+        
         switch (user.role) {
             case 'admin':
-                if (!pathname.startsWith('/admin') && pathname !== '/profile') targetPath = '/admin/dashboard';
+                if (!pathname.startsWith('/admin') && pathname !== '/profile') {
+                    targetPath = '/admin/dashboard';
+                }
                 break;
             case 'job_poster':
-                if (!pathname.startsWith('/poster') && pathname !== '/profile') targetPath = '/poster/dashboard';
+                if (!pathname.startsWith('/poster') && pathname !== '/profile') {
+                    targetPath = '/poster/dashboard';
+                }
                 break;
             case 'job_seeker':
                 if (user.onboardingStatus === 'completed' && !pathname.startsWith('/seeker') && pathname !== '/profile') {
@@ -270,7 +306,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
                 }
                 break;
             case 'job_referrer':
-                if (!pathname.startsWith('/referrer') && pathname !== '/profile') targetPath = '/referrer/dashboard';
+                // FIX: Check onboarding status for referrers - this is the key fix!
+                if (user.onboardingStatus === 'completed' && !pathname.startsWith('/referrer') && pathname !== '/profile') {
+                    targetPath = '/referrer/dashboard';
+                } else if (user.onboardingStatus !== 'completed' && pathname !== '/referrer/onboarding' && pathname !== '/profile') {
+                    targetPath = '/referrer/onboarding';
+                }
                 break;
         }
 
@@ -286,7 +327,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         redirectingRef.current = false;
         console.log('AuthContext useEffect: Pathname changed, resetting redirectingRef to false.');
     }, [pathname]);
-
 
     return (
         <AuthContext.Provider

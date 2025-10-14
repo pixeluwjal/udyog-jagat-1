@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import dbConnect from "@/lib/dbConnect";
-import User, { IUser, OnboardingStatus } from "@/models/User"; // Ensure IUser is imported for type safety
+import User, { IUser, OnboardingStatus } from "@/models/User";
+import Referrer, { IReferrer } from "@/models/Referrer";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { DecodedToken } from "@/lib/authMiddleware";
@@ -8,105 +9,226 @@ import sendEmail from "@/lib/emailservice";
 
 // Define the interface for the incoming request body
 interface CreateUserRequest {
-    email: string;
-    role: "job_poster" | "job_seeker" | "job_referrer" | "admin";
-    isSuperAdmin?: boolean;
-    milanShakaBhaga?: string;
-    valayaNagar?: string;
-    khandaBhaga?: string;
+  email: string;
+  role: "job_poster" | "job_seeker" | "job_referrer" | "admin";
+  isSuperAdmin?: boolean;
+  milanShakaBhaga?: string;
+  valayaNagar?: string;
+  khandaBhaga?: string;
 }
 
 export async function POST(request: Request) {
-    const loginUrl = request.nextUrl.origin;
-    await dbConnect();
+  const loginUrl = request.nextUrl.origin;
+  await dbConnect();
 
-    // 1. Authenticate admin
-    const authHeader = request.headers.get("authorization");
-    if (!authHeader?.startsWith("Bearer ")) {
-        return NextResponse.json({ error: "Unauthorized - No token provided" }, { status: 401 });
+  // 1. Authenticate admin
+  const authHeader = request.headers.get("authorization");
+  if (!authHeader?.startsWith("Bearer ")) {
+    return NextResponse.json(
+      { error: "Unauthorized - No token provided" },
+      { status: 401 }
+    );
+  }
+  const token = authHeader.split(" ")[1];
+  let decodedToken: DecodedToken;
+
+  try {
+    if (!process.env.JWT_SECRET) throw new Error("JWT_SECRET not configured");
+    decodedToken = jwt.verify(token, process.env.JWT_SECRET) as DecodedToken;
+
+    // Only admin or superadmin can create users
+    if (decodedToken.role !== "admin") {
+      return NextResponse.json(
+        { error: "Forbidden - Admin access required" },
+        { status: 403 }
+      );
     }
-    const token = authHeader.split(" ")[1];
-    let decodedToken: DecodedToken;
+  } catch (error) {
+    console.error("JWT verification error:", error);
+    return NextResponse.json(
+      { error: "Unauthorized - Invalid token" },
+      { status: 401 }
+    );
+  }
 
-    try {
-        if (!process.env.JWT_SECRET) throw new Error("JWT_SECRET not configured");
-        decodedToken = jwt.verify(token, process.env.JWT_SECRET) as DecodedToken;
+  try {
+    // 2. Parse and validate request body
+    const {
+      email,
+      role,
+      isSuperAdmin,
+      milanShakaBhaga,
+      valayaNagar,
+      khandaBhaga,
+    }: CreateUserRequest = await request.json();
 
-        // Only admin can create users
-        if (decodedToken.role !== "admin") {
-            return NextResponse.json({ error: "Forbidden - Admin access required" }, { status: 403 });
-        }
-    } catch (error) {
-        console.error("JWT verification error:", error);
-        return NextResponse.json({ error: "Unauthorized - Invalid token" }, { status: 401 });
+    if (!email || !role) {
+      return NextResponse.json(
+        { error: "Email and role are required" },
+        { status: 400 }
+      );
     }
 
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return NextResponse.json(
+        { error: "Invalid email format" },
+        { status: 400 }
+      );
+    }
+
+    // 3. Check permissions based on current user's role
+    const currentUser = await User.findById(decodedToken.id);
+    if (!currentUser) {
+      return NextResponse.json({ error: "User not found" }, { status: 404 });
+    }
+
+    // Define allowed roles based on current user's privileges
+    let allowedRoles: string[];
+
+    if (currentUser.isSuperAdmin) {
+      // SuperAdmin can create all roles including other SuperAdmins
+      allowedRoles = ["job_seeker", "job_poster", "job_referrer", "admin"];
+    } else if (currentUser.role === "admin") {
+      // Regular Admin can only create seeker, referrer, and poster
+      allowedRoles = ["job_seeker", "job_poster", "job_referrer"];
+    } else {
+      return NextResponse.json(
+        { error: "Insufficient privileges" },
+        { status: 403 }
+      );
+    }
+
+    // Check if the requested role is allowed
+    if (!allowedRoles.includes(role)) {
+      return NextResponse.json(
+        {
+          error: `Insufficient privileges to create ${role} role. Allowed roles: ${allowedRoles.join(
+            ", "
+          )}`,
+        },
+        { status: 403 }
+      );
+    }
+
+    // Check if trying to create super admin without super admin privileges
+    if (isSuperAdmin && !currentUser.isSuperAdmin) {
+      return NextResponse.json(
+        { error: "Only super admins can create super admins" },
+        { status: 403 }
+      );
+    }
+
+    // Conditional validation based on role
+    if (role === "admin" || role === "job_referrer") {
+      if (!milanShakaBhaga || !valayaNagar || !khandaBhaga) {
+        return NextResponse.json(
+          {
+            error:
+              "Milan/Shaka/Bhaga, Valaya/Nagar, and Khanda/Bhaga are required for Admin and Referrer roles.",
+          },
+          { status: 400 }
+        );
+      }
+    }
+
+    // 4. Check if user already exists in either collection
+    const existingUser = await User.findOne({ email });
+    const existingReferrer = await Referrer.findOne({ email });
+
+    if (existingUser || existingReferrer) {
+      return NextResponse.json(
+        { error: "Email already in use" },
+        { status: 409 }
+      );
+    }
+
+    // 5. Create user based on role
+    const username = email.split("@")[0];
+    const tempPassword = Math.random().toString(36).slice(2, 10);
+
+    let createdUser;
+    let userResponse;
+
+    if (role === "job_referrer") {
+      // Create in Referrer collection with onboarding not started
+      const onboardingStatus: OnboardingStatus = "not_started"; // Changed from "completed"
+
+      createdUser = await Referrer.create({
+        username,
+        email,
+        password: tempPassword,
+        role: "job_referrer",
+        isSuperAdmin: false,
+        firstLogin: true,
+        createdBy: decodedToken.id,
+        onboardingStatus, // Now it's 'not_started'
+        milanShakaBhaga: milanShakaBhaga!,
+        valayaNagar: valayaNagar!,
+        khandaBhaga: khandaBhaga!,
+        // Initialize empty referrer details for onboarding
+        referrerDetails: {
+          fullName: "",
+          mobileNumber: "",
+          personalEmail: "",
+          residentialAddress: "",
+        },
+        // Initialize empty work details for onboarding
+        workDetails: {
+          companyName: "",
+          workLocation: "",
+          designation: "",
+        },
+      });
+
+      userResponse = {
+        id: createdUser._id,
+        email: createdUser.email,
+        role: createdUser.role,
+        onboardingStatus: createdUser.onboardingStatus, // This will be 'not_started'
+        createdAt: createdUser.createdAt,
+        milanShakaBhaga: createdUser.milanShakaBhaga,
+        valayaNagar: createdUser.valayaNagar,
+        khandaBhaga: createdUser.khandaBhaga,
+        referralCode: createdUser.referralCode,
+      };
+    } else {
+      // Create in User collection for other roles
+      const onboardingStatus: OnboardingStatus =
+        role === "job_seeker" ? "not_started" : "completed";
+
+      createdUser = await User.create({
+        username,
+        email,
+        password: tempPassword,
+        role,
+        isSuperAdmin: !!isSuperAdmin,
+        firstLogin: true,
+        createdBy: decodedToken.id,
+        onboardingStatus,
+        milanShakaBhaga: milanShakaBhaga || undefined,
+        valayaNagar: valayaNagar || undefined,
+        khandaBhaga: khandaBhaga || undefined,
+      });
+
+      userResponse = {
+        id: createdUser._id,
+        email: createdUser.email,
+        role: createdUser.role,
+        onboardingStatus: createdUser.onboardingStatus,
+        createdAt: createdUser.createdAt,
+        milanShakaBhaga: createdUser.milanShakaBhaga,
+        valayaNagar: createdUser.valayaNagar,
+        khandaBhaga: createdUser.khandaBhaga,
+      };
+    }
+
+    // 6. Send welcome email
     try {
-        // 2. Parse and validate request body
-        const { email, role, isSuperAdmin, milanShakaBhaga, valayaNagar, khandaBhaga }: CreateUserRequest = await request.json();
-
-        if (!email || !role) {
-            return NextResponse.json({ error: "Email and role are required" }, { status: 400 });
-        }
-
-        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-            return NextResponse.json({ error: "Invalid email format" }, { status: 400 });
-        }
-
-        // Conditional validation for admin or referrer
-        if (role === "admin" || role === "job_referrer") {
-            if (!milanShakaBhaga || !valayaNagar || !khandaBhaga) {
-                return NextResponse.json(
-                    { error: "Milan/Shaka/Bhaga, Valaya/Nagar, and Khanda/Bhaga are required for Admin and Referrer roles." },
-                    { status: 400 }
-                );
-            }
-        }
-
-        // 3. Check permissions
-        const allowedRoles = ["job_poster", "job_seeker", "job_referrer"];
-        if (!decodedToken.isSuperAdmin && !allowedRoles.includes(role)) {
-            return NextResponse.json({ error: "Insufficient privileges for this role" }, { status: 403 });
-        }
-
-        if (isSuperAdmin && !decodedToken.isSuperAdmin) {
-            return NextResponse.json({ error: "Only super admins can create super admins" }, { status: 403 });
-        }
-
-        // 4. Check if user already exists
-        const existingUser = await User.findOne({ email });
-        if (existingUser) {
-            return NextResponse.json({ error: "Email already in use" }, { status: 409 });
-        }
-
-        // 5. Create user
-        const username = email.split("@")[0];
-        const tempPassword = Math.random().toString(36).slice(2, 10);
-
-        // Correct enum value for onboardingStatus
-        const onboardingStatus: OnboardingStatus = role === "job_seeker" ? "not_started" : "completed";
-
-        const createdUser = await User.create({
-            username,
-            email,
-            password: tempPassword,
-            role,
-            isSuperAdmin: !!isSuperAdmin,
-            firstLogin: true,
-            createdBy: decodedToken.id,
-            onboardingStatus,
-            milanShakaBhaga: milanShakaBhaga || undefined,
-            valayaNagar: valayaNagar || undefined,
-            khandaBhaga: khandaBhaga || undefined,
-        });
-
-        // 6. Send welcome email
-        try {
-            await sendEmail({
-                to: email,
-                subject: "Welcome to Udyog Jagat - Your Account Details",
-                text: `Welcome to Udyog Jagat!\n\nYour login details:\nEmail: ${email}\nTemporary Password: ${tempPassword}\n\nPlease login at: ${loginUrl}\n\nPlease change your password after first login.`,
-                html: `
+      await sendEmail({
+        to: email,
+        subject: "Welcome to Udyog Jagat - Your Account Details",
+        text: `Welcome to Udyog Jagat!\n\nYour login details:\nEmail: ${email}\nTemporary Password: ${tempPassword}\n\nPlease login at: ${loginUrl}\n\nPlease change your password after first login.`,
+        html: `
 <!DOCTYPE html>
 <html>
 <head>
@@ -146,29 +268,25 @@ body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width:
 </div>
 </body>
 </html>
-`
-            });
-        } catch (emailError) {
-            console.error("Failed to send welcome email:", emailError);
-        }
-
-        // 7. Return response
-        return NextResponse.json({
-            message: "User created successfully",
-            user: {
-                id: createdUser._id,
-                email: createdUser.email,
-                role: createdUser.role,
-                onboardingStatus: createdUser.onboardingStatus,
-                createdAt: createdUser.createdAt,
-                milanShakaBhaga: createdUser.milanShakaBhaga,
-                valayaNagar: createdUser.valayaNagar,
-                khandaBhaga: createdUser.khandaBhaga,
-            }
-        }, { status: 201 });
-
-    } catch (error: any) {
-        console.error("User creation error:", error);
-        return NextResponse.json({ error: "Internal server error", details: error.message }, { status: 500 });
+`,
+      });
+    } catch (emailError) {
+      console.error("Failed to send welcome email:", emailError);
     }
+
+    // 7. Return response
+    return NextResponse.json(
+      {
+        message: "User created successfully",
+        user: userResponse,
+      },
+      { status: 201 }
+    );
+  } catch (error: any) {
+    console.error("User creation error:", error);
+    return NextResponse.json(
+      { error: "Internal server error", details: error.message },
+      { status: 500 }
+    );
+  }
 }

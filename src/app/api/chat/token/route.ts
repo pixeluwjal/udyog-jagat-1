@@ -1,47 +1,30 @@
 // app/api/chat/token/route.ts
-import { NextRequest, NextResponse } from "next/server";
-import { createUserToken } from "@/lib/stream-chat";
-import { authMiddleware } from "@/lib/authMiddleware";
+import { NextRequest, NextResponse } from 'next/server';
+import { StreamChat } from 'stream-chat';
 
-export async function GET(request: NextRequest) {
+export async function POST(request: NextRequest) {
   try {
-    console.log('🔐 Token API: Starting authentication...');
-    
-    // Use auth middleware
-    const authResult = await authMiddleware(request);
+    const { userId } = await request.json();
 
-    if (!authResult.success) {
-      console.log('❌ Token API: Auth failed -', authResult.message);
-      return NextResponse.json({ 
-        error: authResult.message 
-      }, { status: authResult.status || 401 });
-    }
-
-    const userId = authResult.user?._id;
-    
     if (!userId) {
-      console.log('❌ Token API: No user ID found');
-      return NextResponse.json({ 
-        error: "User ID not found" 
-      }, { status: 401 });
+      return NextResponse.json({ error: 'User ID required' }, { status: 400 });
     }
 
-    console.log('✅ Token API: Generating token for user:', userId);
+    // Initialize Stream Chat server client
+    const serverClient = StreamChat.getInstance(
+      process.env.NEXT_PUBLIC_STREAM_KEY!,
+      process.env.STREAM_SECRET!
+    );
 
-    // Generate Stream Chat token
-    const token = createUserToken(userId);
+    // Generate token for the user
+    const token = serverClient.createToken(userId);
     
-    console.log('✅ Token API: Successfully generated token');
-    
-    return NextResponse.json({ 
-      token,
-      apiKey: process.env.NEXT_PUBLIC_STREAM_KEY
-    });
-
-  } catch (error: any) {
-    console.error("❌ Token API: Token generation error:", error);
-    return NextResponse.json({ 
-      error: error.message || "Failed to generate token" 
-    }, { status: 500 });
+    return NextResponse.json({ token });
+  } catch (error) {
+    console.error('Token generation error:', error);
+    return NextResponse.json(
+      { error: 'Failed to generate chat token' },
+      { status: 500 }
+    );
   }
 }

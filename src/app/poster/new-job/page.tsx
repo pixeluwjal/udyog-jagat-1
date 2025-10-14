@@ -339,6 +339,7 @@ export default function NewJobPage() {
       <Sidebar
         userRole={user.role}
         onLogout={logout}
+        userEmail={user.email}
         isOpen={isSidebarOpen}
         setIsOpen={setIsSidebarOpen}
       />

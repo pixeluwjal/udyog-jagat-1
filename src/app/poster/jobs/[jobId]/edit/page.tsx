@@ -8,7 +8,21 @@ import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 import Head from 'next/head';
 
-import { FiBriefcase, FiMapPin, FiUsers, FiMenu, FiXCircle, FiSave, FiChevronLeft, FiLoader, FiCheckCircle, FiChevronDown, FiDollarSign, FiEdit3, FiType, FiBuilding } from 'react-icons/fi';
+import { 
+  FiBriefcase, 
+  FiMapPin, 
+  FiUsers, 
+  FiMenu, 
+  FiXCircle, 
+  FiSave, 
+  FiChevronLeft, 
+  FiLoader, 
+  FiCheckCircle, 
+  FiChevronDown, 
+  FiDollarSign, 
+  FiEdit3, 
+  FiType
+} from 'react-icons/fi';
 
 // Updated brand colors with #2245ae
 const primaryBlue = "#2245ae";
@@ -342,7 +356,7 @@ export default function EditJobPage() {
             <Head>
                 <title>Edit Job - {job?.title || 'JobConnect'}</title>
             </Head>
-            <Sidebar userRole={user.role} onLogout={logout} isOpen={isSidebarOpen} setIsOpen={setIsSidebarOpen} />
+            <Sidebar userRole={user.role} onLogout={logout} userEmail={user.email} isOpen={isSidebarOpen} setIsOpen={setIsSidebarOpen} />
 
             <div className="flex-1 flex flex-col overflow-y-auto">
                 {/* Mobile Header */}
@@ -478,7 +492,7 @@ export default function EditJobPage() {
                                         className="space-y-3 bg-gray-50/50 p-4 rounded-xl border border-gray-200/50"
                                     >
                                         <label htmlFor="company" className="block text-sm font-semibold text-[#1a3a9c] flex items-center">
-                                            <FiBuilding className="mr-2 text-[#2245ae]" />
+                                            <FiUsers className="mr-2 text-[#2245ae]" />
                                             Company Name
                                         </label>
                                         <div className="relative">
