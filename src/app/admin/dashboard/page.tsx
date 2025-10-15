@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/app/context/AuthContext';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FiUsers, FiActivity, FiClock, FiSearch, FiPlus, FiZap, FiEdit, FiMail, FiMenu, FiCheckCircle, FiXCircle, FiFilter, FiLoader, FiChevronDown, FiTag, FiRefreshCw, FiTrendingUp, FiUserCheck, FiAward, FiTarget, FiBarChart2 } from 'react-icons/fi';
+import { FiUsers, FiActivity, FiClock, FiSearch, FiPlus, FiZap, FiEdit, FiMail, FiMenu, FiCheckCircle, FiXCircle, FiFilter, FiLoader, FiChevronDown, FiTag, FiRefreshCw, FiTrendingUp, FiUserCheck, FiAward, FiTarget, FiBarChart2, FiUserPlus, FiShare2 } from 'react-icons/fi';
 import Sidebar from '@/app/components/Sidebar';
 
 // Updated brand colors with #2245ae
@@ -26,11 +26,35 @@ interface UserDisplay {
   lastActive?: string;
 }
 
+interface ReferrerDisplay {
+  _id: string;
+  username?: string;
+  email: string;
+  referralCode: string;
+  referrerDetails?: {
+    company?: string;
+    position?: string;
+    experience?: string;
+  };
+  workDetails?: {
+    currentCompany?: string;
+    jobTitle?: string;
+  };
+  jobReferrerDetails?: {
+    areasOfExpertise?: string[];
+    industries?: string[];
+  };
+  onboardingStatus: string;
+  createdAt: string;
+}
+
 interface DashboardStats {
   totalUsers: number;
   activeUsers: number;
   newUsersThisWeek: number;
   userGrowth: number;
+  totalReferrers: number;
+  activeReferrers: number;
 }
 
 // Framer Motion animation variants
@@ -97,11 +121,14 @@ export default function AdminDashboardPage() {
   const router = useRouter();
 
   const [users, setUsers] = useState<UserDisplay[]>([]);
+  const [referrers, setReferrers] = useState<ReferrerDisplay[]>([]);
   const [stats, setStats] = useState<DashboardStats>({
     totalUsers: 0,
     activeUsers: 0,
     newUsersThisWeek: 0,
-    userGrowth: 0
+    userGrowth: 0,
+    totalReferrers: 0,
+    activeReferrers: 0
   });
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [fetchLoading, setFetchLoading] = useState(true);
@@ -111,11 +138,12 @@ export default function AdminDashboardPage() {
   const [message, setMessage] = useState<string | null>(null);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [activeTab, setActiveTab] = useState<'users' | 'referrers'>('users');
 
   /**
    * Calculate real-time statistics from users data
    */
-  const calculateStats = useCallback((usersData: UserDisplay[]): DashboardStats => {
+  const calculateStats = useCallback((usersData: UserDisplay[], referrersData: ReferrerDisplay[]): DashboardStats => {
     const now = new Date();
     const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
     const twoWeeksAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
@@ -131,11 +159,15 @@ export default function AdminDashboardPage() {
       ? Math.round(((newUsersThisWeek - previousWeekUsers) / previousWeekUsers) * 100)
       : newUsersThisWeek > 0 ? 100 : 0;
 
+    const activeReferrers = referrersData.filter(r => r.onboardingStatus === 'completed').length;
+
     return {
       totalUsers: usersData.length,
       activeUsers,
       newUsersThisWeek,
-      userGrowth
+      userGrowth,
+      totalReferrers: referrersData.length,
+      activeReferrers
     };
   }, []);
 
@@ -162,22 +194,41 @@ export default function AdminDashboardPage() {
       if (searchQuery) params.append('search', searchQuery);
       if (filterStatus !== 'all') params.append('status', filterStatus);
 
-      const response = await fetch(`/api/admin/users?${params.toString()}`, {
+      // Fetch users
+      const usersResponse = await fetch(`/api/admin/users?${params.toString()}`, {
         headers: { 'Authorization': `Bearer ${token}` },
         cache: 'no-store'
       });
 
-      const data = await response.json();
+      const usersData = await usersResponse.json();
 
-      if (!response.ok) throw new Error(data.error || 'Failed to fetch users');
+      if (!usersResponse.ok) throw new Error(usersData.error || 'Failed to fetch users');
 
-      if (Array.isArray(data.users)) {
+      // Fetch referrers
+      const referrersResponse = await fetch('/api/referrers', {
+        headers: { 'Authorization': `Bearer ${token}` },
+        cache: 'no-store'
+      });
+
+      const referrersData = await referrersResponse.json();
+
+      if (!referrersResponse.ok) throw new Error(referrersData.error || 'Failed to fetch referrers');
+
+      if (Array.isArray(usersData.users)) {
         // Filter out the currently logged-in admin
-        let filteredUsers = data.users.filter((u: UserDisplay) => u._id !== user._id);
+        let filteredUsers = usersData.users.filter((u: UserDisplay) => u._id !== user._id);
         setUsers(filteredUsers);
         
+        // Set referrers
+        if (Array.isArray(referrersData.referrers)) {
+          setReferrers(referrersData.referrers);
+        } else {
+          console.error('Invalid referrers data format from server');
+          setReferrers([]);
+        }
+        
         // Calculate and set real stats
-        const calculatedStats = calculateStats(filteredUsers);
+        const calculatedStats = calculateStats(filteredUsers, referrersData.referrers || []);
         setStats(calculatedStats);
         
         setStatsLoading(false);
@@ -185,10 +236,11 @@ export default function AdminDashboardPage() {
         console.error('Invalid data format from server');
         setFetchError('Failed to fetch users: Invalid data format from server.');
         setUsers([]);
+        setReferrers([]);
       }
     } catch (err: any) {
-      console.error('Failed to fetch users:', err);
-      let errorMessage = 'Failed to fetch users. Please check your network connection.';
+      console.error('Failed to fetch data:', err);
+      let errorMessage = 'Failed to fetch data. Please check your network connection.';
       if (err instanceof Error) {
         errorMessage = err.message;
       } else if (typeof err === 'string') {
@@ -243,6 +295,8 @@ export default function AdminDashboardPage() {
         return 'bg-gradient-to-r from-purple-500 to-purple-600 text-white';
       case 'job_seeker':
         return 'bg-gradient-to-r from-green-500 to-emerald-600 text-white';
+      case 'job_referrer':
+        return 'bg-gradient-to-r from-orange-500 to-amber-600 text-white';
       default:
         return 'bg-gradient-to-r from-gray-500 to-gray-600 text-white';
     }
@@ -289,22 +343,22 @@ export default function AdminDashboardPage() {
         textColor: 'text-green-600'
       },
       {
-        title: 'New This Week',
-        value: stats.newUsersThisWeek,
-        description: stats.userGrowth !== 0 ? `${stats.userGrowth > 0 ? '+' : ''}${stats.userGrowth}% from last week` : 'New registrations',
-        icon: FiTrendingUp,
-        color: 'from-purple-500 to-purple-600',
-        bgColor: 'bg-gradient-to-br from-purple-100 to-purple-50',
-        textColor: 'text-purple-600'
+        title: 'Active Referrers',
+        value: stats.activeReferrers,
+        description: 'Completed onboarding',
+        icon: FiUserCheck,
+        color: 'from-orange-500 to-amber-600',
+        bgColor: 'bg-gradient-to-br from-orange-100 to-amber-50',
+        textColor: 'text-orange-600'
       },
       {
         title: 'User Growth',
         value: `${stats.userGrowth > 0 ? '+' : ''}${stats.userGrowth}%`,
         description: 'Weekly growth rate',
         icon: FiBarChart2,
-        color: 'from-amber-500 to-amber-600',
-        bgColor: 'bg-gradient-to-br from-amber-100 to-amber-50',
-        textColor: 'text-amber-600'
+        color: 'from-purple-500 to-purple-600',
+        bgColor: 'bg-gradient-to-br from-purple-100 to-purple-50',
+        textColor: 'text-purple-600'
       }
     ];
 
@@ -363,10 +417,13 @@ export default function AdminDashboardPage() {
       );
     }
 
-    if (users.length === 0) {
-      const noUsersMessage = searchQuery || filterStatus !== 'all' 
-        ? 'No users match your current filters. Try adjusting your search criteria.'
-        : 'No users found in the system. Start by creating your first user.';
+    const currentData = activeTab === 'users' ? users : referrers;
+    const isUsersTab = activeTab === 'users';
+
+    if (currentData.length === 0) {
+      const noDataMessage = searchQuery || filterStatus !== 'all' 
+        ? `No ${isUsersTab ? 'users' : 'referrers'} match your current filters. Try adjusting your search criteria.`
+        : `No ${isUsersTab ? 'users' : 'referrers'} found in the system.`;
 
       return (
         <motion.div
@@ -375,15 +432,19 @@ export default function AdminDashboardPage() {
           className="text-center py-16 px-4"
         >
           <div className="mx-auto w-20 h-20 bg-gradient-to-br from-[#2245ae]/10 to-[#1a3a9c]/10 rounded-2xl flex items-center justify-center mb-6">
-            <FiUsers className="h-10 w-10 text-[#2245ae]" />
+            {isUsersTab ? (
+              <FiUsers className="h-10 w-10 text-[#2245ae]" />
+            ) : (
+              <FiUserPlus className="h-10 w-10 text-[#2245ae]" />
+            )}
           </div>
           <h3 className="text-xl font-bold text-[#1a3a9c] mb-2">
-            {searchQuery || filterStatus !== 'all' ? 'No matches found' : 'No users yet'}
+            {searchQuery || filterStatus !== 'all' ? 'No matches found' : `No ${isUsersTab ? 'users' : 'referrers'} yet`}
           </h3>
           <p className="text-[#2245ae] text-base mb-6 max-w-md mx-auto">
-            {noUsersMessage}
+            {noDataMessage}
           </p>
-          {!searchQuery && filterStatus === 'all' && (
+          {!searchQuery && filterStatus === 'all' && isUsersTab && (
             <Link href="/admin/create-user" passHref>
               <motion.button
                 whileHover={{ scale: 1.05 }}
@@ -402,9 +463,9 @@ export default function AdminDashboardPage() {
     return (
       <div className="space-y-4">
         <AnimatePresence>
-          {users.map((user) => (
+          {currentData.map((item) => (
             <motion.div
-              key={user._id}
+              key={item._id}
               initial={{ opacity: 0, y: 20, scale: 0.95 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: -20, scale: 0.95 }}
@@ -423,9 +484,9 @@ export default function AdminDashboardPage() {
                     className="relative"
                   >
                     <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-[#2245ae]/10 to-[#1a3a9c]/10 flex items-center justify-center text-[#2245ae] font-bold text-lg">
-                      {user.username?.charAt(0).toUpperCase() || user.email.charAt(0).toUpperCase()}
+                      {item.username?.charAt(0).toUpperCase() || item.email.charAt(0).toUpperCase()}
                     </div>
-                    {user.status === 'active' && (
+                    {'status' in item && item.status === 'active' && (
                       <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 border-2 border-white rounded-full"></div>
                     )}
                   </motion.div>
@@ -433,16 +494,16 @@ export default function AdminDashboardPage() {
                   <div className="flex-1 min-w-0">
                     <div className="flex flex-col sm:flex-row sm:items-center gap-2 mb-3">
                       <h4 className="text-lg font-bold text-[#1a3a9c] truncate">
-                        {user.username || 'Unnamed User'}
+                        {item.username || 'Unnamed User'}
                       </h4>
                       <div className="flex flex-wrap gap-2">
-                        {user.isSuperAdmin && (
+                        {'isSuperAdmin' in item && item.isSuperAdmin && (
                           <span className="px-3 py-1 bg-gradient-to-r from-yellow-500 to-amber-500 text-white text-xs font-bold rounded-full flex items-center gap-1">
                             <FiAward className="w-3 h-3" />
                             SUPER ADMIN
                           </span>
                         )}
-                        {user.firstLogin && (
+                        {'firstLogin' in item && item.firstLogin && (
                           <span className="px-3 py-1 bg-blue-100 text-blue-700 text-xs font-medium rounded-full">
                             First Login
                           </span>
@@ -453,26 +514,61 @@ export default function AdminDashboardPage() {
                     <div className="flex flex-col sm:flex-row sm:items-center gap-4 text-sm">
                       <p className="text-gray-600 flex items-center">
                         <FiMail className="w-4 h-4 mr-2 text-[#2245ae]" />
-                        {user.email}
+                        {item.email}
                       </p>
                       
-                      <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${getRoleColor(user.role)}`}>
-                        {user.role.replace('_', ' ')}
+                      <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${
+                        getRoleColor('role' in item ? item.role : 'job_referrer')
+                      }`}>
+                        {'role' in item ? item.role.replace('_', ' ') : 'Job Referrer'}
                       </span>
                       
-                      <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${
-                        user.status === 'active' 
-                          ? 'bg-green-100 text-green-700' 
-                          : 'bg-red-100 text-red-700'
-                      }`}>
-                        {user.status === 'active' ? (
-                          <FiCheckCircle className="w-3 h-3 mr-1" />
-                        ) : (
-                          <FiXCircle className="w-3 h-3 mr-1" />
-                        )}
-                        {user.status}
-                      </span>
+                      {'status' in item ? (
+                        <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${
+                          item.status === 'active' 
+                            ? 'bg-green-100 text-green-700' 
+                            : 'bg-red-100 text-red-700'
+                        }`}>
+                          {item.status === 'active' ? (
+                            <FiCheckCircle className="w-3 h-3 mr-1" />
+                          ) : (
+                            <FiXCircle className="w-3 h-3 mr-1" />
+                          )}
+                          {item.status}
+                        </span>
+                      ) : (
+                        <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${
+                          item.onboardingStatus === 'completed'
+                            ? 'bg-green-100 text-green-700'
+                            : 'bg-amber-100 text-amber-700'
+                        }`}>
+                          {item.onboardingStatus === 'completed' ? (
+                            <FiCheckCircle className="w-3 h-3 mr-1" />
+                          ) : (
+                            <FiClock className="w-3 h-3 mr-1" />
+                          )}
+                          {item.onboardingStatus}
+                        </span>
+                      )}
                     </div>
+
+                    {/* Referrer Specific Details */}
+                    {'referrerDetails' in item && item.referrerDetails && (
+                      <div className="mt-3 flex flex-wrap gap-4 text-xs text-gray-600">
+                        {item.referrerDetails.company && (
+                          <span className="flex items-center">
+                            <FiTarget className="w-3 h-3 mr-1" />
+                            {item.referrerDetails.company}
+                          </span>
+                        )}
+                        {item.referrerDetails.position && (
+                          <span>{item.referrerDetails.position}</span>
+                        )}
+                        {item.workDetails?.jobTitle && (
+                          <span>{item.workDetails.jobTitle}</span>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -481,8 +577,12 @@ export default function AdminDashboardPage() {
                     whileHover={{ scale: 1.1 }}
                     whileTap={{ scale: 0.9 }}
                   >
-                    <Link href={`/admin/edit-user/${user._id}`} passHref>
-                      <button className="p-3 bg-[#2245ae]/10 text-[#2245ae] rounded-xl hover:bg-[#2245ae]/20 transition-all duration-200 group" title="Edit User">
+                    <Link href={
+                      'role' in item 
+                        ? `/admin/edit-user/${item._id}`
+                        : `/admin/edit-referrer/${item._id}`
+                    } passHref>
+                      <button className="p-3 bg-[#2245ae]/10 text-[#2245ae] rounded-xl hover:bg-[#2245ae]/20 transition-all duration-200 group" title="Edit">
                         <FiEdit className="w-5 h-5" />
                       </button>
                     </Link>
@@ -574,7 +674,7 @@ export default function AdminDashboardPage() {
                   animate={{ opacity: 1 }}
                   transition={{ delay: 0.3 }}
                 >
-                  Manage your users and platform settings with ease
+                  Manage your users, referrers and platform settings with ease
                 </motion.p>
               </div>
               
@@ -616,7 +716,7 @@ export default function AdminDashboardPage() {
             {/* Stats Cards */}
             {renderStatsCards()}
 
-            {/* Users Section */}
+            {/* Users/Referrers Section */}
             <motion.div
               initial="hidden"
               animate="visible"
@@ -624,20 +724,53 @@ export default function AdminDashboardPage() {
               transition={{ delay: 0.2 }}
               className="bg-white rounded-2xl shadow-lg border border-[#2245ae]/10 overflow-hidden"
             >
-              {/* Section Header */}
+              {/* Section Header with Tabs */}
               <div className="px-6 py-5 border-b border-[#2245ae]/10 bg-gradient-to-r from-[#2245ae]/5 to-transparent">
                 <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
                   <div className="flex-1">
                     <h2 className="text-xl font-semibold text-[#1a3a9c] flex items-center">
-                      <FiUsers className="mr-3 text-[#2245ae]" />
-                      User Management
+                      {activeTab === 'users' ? (
+                        <FiUsers className="mr-3 text-[#2245ae]" />
+                      ) : (
+                        <FiUserPlus className="mr-3 text-[#2245ae]" />
+                      )}
+                      {activeTab === 'users' ? 'User Management' : 'Referrer Management'}
                     </h2>
                     <p className="text-[#2245ae] text-sm mt-1">
-                      Manage all platform users and their permissions
+                      {activeTab === 'users' 
+                        ? 'Manage all platform users and their permissions' 
+                        : 'Manage job referrers and their onboarding status'
+                      }
                     </p>
                   </div>
                   
                   <div className="flex flex-col sm:flex-row gap-4">
+                    {/* Tab Switcher */}
+                    <div className="flex bg-gray-100 rounded-xl p-1">
+                      <button
+                        onClick={() => setActiveTab('users')}
+                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                          activeTab === 'users'
+                            ? 'bg-white text-[#2245ae] shadow-sm'
+                            : 'text-gray-600 hover:text-gray-800'
+                        }`}
+                      >
+                        <FiUsers className="inline w-4 h-4 mr-2" />
+                        Users ({users.length})
+                      </button>
+                      <button
+                        onClick={() => setActiveTab('referrers')}
+                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                          activeTab === 'referrers'
+                            ? 'bg-white text-[#2245ae] shadow-sm'
+                            : 'text-gray-600 hover:text-gray-800'
+                        }`}
+                      >
+                        <FiUserPlus className="inline w-4 h-4 mr-2" />
+                        Referrers ({referrers.length})
+                      </button>
+                    </div>
+
                     {/* Search Input */}
                     <div className="relative w-full sm:w-80">
                       <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-[#2245ae]">
@@ -646,35 +779,37 @@ export default function AdminDashboardPage() {
                       <input
                         type="text"
                         className="block w-full p-3 pl-10 text-base text-[#1a3a9c] border border-[#2245ae]/20 rounded-xl bg-white focus:ring-2 focus:ring-[#2245ae] focus:border-[#2245ae] shadow-sm transition-all duration-200"
-                        placeholder="Search users..."
+                        placeholder={`Search ${activeTab}...`}
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                       />
                     </div>
                     
-                    {/* Status Filter */}
-                    <div className="relative w-full sm:w-48">
-                      <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-[#2245ae]">
-                        <FiFilter className="h-5 w-5" />
+                    {/* Status Filter - Only for users tab */}
+                    {activeTab === 'users' && (
+                      <div className="relative w-full sm:w-48">
+                        <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-[#2245ae]">
+                          <FiFilter className="h-5 w-5" />
+                        </div>
+                        <select
+                          value={filterStatus}
+                          onChange={(e) => setFilterStatus(e.target.value as 'all' | 'active' | 'inactive')}
+                          className="block appearance-none w-full bg-white border border-[#2245ae]/20 text-[#1a3a9c] py-3 px-4 pl-10 pr-8 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2245ae] focus:border-[#2245ae] transition-all shadow-sm cursor-pointer"
+                        >
+                          <option value="all">All Statuses</option>
+                          <option value="active">Active</option>
+                          <option value="inactive">Inactive</option>
+                        </select>
+                        <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-[#2245ae]">
+                          <FiChevronDown className="h-5 w-5" />
+                        </div>
                       </div>
-                      <select
-                        value={filterStatus}
-                        onChange={(e) => setFilterStatus(e.target.value as 'all' | 'active' | 'inactive')}
-                        className="block appearance-none w-full bg-white border border-[#2245ae]/20 text-[#1a3a9c] py-3 px-4 pl-10 pr-8 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2245ae] focus:border-[#2245ae] transition-all shadow-sm cursor-pointer"
-                      >
-                        <option value="all">All Statuses</option>
-                        <option value="active">Active</option>
-                        <option value="inactive">Inactive</option>
-                      </select>
-                      <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-[#2245ae]">
-                        <FiChevronDown className="h-5 w-5" />
-                      </div>
-                    </div>
+                    )}
                   </div>
                 </div>
               </div>
 
-              {/* Users List */}
+              {/* Users/Referrers List */}
               <div className="p-6">
                 {renderUsersList()}
               </div>
