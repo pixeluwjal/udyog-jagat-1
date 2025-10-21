@@ -50,7 +50,6 @@ const ReferrerSchema: Schema<IReferrerDocument> = new Schema(
         isSuperAdmin: { type: Boolean, default: false },
         firstLogin: { type: Boolean, default: true },
         createdBy: { type: Schema.Types.ObjectId, ref: 'User', required: true },
-        onboardingStatus: { type: String, enum: ['not_started', 'in_progress', 'completed'], default: 'not_started' },
         status: {
             type: String,
             enum: ['active', 'inactive'],

@@ -15,6 +15,12 @@ interface CreateUserRequest {
   milanShakaBhaga?: string;
   valayaNagar?: string;
   khandaBhaga?: string;
+  vibhaaga?: string;
+  ghata?: string;
+  milan?: string;
+  valaya?: string;
+  khanda?: string;
+  referrerData?: any;
 }
 
 export async function POST(request: Request) {
@@ -60,6 +66,12 @@ export async function POST(request: Request) {
       milanShakaBhaga,
       valayaNagar,
       khandaBhaga,
+      vibhaaga,
+      ghata,
+      milan,
+      valaya,
+      khanda,
+      referrerData,
     }: CreateUserRequest = await request.json();
 
     if (!email || !role) {
@@ -118,18 +130,49 @@ export async function POST(request: Request) {
       );
     }
 
-    // Conditional validation based on role
-    if (role === "admin" || role === "job_referrer") {
-      if (!milanShakaBhaga || !valayaNagar || !khandaBhaga) {
-        return NextResponse.json(
-          {
-            error:
-              "Milan/Shaka/Bhaga, Valaya/Nagar, and Khanda/Bhaga are required for Admin and Referrer roles.",
-          },
-          { status: 400 }
-        );
-      }
+    // Conditional validation based on role - UPDATED LOGIC
+   // In your API route (/api/admin/create-user)
+// Remove Ghata validation from the conditional validation
+
+if (role === "admin") {
+  // For admin roles, require hierarchy fields (except Ghata which is optional)
+  if (!milanShakaBhaga || !valayaNagar || !khandaBhaga) {
+    return NextResponse.json(
+      {
+        error: "Milan/Shaka/Bhaga, Valaya/Nagar, and Khanda/Bhaga are required for Admin roles.",
+      },
+      { status: 400 }
+    );
+  }
+  // Ghata is optional for admin
+} else if (role === "job_referrer") {
+  // For referrers, check if we have hierarchy data from referrerData
+  if (referrerData) {
+    // Use hierarchy from referrerData if available
+    // Ghata is optional for referrers too
+    if (!referrerData.khanda || !referrerData.valaya || !referrerData.milan) {
+      return NextResponse.json(
+        {
+          error: "Referrer hierarchy data (Khanda, Valaya, Milan) is required for Referrer roles.",
+        },
+        { status: 400 }
+      );
     }
+    // Ghata is optional, no validation needed
+  } else {
+    // Fallback to direct hierarchy fields if no referrerData
+    // Ghata is optional here too
+    if (!milanShakaBhaga || !valayaNagar || !khandaBhaga) {
+      return NextResponse.json(
+        {
+          error: "Milan/Shaka/Bhaga, Valaya/Nagar, and Khanda/Bhaga are required for Referrer roles when no referrer data is provided.",
+        },
+        { status: 400 }
+      );
+    }
+    // Ghata is optional, no validation needed
+  }
+}
 
     // 4. Check if user already exists in either collection
     const existingUser = await User.findOne({ email });
@@ -149,9 +192,25 @@ export async function POST(request: Request) {
     let createdUser;
     let userResponse;
 
+    // Determine hierarchy values based on role and data source
+    let finalMilanShakaBhaga = milanShakaBhaga;
+    let finalValayaNagar = valayaNagar;
+    let finalKhandaBhaga = khandaBhaga;
+    let finalVibhaaga = vibhaaga;
+    let finalGhata = ghata;
+
+    // For referrers, use data from referrerData if available
+    if (role === "job_referrer" && referrerData) {
+      finalMilanShakaBhaga = referrerData.milan || milan;
+      finalValayaNagar = referrerData.valaya || valaya;
+      finalKhandaBhaga = referrerData.khanda || khanda;
+      finalVibhaaga = referrerData.vibhaaga || vibhaaga;
+      finalGhata = referrerData.ghata || ghata;
+    }
+
     if (role === "job_referrer") {
       // Create in Referrer collection with onboarding not started
-      const onboardingStatus: OnboardingStatus = "not_started"; // Changed from "completed"
+      const onboardingStatus: OnboardingStatus = "not_started";
 
       createdUser = await Referrer.create({
         username,
@@ -161,16 +220,18 @@ export async function POST(request: Request) {
         isSuperAdmin: false,
         firstLogin: true,
         createdBy: decodedToken.id,
-        onboardingStatus, // Now it's 'not_started'
-        milanShakaBhaga: milanShakaBhaga!,
-        valayaNagar: valayaNagar!,
-        khandaBhaga: khandaBhaga!,
+        onboardingStatus,
+        milanShakaBhaga: finalMilanShakaBhaga!,
+        valayaNagar: finalValayaNagar!,
+        khandaBhaga: finalKhandaBhaga!,
+        vibhaaga: finalVibhaaga,
+        ghata: finalGhata,
         // Initialize empty referrer details for onboarding
         referrerDetails: {
-          fullName: "",
-          mobileNumber: "",
-          personalEmail: "",
-          residentialAddress: "",
+          fullName: referrerData?.name || "",
+          mobileNumber: referrerData?.phone || "",
+          personalEmail: referrerData?.email || email,
+          residentialAddress: referrerData?.address || "",
         },
         // Initialize empty work details for onboarding
         workDetails: {
@@ -184,11 +245,13 @@ export async function POST(request: Request) {
         id: createdUser._id,
         email: createdUser.email,
         role: createdUser.role,
-        onboardingStatus: createdUser.onboardingStatus, // This will be 'not_started'
+        onboardingStatus: createdUser.onboardingStatus,
         createdAt: createdUser.createdAt,
         milanShakaBhaga: createdUser.milanShakaBhaga,
         valayaNagar: createdUser.valayaNagar,
         khandaBhaga: createdUser.khandaBhaga,
+        vibhaaga: createdUser.vibhaaga,
+        ghata: createdUser.ghata,
         referralCode: createdUser.referralCode,
       };
     } else {
@@ -205,9 +268,11 @@ export async function POST(request: Request) {
         firstLogin: true,
         createdBy: decodedToken.id,
         onboardingStatus,
-        milanShakaBhaga: milanShakaBhaga || undefined,
-        valayaNagar: valayaNagar || undefined,
-        khandaBhaga: khandaBhaga || undefined,
+        milanShakaBhaga: finalMilanShakaBhaga || undefined,
+        valayaNagar: finalValayaNagar || undefined,
+        khandaBhaga: finalKhandaBhaga || undefined,
+        vibhaaga: finalVibhaaga || undefined,
+        ghata: finalGhata || undefined,
       });
 
       userResponse = {
@@ -219,6 +284,8 @@ export async function POST(request: Request) {
         milanShakaBhaga: createdUser.milanShakaBhaga,
         valayaNagar: createdUser.valayaNagar,
         khandaBhaga: createdUser.khandaBhaga,
+        vibhaaga: createdUser.vibhaaga,
+        ghata: createdUser.ghata,
       };
     }
 

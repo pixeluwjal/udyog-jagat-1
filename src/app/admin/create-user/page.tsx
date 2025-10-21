@@ -7,30 +7,141 @@ import Link from 'next/link';
 import Sidebar from '@/app/components/Sidebar';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  FiMail, FiUser, FiBriefcase, FiLink, FiShield,
   FiXCircle, FiCheckCircle, FiLoader, FiChevronLeft, FiMenu, 
-  FiBookOpen, FiMapPin, FiGlobe, FiPlus, FiAward,
-  FiZap
+  FiPlus, FiUser, FiBriefcase, FiLink, FiShield, FiZap,
+  FiAward, FiStar, FiSettings
 } from 'react-icons/fi';
-
-// Brand colors
-const primaryBlue = "#165BF8";
-const darkBlue = "#1C3991";
+import BasicInfoSection from '@/app/components/create-user/BasicInfoSection';
+import OrganizationHierarchy from '@/app/components/create-user/OrganizationHierarchy';
+import ReferrerSelection, { ReferrerResponse } from '@/app/components/create-user/ReferrerSelection';
+import { Organization, OrganizationResponse } from '@/types/organization';
 
 export default function CreateUserPage() {
   const [email, setEmail] = useState('');
   const [role, setRole] = useState<'job_poster' | 'job_seeker' | 'job_referrer' | 'admin' | 'super_admin'>('job_seeker');
-  const [milanShakaBhaga, setMilanShakaBhaga] = useState('');
-  const [valayaNagar, setValayaNagar] = useState('');
-  const [khandaBhaga, setKhandaBhaga] = useState('');
+  const [ghata, setGhata] = useState('');
+  const [milan, setMilan] = useState('');
+  const [valaya, setValaya] = useState('');
+  const [khanda, setKhanda] = useState('');
+  const [vibhaaga, setVibhaaga] = useState('');
+  const [selectedReferrer, setSelectedReferrer] = useState('');
 
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [organizations, setOrganizations] = useState<Organization[]>([]);
+  const [loadingHierarchy, setLoadingHierarchy] = useState(true);
+  const [hierarchyError, setHierarchyError] = useState<string | null>(null);
+  const [referrerResponses, setReferrerResponses] = useState<ReferrerResponse[]>([]);
+  const [loadingReferrers, setLoadingReferrers] = useState(false);
+  const [referrerError, setReferrerError] = useState<string | null>(null);
 
   const { user: currentUser, loading: authLoading, isAuthenticated, token, logout } = useAuth();
   const router = useRouter();
+
+  // Fetch organization hierarchy from our API
+  const fetchOrganizations = async () => {
+    try {
+      setLoadingHierarchy(true);
+      setHierarchyError(null);
+      
+      console.log('Fetching organization hierarchy from internal API...');
+      
+      const response = await fetch('/api/admin/organizations');
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const data: OrganizationResponse = await response.json();
+      
+      if (data.success && data.organizations) {
+        setOrganizations(data.organizations);
+        console.log('Organization hierarchy loaded successfully');
+      } else {
+        throw new Error(data.error || 'Invalid response format from organization API');
+      }
+    } catch (err: any) {
+      console.error('Error fetching organizations:', err);
+      
+      let errorMessage = 'Failed to load organization hierarchy. ';
+      errorMessage += err.message || 'Unknown error occurred. ';
+      errorMessage += 'Please try again or contact support.';
+      
+      setHierarchyError(errorMessage);
+      setOrganizations([]);
+    } finally {
+      setLoadingHierarchy(false);
+    }
+  };
+
+  // Fetch referrer responses from form submissions
+  const fetchReferrerResponses = async () => {
+    try {
+      setLoadingReferrers(true);
+      setReferrerError(null);
+      
+      if (!token) {
+        throw new Error('Authentication token missing');
+      }
+
+      console.log('Fetching referrer responses...');
+      
+      const response = await fetch('/api/admin/referrer-responses', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      if (data.success && data.responses) {
+        setReferrerResponses(data.responses);
+        console.log('Referrer responses loaded successfully:', data.responses.length);
+      } else {
+        throw new Error(data.error || 'Invalid response format from referrer API');
+      }
+    } catch (err: any) {
+      console.error('Error fetching referrer responses:', err);
+      
+      let errorMessage = 'Failed to load referrer data. ';
+      errorMessage += err.message || 'Unknown error occurred. ';
+      errorMessage += 'Please try again or contact support.';
+      
+      setReferrerError(errorMessage);
+      setReferrerResponses([]);
+    } finally {
+      setLoadingReferrers(false);
+    }
+  };
+
+  // Retry functions
+  const retryFetchHierarchy = () => {
+    fetchOrganizations();
+  };
+
+  const retryFetchReferrers = () => {
+    fetchReferrerResponses();
+  };
+
+  useEffect(() => {
+    fetchOrganizations();
+  }, []);
+
+  // Fetch referrer responses when role is set to referrer
+  useEffect(() => {
+    if (role === 'job_referrer' && token) {
+      fetchReferrerResponses();
+    } else {
+      setReferrerResponses([]);
+      setSelectedReferrer('');
+    }
+  }, [role, token]);
 
   useEffect(() => {
     if (authLoading) return;
@@ -59,26 +170,29 @@ export default function CreateUserPage() {
       { 
         value: 'job_seeker', 
         label: 'Job Seeker', 
-        icon: <FiUser className="h-7 w-7" />,
+        icon: <FiUser className="h-6 w-6" />,
         description: 'Browse and apply for jobs',
-        gradient: 'from-blue-500 to-blue-600',
-        color: '#3B82F6'
+        gradient: 'from-blue-500 to-cyan-500',
+        color: '#3B82F6',
+        badge: 'Applicant'
       },
       { 
         value: 'job_poster', 
         label: 'Job Poster', 
-        icon: <FiBriefcase className="h-7 w-7" />,
+        icon: <FiBriefcase className="h-6 w-6" />,
         description: 'Post and manage job listings',
-        gradient: 'from-green-500 to-green-600',
-        color: '#10B981'
+        gradient: 'from-green-500 to-emerald-500',
+        color: '#10B981',
+        badge: 'Recruiter'
       },
       { 
         value: 'job_referrer', 
         label: 'Referrer', 
-        icon: <FiLink className="h-7 w-7" />,
+        icon: <FiAward className="h-6 w-6" />,
         description: 'Refer candidates to jobs',
-        gradient: 'from-purple-500 to-purple-600',
-        color: '#8B5CF6'
+        gradient: 'from-purple-500 to-violet-500',
+        color: '#8B5CF6',
+        badge: 'Connector'
       },
     ];
 
@@ -88,18 +202,20 @@ export default function CreateUserPage() {
         { 
           value: 'admin', 
           label: 'Admin', 
-          icon: <FiShield className="h-7 w-7" />,
+          icon: <FiShield className="h-6 w-6" />,
           description: 'Full system access',
-          gradient: 'from-red-500 to-red-600',
-          color: '#EF4444'
+          gradient: 'from-red-500 to-rose-500',
+          color: '#EF4444',
+          badge: 'Manager'
         },
         { 
           value: 'super_admin', 
           label: 'Super Admin', 
-          icon: <FiZap className="h-7 w-7" />,
+          icon: <FiStar className="h-6 w-6" />,
           description: 'Complete system control',
-          gradient: 'from-yellow-500 to-orange-600',
-          color: '#F59E0B'
+          gradient: 'from-amber-500 to-orange-500',
+          color: '#F59E0B',
+          badge: 'Owner'
         }
       );
     }
@@ -107,101 +223,251 @@ export default function CreateUserPage() {
     return baseOptions;
   };
 
-  const handleSubmit = async (e: FormEvent) => {
-    e.preventDefault();
-    setError(null);
-    setMessage(null);
-    setIsLoading(true);
+  // Helper function to get field values from form responses
+  const getFieldValue = (responses: any[], fieldLabel: string) => {
+    const field = responses.find((r: any) => r.fieldLabel === fieldLabel);
+    return field?.value || '';
+  };
 
-    if (!token) {
-      setError('Authentication token missing. Please log in again.');
-      setIsLoading(false);
-      return;
-    }
+  // Get available vibhaagas from the organization data
+  const getVibhaagas = () => {
+    if (!organizations.length) return [];
+    return organizations[0].vibhaagas || [];
+  };
 
-    if (!email || !role) {
-      setError('Please provide an email and select a role.');
-      setIsLoading(false);
-      return;
-    }
+  // Get khandas for selected vibhaaga
+  const getKhandas = () => {
+    if (!vibhaaga) return [];
+    const vibhaagaObj = getVibhaagas().find(v => v._id === vibhaaga);
+    return vibhaagaObj?.khandas || [];
+  };
 
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      setError('Invalid email format.');
-      setIsLoading(false);
-      return;
-    }
+  // Get valayas for selected khanda
+  const getValayas = () => {
+    if (!khanda) return [];
+    const khandaObj = getKhandas().find(k => k._id === khanda);
+    return khandaObj?.valayas || [];
+  };
 
-    // Validate additional fields for all roles except job_poster
-    if (role !== 'job_poster') {
-      if (!milanShakaBhaga.trim()) {
-        setError('Milan/Shaka is required for this role.');
-        setIsLoading(false);
-        return;
+  // Get milans for selected valay
+  const getMilans = () => {
+    if (!valaya) return [];
+    const valayaObj = getValayas().find(v => v._id === valaya);
+    return valayaObj?.milans || [];
+  };
+
+  // Get ghatas for selected milan
+  const getGhatas = () => {
+    if (!milan) return [];
+    const milanObj = getMilans().find(m => m._id === milan);
+    return milanObj?.ghatas || [];
+  };
+
+  // Reset dependent fields when parent field changes
+  const handleVibhaagaChange = (vibhaagaId: string) => {
+    setVibhaaga(vibhaagaId);
+    setKhanda('');
+    setValaya('');
+    setMilan('');
+    setGhata('');
+  };
+
+  const handleKhandaChange = (khandaId: string) => {
+    setKhanda(khandaId);
+    setValaya('');
+    setMilan('');
+    setGhata('');
+  };
+
+  const handleValayaChange = (valayaId: string) => {
+    setValaya(valayaId);
+    setMilan('');
+    setGhata('');
+  };
+
+  const handleMilanChange = (milanId: string) => {
+    setMilan(milanId);
+    setGhata('');
+  };
+
+  const handleReferrerChange = (referrerId: string) => {
+    setSelectedReferrer(referrerId);
+    // Auto-fill email from selected referrer
+    const selectedResponse = referrerResponses.find(r => r._id === referrerId);
+    if (selectedResponse) {
+      const referrerEmail = getFieldValue(selectedResponse.responses, 'Email');
+      if (referrerEmail) {
+        setEmail(referrerEmail);
       }
-      if (!valayaNagar.trim()) {
-        setError('Valaya/Nagar is required for this role.');
-        setIsLoading(false);
-        return;
-      }
-      if (!khandaBhaga.trim()) {
-        setError('Khanda/Bhaga is required for this role.');
-        setIsLoading(false);
-        return;
-      }
-    }
-
-    try {
-      const payload: {
-        email: string;
-        role: string;
-        isSuperAdmin?: boolean;
-        milanShakaBhaga?: string;
-        valayaNagar?: string;
-        khandaBhaga?: string;
-      } = {
-        email,
-        role: role === 'super_admin' ? 'admin' : role,
-      };
-
-      // Set super admin flag for super_admin role
-      if (role === 'super_admin') {
-        payload.isSuperAdmin = true;
-      }
-
-      if (milanShakaBhaga.trim()) payload.milanShakaBhaga = milanShakaBhaga.trim();
-      if (valayaNagar.trim()) payload.valayaNagar = valayaNagar.trim();
-      if (khandaBhaga.trim()) payload.khandaBhaga = khandaBhaga.trim();
-
-      const response = await fetch('/api/admin/create-user', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify(payload),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to create user');
-      }
-
-      setMessage(data.message || 'User created successfully! A temporary password has been sent to their email.');
-      setEmail('');
-      setRole('job_seeker');
-      setMilanShakaBhaga('');
-      setValayaNagar('');
-      setKhandaBhaga('');
-
-    } catch (err: any) {
-      console.error('Create user error:', err);
-      setError(err.message || 'An unexpected error occurred.');
-    } finally {
-      setIsLoading(false);
     }
   };
 
+const handleSubmit = async (e: FormEvent) => {
+  e.preventDefault();
+  setError(null);
+  setMessage(null);
+  setIsLoading(true);
+
+  if (!token) {
+    setError('Authentication token missing. Please log in again.');
+    setIsLoading(false);
+    return;
+  }
+
+  if (!email || !role) {
+    setError('Please provide an email and select a role.');
+    setIsLoading(false);
+    return;
+  }
+
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    setError('Invalid email format.');
+    setIsLoading(false);
+    return;
+  }
+
+  // For referrers, validate that a referrer is selected
+  if (role === 'job_referrer') {
+    if (!selectedReferrer) {
+      setError('Please select a referrer from the available options.');
+      setIsLoading(false);
+      return;
+    }
+  }
+
+  // Validate organization hierarchy for non-poster roles ONLY
+  // Referrers get their hierarchy from the form response, so don't validate here
+  // GHATA IS NOT MANDATORY - REMOVE GHATA VALIDATION
+  if (role !== 'job_poster' && role !== 'job_referrer') {
+    if (!milan.trim()) {
+      setError('Please select a Milan.');
+      setIsLoading(false);
+      return;
+    }
+    if (!valaya.trim()) {
+      setError('Please select a Valaya.');
+      setIsLoading(false);
+      return;
+    }
+    if (!khanda.trim()) {
+      setError('Please select a Khanda.');
+      setIsLoading(false);
+      return;
+    }
+    if (!vibhaaga.trim()) {
+      setError('Please select a Vibhaaga.');
+      setIsLoading(false);
+      return;
+    }
+    // GHATA IS OPTIONAL - NO VALIDATION FOR GHATA
+  }
+
+  try {
+    const payload: any = {
+      email,
+      role: role === 'super_admin' ? 'admin' : role,
+    };
+
+    // Set super admin flag for super_admin role
+    if (role === 'super_admin') {
+      payload.isSuperAdmin = true;
+    }
+
+    // For referrers, include the selected referrer data WITH hierarchy from form response
+    if (role === 'job_referrer') {
+      const selectedResponse = referrerResponses.find(r => r._id === selectedReferrer);
+      if (selectedResponse) {
+        // Extract hierarchy data from the form responses
+        const getHierarchyValue = (fieldLabel: string) => {
+          const field = selectedResponse.responses.find(r => 
+            r.fieldLabel && r.fieldLabel.includes(fieldLabel)
+          );
+          return field?.value || '';
+        };
+
+        // Get the actual names for the hierarchy from the organization data
+        const selectedKhandaId = getHierarchyValue('khanda');
+        const selectedValayaId = getHierarchyValue('valaya'); 
+        const selectedMilanId = getHierarchyValue('milan');
+        const selectedGhataId = getHierarchyValue('ghata');
+
+        // Find the actual names from organization data
+        const allKhandas = organizations[0]?.khandas || [];
+        const selectedKhanda = allKhandas.find(k => k._id === selectedKhandaId);
+        const selectedValaya = selectedKhanda?.valays?.find(v => v._id === selectedValayaId) || 
+                              selectedKhanda?.valayas?.find(v => v._id === selectedValayaId);
+        const selectedMilan = selectedValaya?.milans?.find(m => m._id === selectedMilanId);
+        const selectedGhata = selectedMilan?.ghatas?.find(g => g._id === selectedGhataId);
+
+        payload.referrerData = {
+          formResponseId: selectedResponse._id,
+          name: getFieldValue(selectedResponse.responses, 'Name'),
+          phone: getFieldValue(selectedResponse.responses, 'Contact Number'),
+          address: `${getFieldValue(selectedResponse.responses, 'Residential Address Line 1')} ${getFieldValue(selectedResponse.responses, 'Residential Address Line 2')}`.trim(),
+          education: `${getFieldValue(selectedResponse.responses, 'Degree')} in ${getFieldValue(selectedResponse.responses, 'Course')}`,
+          college: getFieldValue(selectedResponse.responses, 'College'),
+          currentStatus: getFieldValue(selectedResponse.responses, 'Current Status'),
+          gender: getFieldValue(selectedResponse.responses, 'Gender'),
+          birthYear: getFieldValue(selectedResponse.responses, 'Birth Year'),
+          submittedAt: selectedResponse.submittedAt,
+          // Include hierarchy data - GHATA IS OPTIONAL
+          khanda: selectedKhanda?.name || '',
+          valaya: selectedValaya?.name || '',
+          milan: selectedMilan?.name || '',
+          ghata: selectedGhata?.name || '', // This can be empty
+          vibhaaga: organizations[0]?.name || 'Bengaluru Dakshina Vibhaaga'
+        };
+      }
+    } else if (role !== 'job_poster') {
+      // For other non-poster roles, use the manually selected hierarchy
+      const selectedVibhaaga = getVibhaagas().find(v => v._id === vibhaaga);
+      const selectedKhanda = getKhandas().find(k => k._id === khanda);
+      const selectedValaya = getValayas().find(v => v._id === valaya);
+      const selectedMilan = getMilans().find(m => m._id === milan);
+      const selectedGhata = getGhatas().find(g => g._id === ghata);
+
+      // GHATA IS OPTIONAL - only include if selected
+      if (selectedGhata) payload.ghata = selectedGhata.name;
+      if (selectedMilan) payload.milan = selectedMilan.name;
+      if (selectedValaya) payload.valaya = selectedValaya.name;
+      if (selectedKhanda) payload.khanda = selectedKhanda.name;
+      if (selectedVibhaaga) payload.vibhaaga = selectedVibhaaga.name;
+    }
+
+    const response = await fetch('/api/admin/create-user', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify(payload),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || 'Failed to create user');
+    }
+
+    setMessage(data.message || 'User created successfully! A temporary password has been sent to their email.');
+    
+    // Reset form
+    setEmail('');
+    setRole('job_seeker');
+    setGhata('');
+    setMilan('');
+    setValaya('');
+    setKhanda('');
+    setVibhaaga('');
+    setSelectedReferrer('');
+
+  } catch (err: any) {
+    console.error('Create user error:', err);
+    setError(err.message || 'An unexpected error occurred.');
+  } finally {
+    setIsLoading(false);
+  }
+};
   // Enhanced Animation Variants
   const containerVariants = {
     hidden: { opacity: 0, y: 30 },
@@ -229,25 +495,18 @@ export default function CreateUserPage() {
     },
   };
 
-  const cardHover = {
-    scale: 1.02,
-    y: -5,
-    boxShadow: "0 20px 40px rgba(22, 91, 248, 0.15)",
-    transition: { type: "spring", stiffness: 300, damping: 20 }
-  };
-
   const pulseEffect = {
     scale: [1, 1.05, 1],
     opacity: [1, 0.8, 1],
     transition: { duration: 1.5, repeat: Infinity, ease: "easeInOut" },
   };
 
-  const isRequiredForNonPoster = role !== 'job_poster';
+  const isRequiredForNonPoster = role !== 'job_poster' && role !== 'job_referrer';
   const roleOptions = getRoleOptions();
 
   if (authLoading || !isAuthenticated || !currentUser || currentUser.firstLogin || currentUser.role !== 'admin') {
     return (
-      <div className="flex h-screen bg-gradient-to-br from-[#f6f9ff] to-[#eef2ff] justify-center items-center">
+      <div className="flex h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 justify-center items-center">
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -255,7 +514,7 @@ export default function CreateUserPage() {
         >
           <motion.div
             animate={pulseEffect}
-            className="rounded-full p-6 bg-gradient-to-br from-[#165BF8] to-[#1C3991] shadow-2xl"
+            className="rounded-full p-6 bg-gradient-to-br from-blue-600 to-purple-700 shadow-2xl"
           >
             <FiLoader className="text-white h-12 w-12 animate-spin" />
           </motion.div>
@@ -263,7 +522,7 @@ export default function CreateUserPage() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.3 }}
-            className="mt-6 text-xl font-semibold text-[#1C3991]"
+            className="mt-6 text-xl font-semibold text-gray-800"
           >
             Loading Admin Panel...
           </motion.p>
@@ -273,7 +532,7 @@ export default function CreateUserPage() {
   }
 
   return (
-    <div className="flex h-screen bg-gradient-to-br from-[#f6f9ff] to-[#eef2ff] overflow-hidden font-inter">
+    <div className="flex h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 overflow-hidden font-inter">
       <Sidebar 
         userRole={currentUser.role} 
         onLogout={logout} 
@@ -284,12 +543,12 @@ export default function CreateUserPage() {
 
       <div className="flex-1 flex flex-col overflow-y-auto">
         {/* Enhanced Mobile Header */}
-        <div className="md:hidden bg-white/95 backdrop-blur-md shadow-2xl p-4 flex items-center justify-between z-10 sticky top-0 border-b border-[#165BF8]/10">
+        <div className="lg:hidden bg-white/95 backdrop-blur-md shadow-2xl p-4 flex items-center justify-between z-10 sticky top-0 border-b border-blue-200">
           <motion.button
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
             onClick={() => setMobileSidebarOpen(true)}
-            className="p-3 rounded-xl bg-[#165BF8]/10 text-[#165BF8] hover:bg-[#165BF8]/20 transition-all duration-200"
+            className="p-3 rounded-xl bg-blue-100 text-blue-600 hover:bg-blue-200 transition-all duration-200"
           >
             <FiMenu className="h-6 w-6" />
           </motion.button>
@@ -297,7 +556,7 @@ export default function CreateUserPage() {
           <motion.h1 
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="text-2xl font-black bg-gradient-to-r from-[#165BF8] to-[#1C3991] bg-clip-text text-transparent"
+            className="text-2xl font-black bg-gradient-to-r from-blue-600 to-purple-700 bg-clip-text text-transparent"
           >
             Create User
           </motion.h1>
@@ -305,215 +564,105 @@ export default function CreateUserPage() {
           <div className="w-12"></div>
         </div>
 
+
         {/* Main Content */}
-        <div className="flex-1 overflow-y-auto p-4 md:p-8">
+        <div className="flex-1 overflow-y-auto p-4 lg:p-8">
           <motion.div
             initial="hidden"
             animate="visible"
             variants={containerVariants}
-            className="max-w-4xl mx-auto"
+            className="max-w-7xl mx-auto" // Increased max-width
           >
-            {/* Header Section */}
+            {/* Welcome Card */}
             <motion.div
               variants={itemVariants}
-              className="text-center mb-12"
+              className="bg-gradient-to-r from-blue-600 to-purple-700 rounded-3xl shadow-2xl p-8 mb-8 text-white"
             >
-              <motion.div
-                whileHover={{ scale: 1.05 }}
-                className="inline-flex items-center justify-center w-24 h-24 bg-gradient-to-br from-[#165BF8] to-[#1C3991] rounded-3xl shadow-2xl mb-6"
-              >
-                <FiPlus className="h-12 w-12 text-white" />
-              </motion.div>
-              <h1 className="text-4xl md:text-5xl font-black bg-gradient-to-r from-[#165BF8] to-[#1C3991] bg-clip-text text-transparent mb-4">
-                Create New User
-              </h1>
-              <p className="text-lg text-[#165BF8] font-medium max-w-2xl mx-auto">
-                {currentUser.isSuperAdmin 
-                  ? "Create user accounts with appropriate roles and permissions"
-                  : "Create Job Seekers, Job Posters, and Referrers for your platform"
-                }
-              </p>
+              <div className="flex flex-col lg:flex-row items-center justify-between">
+                <div className="text-center lg:text-left mb-6 lg:mb-0">
+                  <h1 className="text-4xl lg:text-5xl font-black mb-4">
+                    Create New User
+                  </h1>
+                  <p className="text-blue-100 text-lg lg:text-xl max-w-2xl">
+                    {currentUser.isSuperAdmin 
+                      ? "Create user accounts with appropriate roles and permissions across the platform"
+                      : "Create Job Seekers, Job Posters, and Referrers to expand your talent network"
+                    }
+                  </p>
+                </div>
+                <motion.div
+                  whileHover={{ scale: 1.1, rotate: 5 }}
+                  className="flex items-center justify-center w-20 h-20 lg:w-24 lg:h-24 bg-white/20 rounded-2xl backdrop-blur-sm"
+                >
+                  <FiPlus className="h-10 w-10 lg:h-12 lg:w-12 text-white" />
+                </motion.div>
+              </div>
             </motion.div>
 
             {/* Form Container */}
             <motion.div
               variants={itemVariants}
-              className="bg-white rounded-3xl shadow-2xl border border-[#165BF8]/10 overflow-hidden"
+              className="bg-white rounded-3xl shadow-2xl border border-blue-100 overflow-hidden"
             >
               <div className="p-8">
                 <div className="flex items-center justify-between mb-8">
-                  <h2 className="text-2xl font-bold text-[#1C3991]">User Information</h2>
-                  <Link href="/admin/dashboard" passHref>
-                    <motion.button
-                      whileHover={{ scale: 1.05, boxShadow: "0 8px 25px rgba(22, 91, 248, 0.2)" }}
-                      whileTap={{ scale: 0.95 }}
-                      className="flex items-center px-5 py-2.5 bg-[#165BF8]/10 text-[#1C3991] rounded-xl hover:bg-[#165BF8]/20 transition-all duration-200 font-semibold shadow-sm"
-                    >
-                      <FiChevronLeft className="mr-2 w-5 h-5" /> Back to Dashboard
-                    </motion.button>
-                  </Link>
+                  <div>
+                    <h2 className="text-2xl lg:text-3xl font-bold text-gray-900">User Information</h2>
+                    <p className="text-gray-600 mt-2">Fill in the details to create a new user account</p>
+                  </div>
+                  <div className="hidden lg:flex items-center space-x-4">
+                    <div className="flex items-center space-x-2 bg-blue-50 px-4 py-2 rounded-xl">
+                      <FiSettings className="h-5 w-5 text-blue-600" />
+                      <span className="text-blue-700 font-medium">Admin Panel</span>
+                    </div>
+                  </div>
                 </div>
 
                 <form className="space-y-8" onSubmit={handleSubmit}>
                   {/* Basic Information Section */}
-                  <motion.div
-                    variants={itemVariants}
-                    className="bg-gradient-to-br from-[#165BF8]/5 to-[#1C3991]/5 rounded-2xl p-6 border border-[#165BF8]/10"
-                  >
-                    <div className="flex items-center space-x-3 mb-6">
-                      <div className="p-3 bg-[#165BF8] rounded-xl">
-                        <FiUser className="h-6 w-6 text-white" />
-                      </div>
-                      <div>
-                        <h3 className="text-xl font-bold text-[#1C3991]">Basic Information</h3>
-                        <p className="text-[#165BF8] text-sm">Enter user's email and select their role</p>
-                      </div>
-                    </div>
+                  <BasicInfoSection
+                    email={email}
+                    role={role}
+                    onEmailChange={setEmail}
+                    onRoleChange={setRole}
+                    isLoading={isLoading}
+                    roleOptions={roleOptions}
+                  />
 
-                    <div className="grid lg:grid-cols-2 gap-8">
-                      {/* Email Field */}
-                      <motion.div variants={itemVariants}>
-                        <label className="block text-sm font-bold text-[#1C3991] mb-3 uppercase tracking-wide">
-                          Email Address
-                        </label>
-                        <div className="relative group">
-                          <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                            <FiMail className="h-6 w-6 text-[#165BF8]/70" />
-                          </div>
-                          <input
-                            type="email"
-                            required
-                            className="block w-full pl-12 pr-4 py-4 text-lg border-2 border-[#165BF8]/20 rounded-2xl shadow-sm placeholder-[#165BF8]/50 focus:outline-none focus:ring-4 focus:ring-[#165BF8]/20 focus:border-[#165BF8] text-[#1C3991] bg-white transition-all duration-300 group-hover:border-[#165BF8]/40"
-                            value={email}
-                            onChange={(e) => setEmail(e.target.value)}
-                            disabled={isLoading}
-                            placeholder="Enter email address"
-                          />
-                        </div>
-                      </motion.div>
+                  {/* Referrer Selection Section (only for referrer role) */}
+                  {role === 'job_referrer' && (
+                    <ReferrerSelection
+                      referrerResponses={referrerResponses}
+                      loadingReferrers={loadingReferrers}
+                      selectedReferrer={selectedReferrer}
+                      onReferrerChange={handleReferrerChange}
+                      isLoading={isLoading}
+                      referrerError={referrerError}
+                      onRetryReferrers={retryFetchReferrers}
+                    />
+                  )}
 
-                      {/* Role Selection */}
-                      <motion.div variants={itemVariants}>
-                        <label className="block text-sm font-bold text-[#1C3991] mb-4 uppercase tracking-wide">
-                          Select Role
-                        </label>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                          {roleOptions.map((option) => (
-                            <motion.div
-                              key={option.value}
-                              whileHover={cardHover}
-                              whileTap={{ scale: 0.95 }}
-                            >
-                              <input
-                                type="radio"
-                                id={`role-${option.value}`}
-                                name="role"
-                                value={option.value}
-                                checked={role === option.value}
-                                onChange={() => setRole(option.value as any)}
-                                className="hidden peer"
-                                disabled={isLoading}
-                              />
-                              <label
-                                htmlFor={`role-${option.value}`}
-                                className={`block p-4 border-2 rounded-xl cursor-pointer transition-all duration-300
-                                  ${role === option.value
-                                    ? `border-[${option.color}] bg-gradient-to-br ${option.gradient} text-white shadow-xl`
-                                    : 'border-[#165BF8]/20 bg-white text-[#1C3991] hover:border-[#165BF8]/40 hover:shadow-lg'
-                                  }
-                                  ${isLoading ? 'opacity-60 cursor-not-allowed' : ''}`
-                                }
-                                style={role === option.value ? { borderColor: option.color } : {}}
-                              >
-                                <div className="flex items-center space-x-3">
-                                  <div className={`p-2 rounded-lg ${role === option.value ? 'bg-white/20' : 'bg-[#165BF8]/10'}`}>
-                                    {option.icon}
-                                  </div>
-                                  <div className="flex-1">
-                                    <div className="font-bold text-sm">{option.label}</div>
-                                    <div className={`text-xs mt-1 ${role === option.value ? 'text-white/90' : 'text-gray-600'}`}>
-                                      {option.description}
-                                    </div>
-                                  </div>
-                                </div>
-                              </label>
-                            </motion.div>
-                          ))}
-                        </div>
-                      </motion.div>
-                    </div>
-                  </motion.div>
-
-                  {/* Organization Details Section */}
-                  <motion.div
-                    variants={itemVariants}
-                    className="bg-gradient-to-br from-[#165BF8]/5 to-[#1C3991]/5 rounded-2xl p-6 border border-[#165BF8]/10"
-                  >
-                    <div className="flex items-center space-x-3 mb-6">
-                      <div className="p-3 bg-[#165BF8] rounded-xl">
-                        <FiAward className="h-6 w-6 text-white" />
-                      </div>
-                      <div>
-                        <h3 className="text-xl font-bold text-[#1C3991]">Organization Details</h3>
-                        <p className="text-[#165BF8] text-sm">
-                          {isRequiredForNonPoster ? 'Mandatory information' : 'Optional information'}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                      <motion.div variants={itemVariants}>
-                        <label className="block text-sm font-semibold text-[#1C3991] mb-2 flex items-center space-x-2">
-                          <FiBookOpen className="h-4 w-4 text-[#165BF8]" />
-                          <span>Milan/Shaka</span>
-                          {isRequiredForNonPoster && <span className="text-red-500 ml-1">*</span>}
-                        </label>
-                        <input
-                          type="text"
-                          required={isRequiredForNonPoster}
-                          className="block w-full px-4 py-3 border-2 border-[#165BF8]/20 rounded-xl shadow-sm placeholder-[#165BF8]/50 focus:outline-none focus:ring-2 focus:ring-[#165BF8]/30 focus:border-[#165BF8] text-[#1C3991] transition-all duration-200 hover:border-[#165BF8]/40"
-                          value={milanShakaBhaga}
-                          onChange={(e) => setMilanShakaBhaga(e.target.value)}
-                          disabled={isLoading}
-                          placeholder="Enter Milan/Shaka"
-                        />
-                      </motion.div>
-
-                      <motion.div variants={itemVariants}>
-                        <label className="block text-sm font-semibold text-[#1C3991] mb-2 flex items-center space-x-2">
-                          <FiMapPin className="h-4 w-4 text-[#165BF8]" />
-                          <span>Valaya/Nagar</span>
-                          {isRequiredForNonPoster && <span className="text-red-500 ml-1">*</span>}
-                        </label>
-                        <input
-                          type="text"
-                          required={isRequiredForNonPoster}
-                          className="block w-full px-4 py-3 border-2 border-[#165BF8]/20 rounded-xl shadow-sm placeholder-[#165BF8]/50 focus:outline-none focus:ring-2 focus:ring-[#165BF8]/30 focus:border-[#165BF8] text-[#1C3991] transition-all duration-200 hover:border-[#165BF8]/40"
-                          value={valayaNagar}
-                          onChange={(e) => setValayaNagar(e.target.value)}
-                          disabled={isLoading}
-                          placeholder="Enter Valaya/Nagar"
-                        />
-                      </motion.div>
-
-                      <motion.div variants={itemVariants} className="md:col-span-2 lg:col-span-1">
-                        <label className="block text-sm font-semibold text-[#1C3991] mb-2 flex items-center space-x-2">
-                          <FiGlobe className="h-4 w-4 text-[#165BF8]" />
-                          <span>Khanda/Bhaga</span>
-                          {isRequiredForNonPoster && <span className="text-red-500 ml-1">*</span>}
-                        </label>
-                        <input
-                          type="text"
-                          required={isRequiredForNonPoster}
-                          className="block w-full px-4 py-3 border-2 border-[#165BF8]/20 rounded-xl shadow-sm placeholder-[#165BF8]/50 focus:outline-none focus:ring-2 focus:ring-[#165BF8]/30 focus:border-[#165BF8] text-[#1C3991] transition-all duration-200 hover:border-[#165BF8]/40"
-                          value={khandaBhaga}
-                          onChange={(e) => setKhandaBhaga(e.target.value)}
-                          disabled={isLoading}
-                          placeholder="Enter Khanda/Bhaga"
-                        />
-                      </motion.div>
-                    </div>
-                  </motion.div>
+                  {/* Organization Details Section (for non-poster and non-referrer roles) */}
+                  {(role !== 'job_poster' && role !== 'job_referrer') && (
+                    <OrganizationHierarchy
+                      organizations={organizations}
+                      loadingHierarchy={loadingHierarchy}
+                      hierarchyError={hierarchyError}
+                      vibhaaga={vibhaaga}
+                      khanda={khanda}
+                      valaya={valaya}
+                      milan={milan}
+                      ghata={ghata}
+                      onVibhaagaChange={handleVibhaagaChange}
+                      onKhandaChange={handleKhandaChange}
+                      onValayaChange={handleValayaChange}
+                      onMilanChange={handleMilanChange}
+                      onGhataChange={setGhata}
+                      onRetry={retryFetchHierarchy}
+                      isLoading={isLoading}
+                      isRequired={isRequiredForNonPoster}
+                    />
+                  )}
 
                   {/* Messages */}
                   <AnimatePresence>
@@ -542,18 +691,26 @@ export default function CreateUserPage() {
                   </AnimatePresence>
 
                   {/* Submit Button */}
-                  <motion.div variants={itemVariants}>
+                  <motion.div variants={itemVariants} className="pt-6">
                     <motion.button
                       type="submit"
-                      disabled={isLoading}
-                      whileHover={{ scale: 1.02, boxShadow: "0 15px 30px rgba(22, 91, 248, 0.3)" }}
+                      disabled={isLoading || 
+                        (role === 'job_referrer' && (!referrerResponses.length || referrerError)) ||
+                        (isRequiredForNonPoster && (!organizations.length || hierarchyError))
+                      }
+                      whileHover={{ 
+                        scale: isLoading ? 1 : 1.02, 
+                        boxShadow: isLoading ? "none" : "0 20px 40px rgba(59, 130, 246, 0.4)" 
+                      }}
                       whileTap={{ scale: 0.98 }}
-                      className={`w-full flex justify-center items-center py-4 px-6 border border-transparent rounded-2xl shadow-xl text-lg font-bold text-white bg-gradient-to-r from-[#165BF8] to-[#1C3991] hover:from-[#1a65ff] hover:to-[#2242a8] focus:outline-none focus:ring-4 focus:ring-[#165BF8]/30 transition-all duration-300 ${isLoading ? 'opacity-70 cursor-not-allowed' : ''}`}
+                      className={`w-full flex justify-center items-center py-5 px-8 border border-transparent rounded-2xl shadow-2xl text-lg font-bold text-white bg-gradient-to-r from-blue-600 to-purple-700 hover:from-blue-700 hover:to-purple-800 focus:outline-none focus:ring-4 focus:ring-blue-500/30 transition-all duration-300 ${
+                        isLoading ? 'opacity-50 cursor-not-allowed' : ''
+                      }`}
                     >
                       {isLoading ? (
                         <>
                           <FiLoader className="animate-spin mr-3 h-6 w-6" />
-                          Creating User...
+                          Creating User Account...
                         </>
                       ) : (
                         <>
@@ -564,8 +721,14 @@ export default function CreateUserPage() {
                     </motion.button>
                   </motion.div>
 
-                  <motion.p variants={itemVariants} className="text-center text-sm text-[#165BF8] font-medium">
-                    A secure temporary password will be generated and sent to the user's email address
+                  <motion.p 
+                    variants={itemVariants} 
+                    className="text-center text-sm text-gray-600 font-medium"
+                  >
+                    {role === 'job_referrer' 
+                      ? "Selected referrer will be created with their form data and a temporary password will be sent to their email"
+                      : "A secure temporary password will be generated and sent to the user's email address"
+                    }
                   </motion.p>
                 </form>
               </div>

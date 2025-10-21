@@ -120,72 +120,62 @@ export default function ChangePasswordPage() {
     }
   }, [authLoading, isAuthenticated, user, router]);
 
-// In your change-password page, update the handleSubmit function:
-const handleSubmit = async (e: React.FormEvent) => {
-  e.preventDefault();
-  setLoading(true);
-  setMessage('');
-  setError('');
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setMessage('');
+    setError('');
 
-  if (newPassword !== confirmNewPassword) {
-    setError('New passwords do not match.');
-    setLoading(false);
-    return;
-  }
-  if (newPassword.length < 8) {
-    setError('New password must be at least 8 characters long.');
-    setLoading(false);
-    return;
-  }
-
-  if (!token) {
-    setError('Authentication token not found. Please log in again.');
-    setLoading(false);
-    router.push('/login');
-    return;
-  }
-
-  try {
-    const response = await fetch('/api/auth/change-password', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-      },
-      body: JSON.stringify({
-        currentPassword: user?.firstLogin ? undefined : currentPassword,
-        newPassword
-      }),
-    });
-
-    const data = await response.json();
-
-    if (response.ok) {
-      setMessage(data.message || 'Password changed successfully!');
-      if (data.token) {
-        login(data.token);
-        
-        // Add delay to ensure token is processed, then redirect
-        setTimeout(() => {
-          if (user?.role === 'job_referrer' && user?.firstLogin) {
-            // Redirect referrers to onboarding after first password change
-            router.push('/referrer/onboarding');
-          } else {
-            // For other users, let the AuthContext handle redirection
-            // The firstLogin flag is now false, so AuthContext will redirect appropriately
-          }
-        }, 1000);
-      }
-    } else {
-      setError(data.error || 'Failed to change password. Please try again.');
+    if (newPassword !== confirmNewPassword) {
+      setError('New passwords do not match.');
+      setLoading(false);
+      return;
     }
-  } catch (err: any) {
-    console.error('Client-side password change error:', err);
-    setError(err.message || 'An unexpected error occurred during password change.');
-  } finally {
-    setLoading(false);
-  }
-};
+    if (newPassword.length < 8) {
+      setError('New password must be at least 8 characters long.');
+      setLoading(false);
+      return;
+    }
+
+    if (!token) {
+      setError('Authentication token not found. Please log in again.');
+      setLoading(false);
+      router.push('/login');
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/auth/change-password', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          currentPassword: user?.firstLogin ? undefined : currentPassword,
+          newPassword
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setMessage(data.message || 'Password changed successfully!');
+        if (data.token) {
+          login(data.token);
+          // AuthContext will handle redirection based on user role and firstLogin status
+        }
+      } else {
+        setError(data.error || 'Failed to change password. Please try again.');
+      }
+    } catch (err: any) {
+      console.error('Client-side password change error:', err);
+      setError(err.message || 'An unexpected error occurred during password change.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Password strength indicator
   const getPasswordStrength = (password: string) => {
     if (password.length === 0) return { strength: 0, color: 'bg-gray-200', text: '' };
