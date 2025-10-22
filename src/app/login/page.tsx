@@ -41,25 +41,34 @@ export default function LoginPage() {
     const router = useRouter();
 
     // Check if this is referrer portal and set URLs
-    useEffect(() => {
-        const hostname = window.location.hostname;
-        const protocol = window.location.protocol;
-        const port = window.location.port ? `:${window.location.port}` : '';
+ // In your useEffect, update the domain logic:
+useEffect(() => {
+    const hostname = window.location.hostname;
+    const protocol = window.location.protocol;
+    const port = window.location.port ? `:${window.location.port}` : '';
+    
+    // Check if current site is referrer portal (ss.itmilanblr.co.in)
+    if (hostname.includes('ss.itmilanblr.co.in')) {
+        setIsReferrerPortal(true);
+    } else {
+        setIsReferrerPortal(false);
+        // Create referrer login URL based on current environment
+        let referrerUrl;
         
-        // Check if current site is referrer portal (ss.itmilanblr.co.in)
-        if (hostname.startsWith('ss.')) {
-            setIsReferrerPortal(true);
+        if (hostname.includes('test.udyog-jagat.')) {
+            // Test environment
+            referrerUrl = 'https://test.ss.itmilanblr.co.in/login';
+        } else if (hostname.includes('udyog-jagat.')) {
+            // Production environment
+            referrerUrl = 'https://ss.itmilanblr.co.in/login';
         } else {
-            setIsReferrerPortal(false);
-            // Create referrer login URL - ss.itmilanblr.co.in
-            const baseDomain = hostname.includes('udyog-jagat.') 
-                ? hostname.replace('udyog-jagat.', '') // Remove 'udyog-jagat.' prefix
-                : hostname;
-            
-            const referrerUrl = `${protocol}//ss.${baseDomain}${port}/login`;
-            setReferrerLoginUrl(referrerUrl);
+            // Local development
+            referrerUrl = 'http://ss.localhost:3000/login';
         }
-    }, []);
+        
+        setReferrerLoginUrl(referrerUrl);
+    }
+}, []);
 
     const handleSubmit = async (e: FormEvent) => {
         e.preventDefault();

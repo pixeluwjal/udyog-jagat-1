@@ -6,8 +6,11 @@ export async function middleware(request: NextRequest) {
   const path = request.nextUrl.pathname;
   const hostname = request.nextUrl.hostname;
 
-  // Check if this is referrer subdomain (ss.localhost or ss.itmilanblr.co.in)
-  const isReferrerSubdomain = hostname.startsWith('ss.');
+  // Check if this is referrer subdomain (ss.itmilanblr.co.in or test.ss.itmilanblr.co.in)
+  const isReferrerSubdomain = hostname.includes('ss.itmilanblr.co.in');
+  
+  // Check if this is test environment
+  const isTestEnvironment = hostname.startsWith('test.');
   
   // Protected admin routes
   const adminProtectedRoutes = ['/api/admin/users'];
@@ -23,15 +26,14 @@ export async function middleware(request: NextRequest) {
   const isReferrerProtected = referrerProtectedRoutes.some(route => path.startsWith(route));
   const isProtected = protectedRoutes.includes(path) || isAdminProtected || isReferrerProtected;
 
-  // 🔥 BLOCK REFERRER ROUTES ON MAIN DOMAIN/LOCALHOST
+  // 🔥 BLOCK REFERRER ROUTES ON MAIN DOMAIN
   if (isReferrerProtected && !isReferrerSubdomain) {
-    // If trying to access referrer routes from main domain/localhost
-    if (hostname === 'localhost' || hostname === 'udyog-jagat.itmilanblr.co.in') {
-      return new NextResponse(
-        JSON.stringify({ error: 'Unauthorized - Access referrer portal at ss.itmilanblr.co.in' }),
-        { status: 403, headers: { 'Content-Type': 'application/json' } }
-      );
-    }
+    return new NextResponse(
+      JSON.stringify({ 
+        error: `Unauthorized - Please access referrer portal at ${isTestEnvironment ? 'test.ss.itmilanblr.co.in' : 'ss.itmilanblr.co.in'}`
+      }),
+      { status: 403, headers: { 'Content-Type': 'application/json' } }
+    );
   }
 
   if (isProtected) {
@@ -79,8 +81,15 @@ export async function middleware(request: NextRequest) {
 
       // 🔥 ENFORCE MAIN DOMAIN RULES: If on main domain, BLOCK referrers from accessing non-referrer content
       if (!isReferrerSubdomain && decoded.role === 'job_referrer' && !isReferrerProtected) {
+        const redirectUrl = isTestEnvironment 
+          ? 'https://test.ss.itmilanblr.co.in/login'
+          : 'https://ss.itmilanblr.co.in/login';
+          
         return new NextResponse(
-          JSON.stringify({ error: 'Unauthorized - Referrers must use the referrer portal at ss.itmilanblr.co.in' }),
+          JSON.stringify({ 
+            error: 'Unauthorized - Referrers must use the referrer portal',
+            redirectTo: redirectUrl
+          }),
           { status: 403, headers: { 'Content-Type': 'application/json' } }
         );
       }
