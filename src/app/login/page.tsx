@@ -1,12 +1,12 @@
 // src/app/login/page.tsx
 'use client';
 
-import { useState, FormEvent } from 'react';
+import { useState, FormEvent, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FiMail, FiLock, FiLoader, FiAlertCircle, FiCheckCircle } from 'react-icons/fi'; // Import icons
+import { FiMail, FiLock, FiLoader, FiAlertCircle, FiCheckCircle, FiUsers } from 'react-icons/fi';
 
 // Define the interface for your User object (same as in AuthContext.tsx)
 interface User {
@@ -31,17 +31,40 @@ interface LoginApiResponse {
 export default function LoginPage() {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
-    const [error, setError] = useState<string | null>(null); // Use null for no error
-    const [message, setMessage] = useState<string | null>(null); // Use null for no message
+    const [error, setError] = useState<string | null>(null);
+    const [message, setMessage] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
+    const [isReferrerPortal, setIsReferrerPortal] = useState(false);
+    const [referrerLoginUrl, setReferrerLoginUrl] = useState('');
 
     const { login } = useAuth();
     const router = useRouter();
 
+    // Check if this is referrer portal and set URLs
+    useEffect(() => {
+        const hostname = window.location.hostname;
+        const protocol = window.location.protocol;
+        const port = window.location.port ? `:${window.location.port}` : '';
+        
+        // Check if current site is referrer portal (ss.itmilanblr.co.in)
+        if (hostname.startsWith('ss.')) {
+            setIsReferrerPortal(true);
+        } else {
+            setIsReferrerPortal(false);
+            // Create referrer login URL - ss.itmilanblr.co.in
+            const baseDomain = hostname.includes('udyog-jagat.') 
+                ? hostname.replace('udyog-jagat.', '') // Remove 'udyog-jagat.' prefix
+                : hostname;
+            
+            const referrerUrl = `${protocol}//ss.${baseDomain}${port}/login`;
+            setReferrerLoginUrl(referrerUrl);
+        }
+    }, []);
+
     const handleSubmit = async (e: FormEvent) => {
         e.preventDefault();
-        setError(null); // Clear previous errors
-        setMessage(null); // Clear previous messages
+        setError(null);
+        setMessage(null);
         setLoading(true);
 
         try {
@@ -70,6 +93,14 @@ export default function LoginPage() {
             setMessage('Login successful! Redirecting...');
 
             if (user) {
+                // If user is a referrer but logging in from main domain, redirect to referrer portal
+                if (user.role === 'job_referrer' && !isReferrerPortal && referrerLoginUrl) {
+                    const redirectUrl = new URL(referrerLoginUrl);
+                    redirectUrl.searchParams.set('email', email);
+                    window.location.href = redirectUrl.toString();
+                    return;
+                }
+
                 if (user.firstLogin) {
                     router.push('/change-password');
                 } else if (user.role === 'job_seeker' && user.onboardingStatus !== 'completed') {
@@ -78,14 +109,13 @@ export default function LoginPage() {
                     router.push('/admin/dashboard');
                 } else if (user.role === 'job_poster') {
                     router.push('/poster/dashboard');
-                } else if (user.role === 'job_referrer') { // Added job_referrer redirect
+                } else if (user.role === 'job_referrer') {
                     router.push('/referrer/dashboard');
-                }
-                else {
-                    router.push('/'); // Fallback
+                } else {
+                    router.push('/');
                 }
             } else {
-                router.push('/'); // Fallback if user object is unexpectedly missing
+                router.push('/');
             }
 
         } catch (err: any) {
@@ -101,6 +131,12 @@ export default function LoginPage() {
         }
     };
 
+    const redirectToReferrerLogin = () => {
+        if (referrerLoginUrl) {
+            window.location.href = referrerLoginUrl;
+        }
+    };
+
     return (
         <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-sky-100 py-12 px-4 sm:px-6 lg:px-8 font-inter">
             <motion.div
@@ -111,11 +147,24 @@ export default function LoginPage() {
             >
                 <div>
                     <h2 className="mt-6 text-center text-4xl font-extrabold text-gray-900 leading-tight bg-clip-text text-transparent bg-gradient-to-r from-[#1758F1] to-[#1C3990]">
-                        Udyog Jagat!
+                        {isReferrerPortal ? 'Referrer Portal' : 'Udyog Jagat!'}
                     </h2>
                     <p className="mt-2 text-center text-base text-gray-600">
-                        Sign in to your account to continue
+                        {isReferrerPortal ? 'Job Referrer Sign In' : 'Sign in to your account to continue'}
                     </p>
+                    
+                    {/* Show referrer portal link only on main domain */}
+                    {!isReferrerPortal && referrerLoginUrl && (
+                        <div className="mt-4 text-center">
+                            <button
+                                onClick={redirectToReferrerLogin}
+                                className="inline-flex items-center text-sm text-[#1758F1] hover:text-[#1C3990] cursor-pointer transition-colors duration-200"
+                            >
+                                <FiUsers className="mr-2 h-4 w-4" />
+                                Are you a Job Referrer? Login here
+                            </button>
+                        </div>
+                    )}
                 </div>
                 <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
                     <div className="rounded-md shadow-sm space-y-4">

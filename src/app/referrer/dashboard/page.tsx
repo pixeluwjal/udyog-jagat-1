@@ -280,11 +280,6 @@ export default function ReferrerDashboard() {
       router.push('/');
       return;
     }
-
-    if (user.onboardingStatus !== 'completed') {
-      router.push('/referrer/onboarding');
-      return;
-    }
   }, [authLoading, user, router]);
 
   // Initialize Stream Chat and fetch seekers
