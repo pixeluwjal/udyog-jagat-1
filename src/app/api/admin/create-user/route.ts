@@ -130,49 +130,34 @@ export async function POST(request: Request) {
       );
     }
 
-    // Conditional validation based on role - UPDATED LOGIC
-   // In your API route (/api/admin/create-user)
-// Remove Ghata validation from the conditional validation
-
-if (role === "admin") {
-  // For admin roles, require hierarchy fields (except Ghata which is optional)
-  if (!milanShakaBhaga || !valayaNagar || !khandaBhaga) {
-    return NextResponse.json(
-      {
-        error: "Milan/Shaka/Bhaga, Valaya/Nagar, and Khanda/Bhaga are required for Admin roles.",
-      },
-      { status: 400 }
-    );
-  }
-  // Ghata is optional for admin
-} else if (role === "job_referrer") {
-  // For referrers, check if we have hierarchy data from referrerData
-  if (referrerData) {
-    // Use hierarchy from referrerData if available
-    // Ghata is optional for referrers too
-    if (!referrerData.khanda || !referrerData.valaya || !referrerData.milan) {
-      return NextResponse.json(
-        {
-          error: "Referrer hierarchy data (Khanda, Valaya, Milan) is required for Referrer roles.",
-        },
-        { status: 400 }
-      );
+    // FIXED: Conditional validation based on role - GHATA IS OPTIONAL
+    if (role === "admin") {
+      // For admin roles, require hierarchy fields (GHATA IS OPTIONAL)
+      if (!milanShakaBhaga || !valayaNagar || !khandaBhaga) {
+        return NextResponse.json(
+          {
+            error: "Milan/Shaka/Bhaga, Valaya/Nagar, and Khanda/Bhaga are required for Admin roles.",
+          },
+          { status: 400 }
+        );
+      }
+      // GHATA IS OPTIONAL - NO VALIDATION NEEDED
+    } else if (role === "job_referrer") {
+      // For referrers, check hierarchy from multiple sources
+      const hasDirectHierarchy = milanShakaBhaga && valayaNagar && khandaBhaga;
+      const hasReferrerDataHierarchy = referrerData && referrerData.khanda && referrerData.valaya && referrerData.milan;
+      const hasMappedHierarchy = referrerData && referrerData.khandaBhaga && referrerData.valayaNagar && referrerData.milanShakaBhaga;
+      
+      if (!hasDirectHierarchy && !hasReferrerDataHierarchy && !hasMappedHierarchy) {
+        return NextResponse.json(
+          {
+            error: "Referrer hierarchy data (Khanda, Valaya, Milan) is required for Referrer roles.",
+          },
+          { status: 400 }
+        );
+      }
+      // GHATA IS OPTIONAL - NO VALIDATION NEEDED
     }
-    // Ghata is optional, no validation needed
-  } else {
-    // Fallback to direct hierarchy fields if no referrerData
-    // Ghata is optional here too
-    if (!milanShakaBhaga || !valayaNagar || !khandaBhaga) {
-      return NextResponse.json(
-        {
-          error: "Milan/Shaka/Bhaga, Valaya/Nagar, and Khanda/Bhaga are required for Referrer roles when no referrer data is provided.",
-        },
-        { status: 400 }
-      );
-    }
-    // Ghata is optional, no validation needed
-  }
-}
 
     // 4. Check if user already exists in either collection
     const existingUser = await User.findOne({ email });
@@ -192,20 +177,34 @@ if (role === "admin") {
     let createdUser;
     let userResponse;
 
-    // Determine hierarchy values based on role and data source
+    // FIXED: Determine hierarchy values based on role and data source
     let finalMilanShakaBhaga = milanShakaBhaga;
     let finalValayaNagar = valayaNagar;
     let finalKhandaBhaga = khandaBhaga;
     let finalVibhaaga = vibhaaga;
-    let finalGhata = ghata;
+    let finalGhata = ghata; // GHATA IS OPTIONAL
 
-    // For referrers, use data from referrerData if available
-    if (role === "job_referrer" && referrerData) {
-      finalMilanShakaBhaga = referrerData.milan || milan;
-      finalValayaNagar = referrerData.valaya || valaya;
-      finalKhandaBhaga = referrerData.khanda || khanda;
-      finalVibhaaga = referrerData.vibhaaga || vibhaaga;
-      finalGhata = referrerData.ghata || ghata;
+    // For referrers, use data from multiple sources
+    if (role === "job_referrer") {
+      // Priority 1: Use direct fields from main payload
+      if (milanShakaBhaga) finalMilanShakaBhaga = milanShakaBhaga;
+      if (valayaNagar) finalValayaNagar = valayaNagar;
+      if (khandaBhaga) finalKhandaBhaga = khandaBhaga;
+      
+      // Priority 2: Use mapped fields from referrerData
+      if (referrerData) {
+        if (referrerData.milanShakaBhaga) finalMilanShakaBhaga = referrerData.milanShakaBhaga;
+        if (referrerData.valayaNagar) finalValayaNagar = referrerData.valayaNagar;
+        if (referrerData.khandaBhaga) finalKhandaBhaga = referrerData.khandaBhaga;
+        
+        // Also check for alternative field names
+        if (referrerData.milan) finalMilanShakaBhaga = referrerData.milan;
+        if (referrerData.valaya) finalValayaNagar = referrerData.valaya;
+        if (referrerData.khanda) finalKhandaBhaga = referrerData.khanda;
+        
+        finalVibhaaga = referrerData.vibhaaga || vibhaaga;
+        finalGhata = referrerData.ghata || ghata; // GHATA IS OPTIONAL
+      }
     }
 
     if (role === "job_referrer") {
@@ -224,20 +223,20 @@ if (role === "admin") {
         milanShakaBhaga: finalMilanShakaBhaga!,
         valayaNagar: finalValayaNagar!,
         khandaBhaga: finalKhandaBhaga!,
-        vibhaaga: finalVibhaaga,
-        ghata: finalGhata,
+        vibhaaga: finalVibhaaga, // OPTIONAL
+        ghata: finalGhata, // OPTIONAL - CAN BE UNDEFINED
         // Initialize empty referrer details for onboarding
         referrerDetails: {
-          fullName: referrerData?.name || "",
-          mobileNumber: referrerData?.phone || "",
+          fullName: referrerData?.name || referrerData?.fullName || "",
+          mobileNumber: referrerData?.phone || referrerData?.mobileNumber || "",
           personalEmail: referrerData?.email || email,
-          residentialAddress: referrerData?.address || "",
+          residentialAddress: referrerData?.address || referrerData?.residentialAddress || "",
         },
         // Initialize empty work details for onboarding
         workDetails: {
-          companyName: "",
-          workLocation: "",
-          designation: "",
+          companyName: referrerData?.companyName || "",
+          workLocation: referrerData?.workLocation || "",
+          designation: referrerData?.designation || "",
         },
       });
 
@@ -272,7 +271,7 @@ if (role === "admin") {
         valayaNagar: finalValayaNagar || undefined,
         khandaBhaga: finalKhandaBhaga || undefined,
         vibhaaga: finalVibhaaga || undefined,
-        ghata: finalGhata || undefined,
+        ghata: finalGhata || undefined, // OPTIONAL
       });
 
       userResponse = {

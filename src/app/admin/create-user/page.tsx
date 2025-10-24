@@ -1,20 +1,34 @@
+// src/app/admin/create-user/page.tsx
 'use client';
 
 import { useState, FormEvent, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/app/context/AuthContext';
-import Link from 'next/link';
-import Sidebar from '@/app/components/Sidebar';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  FiXCircle, FiCheckCircle, FiLoader, FiChevronLeft, FiMenu, 
-  FiPlus, FiUser, FiBriefcase, FiLink, FiShield, FiZap,
-  FiAward, FiStar, FiSettings
+  FiXCircle, FiCheckCircle, FiLoader, FiMenu, 
+  FiPlus, FiUser, FiBriefcase, FiShield, FiZap,
+  FiAward, FiStar, FiSettings, FiInfo
 } from 'react-icons/fi';
+import Sidebar from '@/app/components/Sidebar';
 import BasicInfoSection from '@/app/components/create-user/BasicInfoSection';
 import OrganizationHierarchy from '@/app/components/create-user/OrganizationHierarchy';
-import ReferrerSelection, { ReferrerResponse } from '@/app/components/create-user/ReferrerSelection';
+import ReferrerSelection, { ReferrerFormData } from '@/app/components/create-user/ReferrerSelection';
 import { Organization, OrganizationResponse } from '@/types/organization';
+
+// Initial referrer data
+const initialReferrerData: ReferrerFormData = {
+  fullName: '',
+  email: '',
+  mobileNumber: '',
+  residentialAddress: '',
+  companyName: '',
+  workLocation: '',
+  designation: '',
+  milanShakaBhaga: '',
+  valayaNagar: '',
+  khandaBhaga: ''
+};
 
 export default function CreateUserPage() {
   const [email, setEmail] = useState('');
@@ -24,7 +38,7 @@ export default function CreateUserPage() {
   const [valaya, setValaya] = useState('');
   const [khanda, setKhanda] = useState('');
   const [vibhaaga, setVibhaaga] = useState('');
-  const [selectedReferrer, setSelectedReferrer] = useState('');
+  const [referrerData, setReferrerData] = useState<ReferrerFormData>(initialReferrerData);
 
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -33,9 +47,6 @@ export default function CreateUserPage() {
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [loadingHierarchy, setLoadingHierarchy] = useState(true);
   const [hierarchyError, setHierarchyError] = useState<string | null>(null);
-  const [referrerResponses, setReferrerResponses] = useState<ReferrerResponse[]>([]);
-  const [loadingReferrers, setLoadingReferrers] = useState(false);
-  const [referrerError, setReferrerError] = useState<string | null>(null);
 
   const { user: currentUser, loading: authLoading, isAuthenticated, token, logout } = useAuth();
   const router = useRouter();
@@ -76,72 +87,31 @@ export default function CreateUserPage() {
     }
   };
 
-  // Fetch referrer responses from form submissions
-  const fetchReferrerResponses = async () => {
-    try {
-      setLoadingReferrers(true);
-      setReferrerError(null);
-      
-      if (!token) {
-        throw new Error('Authentication token missing');
-      }
-
-      console.log('Fetching referrer responses...');
-      
-      const response = await fetch('/api/admin/referrer-responses', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
-
-      if (data.success && data.responses) {
-        setReferrerResponses(data.responses);
-        console.log('Referrer responses loaded successfully:', data.responses.length);
-      } else {
-        throw new Error(data.error || 'Invalid response format from referrer API');
-      }
-    } catch (err: any) {
-      console.error('Error fetching referrer responses:', err);
-      
-      let errorMessage = 'Failed to load referrer data. ';
-      errorMessage += err.message || 'Unknown error occurred. ';
-      errorMessage += 'Please try again or contact support.';
-      
-      setReferrerError(errorMessage);
-      setReferrerResponses([]);
-    } finally {
-      setLoadingReferrers(false);
-    }
-  };
-
-  // Retry functions
+  // Retry function for hierarchy
   const retryFetchHierarchy = () => {
     fetchOrganizations();
-  };
-
-  const retryFetchReferrers = () => {
-    fetchReferrerResponses();
   };
 
   useEffect(() => {
     fetchOrganizations();
   }, []);
 
-  // Fetch referrer responses when role is set to referrer
+  // Reset referrer data when role changes away from referrer
   useEffect(() => {
-    if (role === 'job_referrer' && token) {
-      fetchReferrerResponses();
-    } else {
-      setReferrerResponses([]);
-      setSelectedReferrer('');
+    if (role !== 'job_referrer') {
+      setReferrerData(initialReferrerData);
     }
-  }, [role, token]);
+  }, [role]);
+
+  // Auto-fill email in referrer data when email changes
+  useEffect(() => {
+    if (role === 'job_referrer' && email) {
+      setReferrerData(prev => ({
+        ...prev,
+        email: email
+      }));
+    }
+  }, [email, role]);
 
   useEffect(() => {
     if (authLoading) return;
@@ -173,8 +143,7 @@ export default function CreateUserPage() {
         icon: <FiUser className="h-6 w-6" />,
         description: 'Browse and apply for jobs',
         gradient: 'from-blue-500 to-cyan-500',
-        color: '#3B82F6',
-        badge: 'Applicant'
+        color: '#3B82F6'
       },
       { 
         value: 'job_poster', 
@@ -182,8 +151,7 @@ export default function CreateUserPage() {
         icon: <FiBriefcase className="h-6 w-6" />,
         description: 'Post and manage job listings',
         gradient: 'from-green-500 to-emerald-500',
-        color: '#10B981',
-        badge: 'Recruiter'
+        color: '#10B981'
       },
       { 
         value: 'job_referrer', 
@@ -191,8 +159,7 @@ export default function CreateUserPage() {
         icon: <FiAward className="h-6 w-6" />,
         description: 'Refer candidates to jobs',
         gradient: 'from-purple-500 to-violet-500',
-        color: '#8B5CF6',
-        badge: 'Connector'
+        color: '#8B5CF6'
       },
     ];
 
@@ -205,8 +172,7 @@ export default function CreateUserPage() {
           icon: <FiShield className="h-6 w-6" />,
           description: 'Full system access',
           gradient: 'from-red-500 to-rose-500',
-          color: '#EF4444',
-          badge: 'Manager'
+          color: '#EF4444'
         },
         { 
           value: 'super_admin', 
@@ -214,53 +180,12 @@ export default function CreateUserPage() {
           icon: <FiStar className="h-6 w-6" />,
           description: 'Complete system control',
           gradient: 'from-amber-500 to-orange-500',
-          color: '#F59E0B',
-          badge: 'Owner'
+          color: '#F59E0B'
         }
       );
     }
 
     return baseOptions;
-  };
-
-  // Helper function to get field values from form responses
-  const getFieldValue = (responses: any[], fieldLabel: string) => {
-    const field = responses.find((r: any) => r.fieldLabel === fieldLabel);
-    return field?.value || '';
-  };
-
-  // Get available vibhaagas from the organization data
-  const getVibhaagas = () => {
-    if (!organizations.length) return [];
-    return organizations[0].vibhaagas || [];
-  };
-
-  // Get khandas for selected vibhaaga
-  const getKhandas = () => {
-    if (!vibhaaga) return [];
-    const vibhaagaObj = getVibhaagas().find(v => v._id === vibhaaga);
-    return vibhaagaObj?.khandas || [];
-  };
-
-  // Get valayas for selected khanda
-  const getValayas = () => {
-    if (!khanda) return [];
-    const khandaObj = getKhandas().find(k => k._id === khanda);
-    return khandaObj?.valayas || [];
-  };
-
-  // Get milans for selected valay
-  const getMilans = () => {
-    if (!valaya) return [];
-    const valayaObj = getValayas().find(v => v._id === valaya);
-    return valayaObj?.milans || [];
-  };
-
-  // Get ghatas for selected milan
-  const getGhatas = () => {
-    if (!milan) return [];
-    const milanObj = getMilans().find(m => m._id === milan);
-    return milanObj?.ghatas || [];
   };
 
   // Reset dependent fields when parent field changes
@@ -290,18 +215,8 @@ export default function CreateUserPage() {
     setGhata('');
   };
 
-  const handleReferrerChange = (referrerId: string) => {
-    setSelectedReferrer(referrerId);
-    // Auto-fill email from selected referrer
-    const selectedResponse = referrerResponses.find(r => r._id === referrerId);
-    if (selectedResponse) {
-      const referrerEmail = getFieldValue(selectedResponse.responses, 'Email');
-      if (referrerEmail) {
-        setEmail(referrerEmail);
-      }
-    }
-  };
-
+// Update the handleSubmit function in your create-user page
+// Update the handleSubmit function in your create-user page
 const handleSubmit = async (e: FormEvent) => {
   e.preventDefault();
   setError(null);
@@ -326,18 +241,38 @@ const handleSubmit = async (e: FormEvent) => {
     return;
   }
 
-  // For referrers, validate that a referrer is selected
+  // For referrers, validate all required fields
   if (role === 'job_referrer') {
-    if (!selectedReferrer) {
-      setError('Please select a referrer from the available options.');
+    const requiredFields: (keyof ReferrerFormData)[] = [
+      'fullName', 'mobileNumber', 'residentialAddress', 
+      'companyName', 'workLocation', 'designation'
+    ];
+
+    const missingFields = requiredFields.filter(field => !referrerData[field]?.trim());
+    
+    if (missingFields.length > 0) {
+      setError(`Please fill in all required referrer fields: ${missingFields.join(', ')}`);
+      setIsLoading(false);
+      return;
+    }
+
+    // Validate mobile number format
+    const mobileRegex = /^[0-9]{10}$/;
+    if (!mobileRegex.test(referrerData.mobileNumber.replace(/\D/g, ''))) {
+      setError('Please enter a valid 10-digit mobile number.');
+      setIsLoading(false);
+      return;
+    }
+
+    // Validate organization hierarchy for referrers - check the actual fields being used
+    if (!referrerData.milanShakaBhaga || !referrerData.valayaNagar || !referrerData.khandaBhaga) {
+      setError('Please select Khanda, Valaya, and Milan from the organization hierarchy dropdowns.');
       setIsLoading(false);
       return;
     }
   }
 
   // Validate organization hierarchy for non-poster roles ONLY
-  // Referrers get their hierarchy from the form response, so don't validate here
-  // GHATA IS NOT MANDATORY - REMOVE GHATA VALIDATION
   if (role !== 'job_poster' && role !== 'job_referrer') {
     if (!milan.trim()) {
       setError('Please select a Milan.');
@@ -359,7 +294,6 @@ const handleSubmit = async (e: FormEvent) => {
       setIsLoading(false);
       return;
     }
-    // GHATA IS OPTIONAL - NO VALIDATION FOR GHATA
   }
 
   try {
@@ -373,66 +307,52 @@ const handleSubmit = async (e: FormEvent) => {
       payload.isSuperAdmin = true;
     }
 
-    // For referrers, include the selected referrer data WITH hierarchy from form response
+    // For referrers, include the complete referrer data
     if (role === 'job_referrer') {
-      const selectedResponse = referrerResponses.find(r => r._id === selectedReferrer);
-      if (selectedResponse) {
-        // Extract hierarchy data from the form responses
-        const getHierarchyValue = (fieldLabel: string) => {
-          const field = selectedResponse.responses.find(r => 
-            r.fieldLabel && r.fieldLabel.includes(fieldLabel)
-          );
-          return field?.value || '';
-        };
+      // Include hierarchy data directly in the main payload (REQUIRED by schema)
+      payload.milanShakaBhaga = referrerData.milanShakaBhaga;
+      payload.valayaNagar = referrerData.valayaNagar;
+      payload.khandaBhaga = referrerData.khandaBhaga;
+      
+      // Include optional hierarchy fields
+      if (referrerData.vibhaaga) payload.vibhaaga = referrerData.vibhaaga;
+      if (referrerData.ghata) payload.ghata = referrerData.ghata;
 
-        // Get the actual names for the hierarchy from the organization data
-        const selectedKhandaId = getHierarchyValue('khanda');
-        const selectedValayaId = getHierarchyValue('valaya'); 
-        const selectedMilanId = getHierarchyValue('milan');
-        const selectedGhataId = getHierarchyValue('ghata');
-
-        // Find the actual names from organization data
-        const allKhandas = organizations[0]?.khandas || [];
-        const selectedKhanda = allKhandas.find(k => k._id === selectedKhandaId);
-        const selectedValaya = selectedKhanda?.valays?.find(v => v._id === selectedValayaId) || 
-                              selectedKhanda?.valayas?.find(v => v._id === selectedValayaId);
-        const selectedMilan = selectedValaya?.milans?.find(m => m._id === selectedMilanId);
-        const selectedGhata = selectedMilan?.ghatas?.find(g => g._id === selectedGhataId);
-
-        payload.referrerData = {
-          formResponseId: selectedResponse._id,
-          name: getFieldValue(selectedResponse.responses, 'Name'),
-          phone: getFieldValue(selectedResponse.responses, 'Contact Number'),
-          address: `${getFieldValue(selectedResponse.responses, 'Residential Address Line 1')} ${getFieldValue(selectedResponse.responses, 'Residential Address Line 2')}`.trim(),
-          education: `${getFieldValue(selectedResponse.responses, 'Degree')} in ${getFieldValue(selectedResponse.responses, 'Course')}`,
-          college: getFieldValue(selectedResponse.responses, 'College'),
-          currentStatus: getFieldValue(selectedResponse.responses, 'Current Status'),
-          gender: getFieldValue(selectedResponse.responses, 'Gender'),
-          birthYear: getFieldValue(selectedResponse.responses, 'Birth Year'),
-          submittedAt: selectedResponse.submittedAt,
-          // Include hierarchy data - GHATA IS OPTIONAL
-          khanda: selectedKhanda?.name || '',
-          valaya: selectedValaya?.name || '',
-          milan: selectedMilan?.name || '',
-          ghata: selectedGhata?.name || '', // This can be empty
-          vibhaaga: organizations[0]?.name || 'Bengaluru Dakshina Vibhaaga'
-        };
-      }
+      // Create referrerData object for personal and work details
+      payload.referrerData = {
+        // Personal details (will be used for referrerDetails)
+        name: referrerData.fullName,
+        phone: referrerData.mobileNumber,
+        email: referrerData.email,
+        address: referrerData.residentialAddress,
+        
+        // Additional fields for work information
+        companyName: referrerData.companyName,
+        workLocation: referrerData.workLocation,
+        designation: referrerData.designation
+      };
     } else if (role !== 'job_poster') {
       // For other non-poster roles, use the manually selected hierarchy
-      const selectedVibhaaga = getVibhaagas().find(v => v._id === vibhaaga);
-      const selectedKhanda = getKhandas().find(k => k._id === khanda);
-      const selectedValaya = getValayas().find(v => v._id === valaya);
-      const selectedMilan = getMilans().find(m => m._id === milan);
-      const selectedGhata = getGhatas().find(g => g._id === ghata);
+      const selectedVibhaaga = organizations[0]?.vibhaagas?.find(v => v._id === vibhaaga);
+      const selectedKhanda = selectedVibhaaga?.khandas?.find(k => k._id === khanda);
+      const selectedValaya = selectedKhanda?.valayas?.find(v => v._id === valaya);
+      const selectedMilan = selectedValaya?.milans?.find(m => m._id === milan);
+      const selectedGhata = selectedMilan?.ghatas?.find(g => g._id === ghata);
 
-      // GHATA IS OPTIONAL - only include if selected
+      // Include hierarchy fields
       if (selectedGhata) payload.ghata = selectedGhata.name;
       if (selectedMilan) payload.milan = selectedMilan.name;
       if (selectedValaya) payload.valaya = selectedValaya.name;
       if (selectedKhanda) payload.khanda = selectedKhanda.name;
       if (selectedVibhaaga) payload.vibhaaga = selectedVibhaaga.name;
+      
+      // Also include the legacy field names
+      if (selectedMilan) payload.milanShakaBhaga = selectedMilan.name;
+      if (selectedValaya) payload.valayaNagar = selectedValaya.name;
+      if (selectedKhanda) payload.khandaBhaga = selectedKhanda.name;
     }
+
+    console.log('Sending payload:', JSON.stringify(payload, null, 2));
 
     const response = await fetch('/api/admin/create-user', {
       method: 'POST',
@@ -459,7 +379,7 @@ const handleSubmit = async (e: FormEvent) => {
     setValaya('');
     setKhanda('');
     setVibhaaga('');
-    setSelectedReferrer('');
+    setReferrerData(initialReferrerData);
 
   } catch (err: any) {
     console.error('Create user error:', err);
@@ -468,7 +388,8 @@ const handleSubmit = async (e: FormEvent) => {
     setIsLoading(false);
   }
 };
-  // Enhanced Animation Variants
+
+  // Animation Variants
   const containerVariants = {
     hidden: { opacity: 0, y: 30 },
     visible: { 
@@ -564,14 +485,13 @@ const handleSubmit = async (e: FormEvent) => {
           <div className="w-12"></div>
         </div>
 
-
         {/* Main Content */}
         <div className="flex-1 overflow-y-auto p-4 lg:p-8">
           <motion.div
             initial="hidden"
             animate="visible"
             variants={containerVariants}
-            className="max-w-7xl mx-auto" // Increased max-width
+            className="max-w-7xl mx-auto"
           >
             {/* Welcome Card */}
             <motion.div
@@ -629,16 +549,12 @@ const handleSubmit = async (e: FormEvent) => {
                     roleOptions={roleOptions}
                   />
 
-                  {/* Referrer Selection Section (only for referrer role) */}
+                  {/* Referrer Details Section (only for referrer role) */}
                   {role === 'job_referrer' && (
                     <ReferrerSelection
-                      referrerResponses={referrerResponses}
-                      loadingReferrers={loadingReferrers}
-                      selectedReferrer={selectedReferrer}
-                      onReferrerChange={handleReferrerChange}
+                      referrerData={referrerData}
+                      onReferrerDataChange={setReferrerData}
                       isLoading={isLoading}
-                      referrerError={referrerError}
-                      onRetryReferrers={retryFetchReferrers}
                     />
                   )}
 
@@ -695,7 +611,7 @@ const handleSubmit = async (e: FormEvent) => {
                     <motion.button
                       type="submit"
                       disabled={isLoading || 
-                        (role === 'job_referrer' && (!referrerResponses.length || referrerError)) ||
+                        (role === 'job_referrer' && Object.values(referrerData).some(val => !val?.trim())) ||
                         (isRequiredForNonPoster && (!organizations.length || hierarchyError))
                       }
                       whileHover={{ 
@@ -726,7 +642,7 @@ const handleSubmit = async (e: FormEvent) => {
                     className="text-center text-sm text-gray-600 font-medium"
                   >
                     {role === 'job_referrer' 
-                      ? "Selected referrer will be created with their form data and a temporary password will be sent to their email"
+                      ? "Referrer account will be created with the provided details and a temporary password will be sent via email"
                       : "A secure temporary password will be generated and sent to the user's email address"
                     }
                   </motion.p>

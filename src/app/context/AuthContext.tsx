@@ -210,7 +210,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
                             // FIX: Check onboarding status for referrers
                             calculatedTargetPath = fetchedUser.onboardingStatus === 'completed'
                                 ? '/referrer/dashboard'
-                                : '/referrer/onboarding';
+                                : '/referrer/dashboard';
                             break;
                         default:
                             calculatedTargetPath = '/';
@@ -309,8 +309,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
                 // FIX: Check onboarding status for referrers - this is the key fix!
                 if (user.onboardingStatus === 'completed' && !pathname.startsWith('/referrer') && pathname !== '/profile') {
                     targetPath = '/referrer/dashboard';
-                } else if (user.onboardingStatus !== 'completed' && pathname !== '/referrer/onboarding' && pathname !== '/profile') {
-                    targetPath = '/referrer/onboarding';
+                } else if (user.onboardingStatus !== 'completed' && pathname !== '/referrer/dashboard' && pathname !== '/profile') {
+                    targetPath = '/referrer/dashboard';
                 }
                 break;
         }

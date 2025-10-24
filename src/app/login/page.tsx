@@ -19,6 +19,14 @@ interface User {
     createdAt: string;
     updatedAt: string;
     onboardingStatus?: 'pending' | 'in_progress' | 'completed';
+    // Referrer specific fields
+    referralCode?: string;
+    milanShakaBhaga?: string;
+    valayaNagar?: string;
+    khandaBhaga?: string;
+    referrerDetails?: any;
+    workDetails?: any;
+    jobReferrerDetails?: any;
 }
 
 // Define the interface for the expected API response data on successful login
@@ -34,41 +42,9 @@ export default function LoginPage() {
     const [error, setError] = useState<string | null>(null);
     const [message, setMessage] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
-    const [isReferrerPortal, setIsReferrerPortal] = useState(false);
-    const [referrerLoginUrl, setReferrerLoginUrl] = useState('');
 
     const { login } = useAuth();
     const router = useRouter();
-
-    // Check if this is referrer portal and set URLs
- // In your useEffect, update the domain logic:
-useEffect(() => {
-    const hostname = window.location.hostname;
-    const protocol = window.location.protocol;
-    const port = window.location.port ? `:${window.location.port}` : '';
-    
-    // Check if current site is referrer portal (ss.itmilanblr.co.in)
-    if (hostname.includes('ss.itmilanblr.co.in')) {
-        setIsReferrerPortal(true);
-    } else {
-        setIsReferrerPortal(false);
-        // Create referrer login URL based on current environment
-        let referrerUrl;
-        
-        if (hostname.includes('test.udyog-jagat.')) {
-            // Test environment
-            referrerUrl = 'https://test.ss.itmilanblr.co.in/login';
-        } else if (hostname.includes('udyog-jagat.')) {
-            // Production environment
-            referrerUrl = 'https://ss.itmilanblr.co.in/login';
-        } else {
-            // Local development
-            referrerUrl = 'http://ss.localhost:3000/login';
-        }
-        
-        setReferrerLoginUrl(referrerUrl);
-    }
-}, []);
 
     const handleSubmit = async (e: FormEvent) => {
         e.preventDefault();
@@ -102,14 +78,7 @@ useEffect(() => {
             setMessage('Login successful! Redirecting...');
 
             if (user) {
-                // If user is a referrer but logging in from main domain, redirect to referrer portal
-                if (user.role === 'job_referrer' && !isReferrerPortal && referrerLoginUrl) {
-                    const redirectUrl = new URL(referrerLoginUrl);
-                    redirectUrl.searchParams.set('email', email);
-                    window.location.href = redirectUrl.toString();
-                    return;
-                }
-
+                // Handle redirection based on user role and status
                 if (user.firstLogin) {
                     router.push('/change-password');
                 } else if (user.role === 'job_seeker' && user.onboardingStatus !== 'completed') {
@@ -140,12 +109,6 @@ useEffect(() => {
         }
     };
 
-    const redirectToReferrerLogin = () => {
-        if (referrerLoginUrl) {
-            window.location.href = referrerLoginUrl;
-        }
-    };
-
     return (
         <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-sky-100 py-12 px-4 sm:px-6 lg:px-8 font-inter">
             <motion.div
@@ -156,24 +119,11 @@ useEffect(() => {
             >
                 <div>
                     <h2 className="mt-6 text-center text-4xl font-extrabold text-gray-900 leading-tight bg-clip-text text-transparent bg-gradient-to-r from-[#1758F1] to-[#1C3990]">
-                        {isReferrerPortal ? 'Referrer Portal' : 'Udyog Jagat!'}
+                        Udyog Jagat!
                     </h2>
                     <p className="mt-2 text-center text-base text-gray-600">
-                        {isReferrerPortal ? 'Job Referrer Sign In' : 'Sign in to your account to continue'}
+                        Sign in to your account to continue
                     </p>
-                    
-                    {/* Show referrer portal link only on main domain */}
-                    {!isReferrerPortal && referrerLoginUrl && (
-                        <div className="mt-4 text-center">
-                            <button
-                                onClick={redirectToReferrerLogin}
-                                className="inline-flex items-center text-sm text-[#1758F1] hover:text-[#1C3990] cursor-pointer transition-colors duration-200"
-                            >
-                                <FiUsers className="mr-2 h-4 w-4" />
-                                Are you a Job Referrer? Login here
-                            </button>
-                        </div>
-                    )}
                 </div>
                 <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
                     <div className="rounded-md shadow-sm space-y-4">
