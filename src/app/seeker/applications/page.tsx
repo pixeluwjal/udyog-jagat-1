@@ -18,7 +18,8 @@ import {
   FiFileText,
   FiTrendingUp,
   FiClock,
-  FiAward
+  FiAward,
+  FiRefreshCcw
 } from 'react-icons/fi';
 import { IoSparkles, IoRocket } from 'react-icons/io5';
 
