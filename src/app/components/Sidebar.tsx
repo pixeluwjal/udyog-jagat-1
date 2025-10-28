@@ -16,7 +16,8 @@ import {
   FiLogOut, 
   FiSave,
   FiAward,
-  FiTrendingUp
+  FiTrendingUp,
+  FiShield
 } from 'react-icons/fi';
 
 interface NavItem {
@@ -37,7 +38,7 @@ interface SidebarProps {
 }
 
 export default function Sidebar({
-    userRole,
+    userRole: initialUserRole,
     onLogout,
     userDisplayName = "User",
     userEmail = "user@example.com",
@@ -49,7 +50,50 @@ export default function Sidebar({
     const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
     const [activeHover, setActiveHover] = useState<string | null>(null);
     const [hasUnread, setHasUnread] = useState(unreadCount > 0);
+    const [userRole, setUserRole] = useState(initialUserRole);
+    const [isLoading, setIsLoading] = useState(false);
     const pathname = usePathname();
+
+    // Check if user is super admin
+    useEffect(() => {
+        const checkSuperAdmin = async () => {
+            // Only check if initial role is admin (potential super admin)
+            if (initialUserRole === 'admin') {
+                setIsLoading(true);
+                try {
+                    const token = localStorage.getItem('token');
+                    if (!token) {
+                        console.error('No token found for super admin check');
+                        return;
+                    }
+
+                    const response = await fetch('/api/auth/me', {
+                        headers: {
+                            'Authorization': `Bearer ${token}`
+                        }
+                    });
+                    
+                    if (response.ok) {
+                        const data = await response.json();
+                        console.log('User data from /api/auth/me:', data.user);
+                        
+                        // Check if user is super admin based on the data
+                        if (data.user.role === 'admin' && data.user.isSuperAdmin === true) {
+                            setUserRole('super_admin');
+                        }
+                    } else {
+                        console.error('Failed to fetch user data:', response.status);
+                    }
+                } catch (error) {
+                    console.error('Failed to fetch user data:', error);
+                } finally {
+                    setIsLoading(false);
+                }
+            }
+        };
+
+        checkSuperAdmin();
+    }, [initialUserRole]);
 
     const getUserInitials = (name: string): string => {
         if (!name || typeof name !== 'string') return "U";
@@ -87,6 +131,7 @@ export default function Sidebar({
         job_seeker: "Job Seeker",
         admin: "Administrator",
         job_referrer: "Job Referrer",
+        super_admin: "Super Administrator"
     };
 
     const currentTheme = blueTheme;
@@ -117,6 +162,14 @@ export default function Sidebar({
             ]
             : []),
         ...(userRole === "admin"
+            ? [
+                { href: "/admin/dashboard", icon: <FiHome className="h-5 w-5" />, text: "Dashboard" },
+                { href: "/admin/create-user", icon: <FiUser className="h-5 w-5" />, text: "Create User" },
+                { href: "/admin/generate-referral", icon: <FiLink className="h-5 w-5" />, text: "Generate Referral" },
+                { href: "/admin/my-created-users", icon: <FiUsers className="h-5 w-5" />, text: "My Created Users" },
+            ]
+            : []),
+        ...(userRole === "super_admin"
             ? [
                 { href: "/admin/dashboard", icon: <FiHome className="h-5 w-5" />, text: "Dashboard" },
                 { href: "/admin/create-user", icon: <FiUser className="h-5 w-5" />, text: "Create User" },
@@ -222,6 +275,11 @@ export default function Sidebar({
                                         className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full border-2 border-white"
                                     />
                                 )}
+                                {isLoading && (
+                                    <div className="absolute inset-0 flex items-center justify-center">
+                                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                                    </div>
+                                )}
                             </motion.div>
                             <div className="flex-1 min-w-0">
                                 <h1 className="text-xl font-bold tracking-tight truncate">
@@ -230,7 +288,9 @@ export default function Sidebar({
                                 <p className="text-sm opacity-90 truncate">{userEmail}</p>
                                 <div className="flex items-center mt-1">
                                     <div className={`w-2 h-2 rounded-full ${currentTheme.active} mr-2`}></div>
-                                    <span className="text-xs opacity-75">{roleTitles[userRole]}</span>
+                                    <span className="text-xs opacity-75">
+                                        {isLoading ? "Checking..." : roleTitles[userRole]}
+                                    </span>
                                 </div>
                             </div>
                         </motion.div>
@@ -241,6 +301,11 @@ export default function Sidebar({
                                 className={`w-12 h-12 rounded-2xl ${currentTheme.accent} flex items-center justify-center text-white font-bold text-xl shadow-lg`}
                             >
                                 {initials}
+                                {isLoading && (
+                                    <div className="absolute inset-0 flex items-center justify-center">
+                                        <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                                    </div>
+                                )}
                             </motion.div>
                             {hasUnread && (
                                 <motion.div
@@ -416,6 +481,11 @@ export default function Sidebar({
                                         {hasUnread && (
                                             <div className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full border-2 border-white" />
                                         )}
+                                        {isLoading && (
+                                            <div className="absolute inset-0 flex items-center justify-center">
+                                                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                                            </div>
+                                        )}
                                     </div>
                                     <div className="flex-1 min-w-0">
                                         <h2 className="text-xl font-bold tracking-tight truncate">
@@ -424,7 +494,9 @@ export default function Sidebar({
                                         <p className="text-sm opacity-90 truncate">{userEmail}</p>
                                         <div className="flex items-center mt-1">
                                             <div className={`w-2 h-2 rounded-full ${currentTheme.active} mr-2`}></div>
-                                            <span className="text-xs opacity-75">{roleTitles[userRole]}</span>
+                                            <span className="text-xs opacity-75">
+                                                {isLoading ? "Checking..." : roleTitles[userRole]}
+                                            </span>
                                         </div>
                                     </div>
                                 </div>

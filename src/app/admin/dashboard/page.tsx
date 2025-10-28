@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/app/context/AuthContext';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FiUsers, FiActivity, FiClock, FiSearch, FiPlus, FiZap, FiEdit, FiMail, FiMenu, FiCheckCircle, FiXCircle, FiFilter, FiLoader, FiChevronDown, FiTag, FiRefreshCw, FiTrendingUp, FiUserCheck, FiAward, FiTarget, FiBarChart2, FiUserPlus, FiShare2 } from 'react-icons/fi';
+import { FiUsers, FiActivity, FiClock, FiSearch, FiPlus, FiZap, FiEdit, FiMail, FiMenu, FiCheckCircle, FiXCircle, FiFilter, FiLoader, FiChevronDown, FiTag, FiRefreshCw, FiTrendingUp, FiUserCheck, FiAward, FiTarget, FiBarChart2, FiUserPlus, FiShare2, FiSettings, FiShield } from 'react-icons/fi';
 import Sidebar from '@/app/components/Sidebar';
 
 // Updated brand colors with #2245ae
@@ -139,6 +139,62 @@ export default function AdminDashboardPage() {
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState<'users' | 'referrers'>('users');
+  const [actualUserRole, setActualUserRole] = useState(user?.role || 'admin');
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+  const [checkingSuperAdmin, setCheckingSuperAdmin] = useState(true);
+
+  // Check if user is super admin using the API
+  const checkSuperAdminStatus = useCallback(async () => {
+    if (!user || user.role !== 'admin') {
+      setCheckingSuperAdmin(false);
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        setCheckingSuperAdmin(false);
+        return;
+      }
+
+      const response = await fetch('/api/auth/check-super-admin', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log('Super admin check response:', data);
+        
+        if (data.isSuperAdmin) {
+          setIsSuperAdmin(true);
+          setActualUserRole('super_admin');
+        } else {
+          setIsSuperAdmin(false);
+          setActualUserRole('admin');
+        }
+      } else {
+        console.error('Failed to check super admin status:', response.status);
+        setIsSuperAdmin(false);
+        setActualUserRole('admin');
+      }
+    } catch (error) {
+      console.error('Error checking super admin status:', error);
+      setIsSuperAdmin(false);
+      setActualUserRole('admin');
+    } finally {
+      setCheckingSuperAdmin(false);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    if (user && user.role === 'admin') {
+      checkSuperAdminStatus();
+    } else {
+      setCheckingSuperAdmin(false);
+    }
+  }, [user, checkSuperAdminStatus]);
 
   /**
    * Calculate real-time statistics from users data
@@ -254,17 +310,17 @@ export default function AdminDashboardPage() {
   }, [isAuthenticated, token, user, searchQuery, filterStatus, calculateStats]);
 
   useEffect(() => {
-    if (!authLoading && isAuthenticated && user && user.role === 'admin') {
+    if (!authLoading && isAuthenticated && user && user.role === 'admin' && !checkingSuperAdmin) {
       const handler = setTimeout(() => fetchUsers(), 500);
 
       return () => {
         clearTimeout(handler);
       };
     }
-  }, [authLoading, isAuthenticated, user, fetchUsers, searchQuery, filterStatus]);
+  }, [authLoading, isAuthenticated, user, fetchUsers, searchQuery, filterStatus, checkingSuperAdmin]);
 
   useEffect(() => {
-    if (authLoading) return;
+    if (authLoading || checkingSuperAdmin) return;
 
     if (!isAuthenticated || !user) {
       router.push('/login');
@@ -281,7 +337,7 @@ export default function AdminDashboardPage() {
       else if (user.role === 'job_seeker') router.push('/seeker/dashboard');
       else router.push('/');
     }
-  }, [authLoading, isAuthenticated, user, router]);
+  }, [authLoading, isAuthenticated, user, router, checkingSuperAdmin]);
 
   const handleRefresh = () => {
     fetchUsers(true);
@@ -291,6 +347,8 @@ export default function AdminDashboardPage() {
     switch (role) {
       case 'admin':
         return 'bg-gradient-to-r from-[#2245ae] to-[#1a3a9c] text-white';
+      case 'super_admin':
+        return 'bg-gradient-to-r from-yellow-500 to-amber-500 text-white';
       case 'job_poster':
         return 'bg-gradient-to-r from-purple-500 to-purple-600 text-white';
       case 'job_seeker':
@@ -499,7 +557,7 @@ export default function AdminDashboardPage() {
                       <div className="flex flex-wrap gap-2">
                         {'isSuperAdmin' in item && item.isSuperAdmin && (
                           <span className="px-3 py-1 bg-gradient-to-r from-yellow-500 to-amber-500 text-white text-xs font-bold rounded-full flex items-center gap-1">
-                            <FiAward className="w-3 h-3" />
+                            <FiShield className="w-3 h-3" />
                             SUPER ADMIN
                           </span>
                         )}
@@ -572,22 +630,21 @@ export default function AdminDashboardPage() {
                   </div>
                 </div>
 
-                <div className="flex items-center gap-3">
-                  <motion.div
-                    whileHover={{ scale: 1.1 }}
-                    whileTap={{ scale: 0.9 }}
-                  >
-                    <Link href={
-                      'role' in item 
-                        ? `/admin/edit-user/${item._id}`
-                        : `/admin/edit-referrer/${item._id}`
-                    } passHref>
-                      <button className="p-3 bg-[#2245ae]/10 text-[#2245ae] rounded-xl hover:bg-[#2245ae]/20 transition-all duration-200 group" title="Edit">
-                        <FiEdit className="w-5 h-5" />
-                      </button>
-                    </Link>
-                  </motion.div>
-                </div>
+                {/* Edit Button - Only show for users (not referrers) and if current user is super admin */}
+                {'role' in item && isSuperAdmin && (
+                  <div className="flex items-center gap-3">
+                    <motion.div
+                      whileHover={{ scale: 1.1 }}
+                      whileTap={{ scale: 0.9 }}
+                    >
+                      <Link href={`/admin/edit-user/${item._id}`} passHref>
+                        <button className="p-3 bg-[#2245ae]/10 text-[#2245ae] rounded-xl hover:bg-[#2245ae]/20 transition-all duration-200 group" title="Edit">
+                          <FiEdit className="w-5 h-5" />
+                        </button>
+                      </Link>
+                    </motion.div>
+                  </div>
+                )}
               </div>
             </motion.div>
           ))}
@@ -596,7 +653,7 @@ export default function AdminDashboardPage() {
     );
   };
 
-  if (authLoading || !isAuthenticated || !user || user.firstLogin || user.role !== 'admin') {
+  if (authLoading || checkingSuperAdmin || !isAuthenticated || !user || user.firstLogin || user.role !== 'admin') {
     return (
       <div className={`flex h-screen bg-gradient-to-br from-[#f6f9ff] to-[${lightBlue}] justify-center items-center font-inter`}>
         <motion.div
@@ -611,7 +668,7 @@ export default function AdminDashboardPage() {
             <FiLoader className="text-[#2245ae] h-12 w-12 animate-spin" />
           </motion.div>
           <p className="mt-6 text-lg font-medium text-[#1a3a9c]">
-            Loading admin panel...
+            {checkingSuperAdmin ? 'Checking permissions...' : 'Loading admin panel...'}
           </p>
         </motion.div>
       </div>
@@ -620,7 +677,7 @@ export default function AdminDashboardPage() {
 
   return (
     <div className={`flex h-screen bg-gradient-to-br from-[#f6f9ff] to-[${lightBlue}] overflow-hidden font-inter`}>
-      <Sidebar userRole={user.role} onLogout={logout} isOpen={mobileSidebarOpen} setIsOpen={setMobileSidebarOpen} userEmail={user?.email}/>
+      <Sidebar userRole={actualUserRole} onLogout={logout} isOpen={mobileSidebarOpen} setIsOpen={setMobileSidebarOpen} userEmail={user?.email}/>
 
       <div className="flex-1 flex flex-col overflow-y-auto">
         {/* Mobile Header */}
@@ -635,7 +692,7 @@ export default function AdminDashboardPage() {
             <FiMenu className="h-6 w-6" />
           </motion.button>
           <h1 className="text-2xl font-bold bg-gradient-to-r from-[#2245ae] to-[#1a3a9c] bg-clip-text text-transparent">
-            Admin Panel
+            {isSuperAdmin ? 'Super Admin Panel' : 'Admin Panel'}
           </h1>
           <motion.button
             whileHover={{ scale: 1.05 }}
@@ -665,7 +722,7 @@ export default function AdminDashboardPage() {
                   transition={{ delay: 0.2 }}
                 >
                   <span className="bg-gradient-to-r from-[#2245ae] to-[#1a3a9c] bg-clip-text text-transparent">
-                    Welcome back, {user.username || 'Admin'}!
+                    Welcome back, {user.username || (isSuperAdmin ? 'Super Admin' : 'Admin')}!
                   </span>
                 </motion.h1>
                 <motion.p 
@@ -674,8 +731,24 @@ export default function AdminDashboardPage() {
                   animate={{ opacity: 1 }}
                   transition={{ delay: 0.3 }}
                 >
-                  Manage your users, referrers and platform settings with ease
+                  {isSuperAdmin 
+                    ? 'Full system access - Manage users, referrers, and platform settings' 
+                    : 'Manage your users, referrers and platform settings with ease'
+                  }
                 </motion.p>
+                
+                {/* Super Admin Badge */}
+                {isSuperAdmin && (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.8 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ delay: 0.4 }}
+                    className="inline-flex items-center mt-3 px-4 py-2 bg-gradient-to-r from-yellow-500 to-amber-500 text-white rounded-full text-sm font-bold"
+                  >
+                    <FiShield className="w-4 h-4 mr-2" />
+                    SUPER ADMINISTRATOR
+                  </motion.div>
+                )}
               </div>
               
               <div className="flex flex-col sm:flex-row gap-4 w-full lg:w-auto">
@@ -689,16 +762,18 @@ export default function AdminDashboardPage() {
                   Refresh Data
                 </motion.button>
                 
-                <Link href="/admin/create-user" passHref>
-                  <motion.button
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    className="flex items-center justify-center px-6 py-3 bg-gradient-to-r from-[#2245ae] to-[#1a3a9c] text-white rounded-xl font-semibold shadow-lg hover:shadow-xl hover:from-[#2a55cc] hover:to-[#2242a8] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#2245ae] transition-all duration-200"
-                  >
-                    <FiPlus className="w-5 h-5 mr-3" />
-                    New User
-                  </motion.button>
-                </Link>
+                {isSuperAdmin && (
+                  <Link href="/admin/create-user" passHref>
+                    <motion.button
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      className="flex items-center justify-center px-6 py-3 bg-gradient-to-r from-[#2245ae] to-[#1a3a9c] text-white rounded-xl font-semibold shadow-lg hover:shadow-xl hover:from-[#2a55cc] hover:to-[#2242a8] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#2245ae] transition-all duration-200"
+                    >
+                      <FiPlus className="w-5 h-5 mr-3" />
+                      New User
+                    </motion.button>
+                  </Link>
+                )}
 
                 <Link href="/admin/generate-referral" passHref>
                   <motion.button
@@ -739,7 +814,7 @@ export default function AdminDashboardPage() {
                     <p className="text-[#2245ae] text-sm mt-1">
                       {activeTab === 'users' 
                         ? 'Manage all platform users and their permissions' 
-                        : 'Manage job referrers and their onboarding status'
+                        : 'View job referrers and their onboarding status'
                       }
                     </p>
                   </div>
