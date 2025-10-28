@@ -1,4 +1,5 @@
-"use client";
+// app/profile/page.tsx
+'use client';
 
 import { useState, useEffect, FormEvent } from "react";
 import { useRouter } from "next/navigation";
@@ -31,50 +32,12 @@ import {
 const primaryBlue = "#165BF8";
 const darkBlue = "#1C3991";
 
-// Enhanced Animation Variants
-const fadeIn = {
-  hidden: { opacity: 0, y: 30 },
-  visible: { 
-    opacity: 1, 
-    y: 0, 
-    transition: { 
-      duration: 0.6, 
-      ease: [0.16, 1, 0.3, 1],
-      delay: 0.1
-    } 
-  },
-};
-
-const cardAnimation = {
-  hidden: { opacity: 0, y: 20, scale: 0.98 },
-  visible: {
-    opacity: 1,
-    y: 0,
-    scale: 1,
-    transition: { 
-      duration: 0.7, 
-      ease: [0.16, 1, 0.3, 1],
-      staggerChildren: 0.15
-    }
-  }
-};
-
-const pulseEffect = {
-  scale: [1, 1.05, 1],
-  opacity: [1, 0.8, 1],
-  transition: { 
-    duration: 1.5, 
-    repeat: Infinity, 
-    ease: "easeInOut" 
-  }
-};
-
-const cardHover = {
-  scale: 1.02,
-  y: -5,
-  boxShadow: "0 20px 40px rgba(22, 91, 248, 0.15)",
-  transition: { type: "spring", stiffness: 300, damping: 20 }
-};
+interface Organization {
+  _id: string;
+  name: string;
+  type: 'milan' | 'valaya' | 'khanda' | 'vibhaaga' | 'ghata';
+  parentId?: string;
+}
 
 export default function ProfilePage() {
   const {
@@ -91,9 +54,11 @@ export default function ProfilePage() {
   const [formData, setFormData] = useState({
     username: "",
     email: "",
-    milanShaka: "",
-    valayaNagar: "",
-    khandaBhaga: "",
+    milan: "",
+    valaya: "",
+    khanda: "",
+    vibhaaga: "",
+    ghata: "",
   });
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -102,12 +67,50 @@ export default function ProfilePage() {
   const [resume, setResume] = useState<{ fileName: string; resumeId: string } | null>(null);
   const [resumeFile, setResumeFile] = useState<File | null>(null);
 
+  const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [loading, setLoading] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [loadingOrgs, setLoadingOrgs] = useState(false);
+
+  // Fetch organizations from API
+  const fetchOrganizations = async () => {
+    try {
+      setLoadingOrgs(true);
+      console.log('🟡 Fetching organizations from /api/admin/organizations');
+      
+      const response = await fetch('/api/admin/organizations');
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      console.log('🟢 Organizations API response:', data);
+      
+      if (data.success && data.organizations) {
+        console.log('✅ Organizations data:', data.organizations);
+        setOrganizations(data.organizations);
+      } else {
+        throw new Error(data.error || 'Failed to fetch organizations');
+      }
+    } catch (err: any) {
+      console.error('❌ Error fetching organizations:', err);
+      setError('Failed to load organization data: ' + err.message);
+    } finally {
+      setLoadingOrgs(false);
+    }
+  };
+
+  // Filter organizations by type
+  const getOrganizationsByType = (type: Organization['type']) => {
+    const filtered = organizations.filter(org => org.type === type);
+    console.log(`🟡 Organizations of type ${type}:`, filtered);
+    return filtered;
+  };
 
   const fetchResumeDetails = async () => {
     if (!token || !currentUser || currentUser.role !== 'job_seeker') return;
@@ -145,10 +148,16 @@ export default function ProfilePage() {
         setFormData({
           username: currentUser.username || "",
           email: currentUser.email || "",
-          milanShaka: currentUser.milanShakaBhaga || "",
-          valayaNagar: currentUser.valayaNagar || "",
-          khandaBhaga: currentUser.khandaBhaga || "",
+          milan: currentUser.milan || "",
+          valaya: currentUser.valaya || "",
+          khanda: currentUser.khanda || "",
+          vibhaaga: currentUser.vibhaaga || "",
+          ghata: currentUser.ghata || "",
         });
+        
+        // Fetch organizations data
+        fetchOrganizations();
+        
         if (currentUser.role === 'job_seeker') {
           fetchResumeDetails();
         }
@@ -156,7 +165,7 @@ export default function ProfilePage() {
     }
   }, [authLoading, isAuthenticated, currentUser, router, token]);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
@@ -189,16 +198,21 @@ export default function ProfilePage() {
     try {
       const payload: {
         username: string;
-        milanShakaBhaga?: string;
-        valayaNagar?: string;
-        khandaBhaga?: string;
+        milan?: string;
+        valaya?: string;
+        khanda?: string;
+        vibhaaga?: string;
+        ghata?: string;
       } = {
         username: formData.username,
       };
 
-      payload.milanShakaBhaga = formData.milanShaka;
-      payload.valayaNagar = formData.valayaNagar;
-      payload.khandaBhaga = formData.khandaBhaga;
+      // Add the new organization hierarchy fields
+      payload.milan = formData.milan;
+      payload.valaya = formData.valaya;
+      payload.khanda = formData.khanda;
+      payload.vibhaaga = formData.vibhaaga;
+      payload.ghata = formData.ghata;
 
       const response = await fetch("/api/profile", {
         method: "PUT",
@@ -369,7 +383,11 @@ export default function ProfilePage() {
           className="flex flex-col items-center"
         >
           <motion.div
-            animate={pulseEffect}
+            animate={{
+              scale: [1, 1.1, 1],
+              opacity: [1, 0.8, 1],
+            }}
+            transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
             className="rounded-full p-6 bg-gradient-to-br from-[#165BF8] to-[#1C3991] shadow-2xl"
           >
             <FiLoader className="text-white h-12 w-12 animate-spin" />
@@ -400,6 +418,10 @@ export default function ProfilePage() {
       default: return <FiUser className="h-5 w-5" />;
     }
   };
+
+  // Debug info
+  console.log('🟡 Current organizations state:', organizations);
+  console.log('🟡 Loading organizations:', loadingOrgs);
 
   return (
     <div className="flex h-screen bg-gradient-to-br from-[#f6f9ff] to-[#eef2ff] overflow-hidden font-inter">
@@ -438,9 +460,9 @@ export default function ProfilePage() {
           <div className="max-w-4xl mx-auto space-y-8">
             {/* Page Header */}
             <motion.div
-              initial="hidden"
-              animate="visible"
-              variants={fadeIn}
+              initial={{ opacity: 0, y: 30 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1], delay: 0.1 }}
               className="text-center"
             >
               <motion.div
@@ -459,9 +481,9 @@ export default function ProfilePage() {
 
             {/* Profile Information Card */}
             <motion.div
-              initial="hidden"
-              animate="visible"
-              variants={cardAnimation}
+              initial={{ opacity: 0, y: 20, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
               className="bg-white rounded-3xl shadow-2xl border border-[#165BF8]/10 overflow-hidden"
             >
               <div className="p-8 border-b border-[#165BF8]/10">
@@ -524,7 +546,11 @@ export default function ProfilePage() {
                 <form onSubmit={handleSaveProfile} className="space-y-8">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     {/* Username */}
-                    <motion.div variants={cardAnimation}>
+                    <motion.div
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.1 }}
+                    >
                       <label className="block text-sm font-bold text-[#1C3991] mb-3 uppercase tracking-wide">
                         <FiUser className="inline-block mr-2 text-[#165BF8]" /> Username
                       </label>
@@ -543,7 +569,11 @@ export default function ProfilePage() {
                     </motion.div>
 
                     {/* Email */}
-                    <motion.div variants={cardAnimation}>
+                    <motion.div
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.15 }}
+                    >
                       <label className="block text-sm font-bold text-[#1C3991] mb-3 uppercase tracking-wide">
                         <FiMail className="inline-block mr-2 text-[#165BF8]" /> Email
                       </label>
@@ -557,7 +587,11 @@ export default function ProfilePage() {
                     </motion.div>
 
                     {/* Role */}
-                    <motion.div variants={cardAnimation}>
+                    <motion.div
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.2 }}
+                    >
                       <label className="block text-sm font-bold text-[#1C3991] mb-3 uppercase tracking-wide">
                         <FiTag className="inline-block mr-2 text-[#165BF8]" /> Role
                       </label>
@@ -572,70 +606,196 @@ export default function ProfilePage() {
 
                   {shouldDisplayAdditionalFields && (
                     <motion.div 
-                      variants={cardAnimation}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.25 }}
                       className="pt-8 border-t border-[#165BF8]/10 mt-8 space-y-6"
                     >
                       <h3 className="text-xl font-black text-[#1C3991] flex items-center">
                         <FiAward className="mr-3 text-[#165BF8]" />
-                        Additional Details
+                        Organization Hierarchy
                       </h3>
                       
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <motion.div variants={cardAnimation}>
+                        {/* Milan */}
+                        <motion.div
+                          initial={{ opacity: 0, y: 20 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: 0.3 }}
+                        >
                           <label className="block text-sm font-bold text-[#1C3991] mb-3">
-                            <FiBookOpen className="inline-block mr-2 text-[#165BF8]" /> Milan/Shaka
+                            <FiBookOpen className="inline-block mr-2 text-[#165BF8]" /> Milan
                           </label>
-                          <input
-                            type="text"
-                            name="milanShaka"
-                            value={formData.milanShaka}
-                            onChange={handleChange}
-                            readOnly={!isEditing}
-                            className={`block w-full px-4 py-3.5 border-2 rounded-2xl shadow-sm placeholder-[#165BF8]/50 focus:outline-none focus:ring-4 focus:ring-[#165BF8]/20 focus:border-[#165BF8] text-[#1C3991] transition-all duration-300 ${
-                              !isEditing 
-                                ? "bg-gray-100 border-gray-200 cursor-not-allowed" 
-                                : "bg-white border-[#165BF8]/20 hover:border-[#165BF8]/40"
-                            }`}
-                            placeholder="Enter Milan/Shaka"
-                          />
+                          {loadingOrgs ? (
+                            <div className="flex items-center justify-center p-4 border-2 border-[#165BF8]/20 rounded-2xl bg-gray-100">
+                              <FiLoader className="animate-spin text-[#165BF8] mr-2" />
+                              <span className="text-[#1C3991]">Loading Milan options...</span>
+                            </div>
+                          ) : (
+                            <select
+                              name="milan"
+                              value={formData.milan}
+                              onChange={handleChange}
+                              disabled={!isEditing}
+                              className={`block w-full px-4 py-3.5 border-2 rounded-2xl shadow-sm focus:outline-none focus:ring-4 focus:ring-[#165BF8]/20 focus:border-[#165BF8] text-[#1C3991] transition-all duration-300 ${
+                                !isEditing 
+                                  ? "bg-gray-100 border-gray-200 cursor-not-allowed" 
+                                  : "bg-white border-[#165BF8]/20 hover:border-[#165BF8]/40"
+                              }`}
+                            >
+                              <option value="">Select Milan</option>
+                              {getOrganizationsByType('milan').map((org) => (
+                                <option key={org._id} value={org._id}>
+                                  {org.name}
+                                </option>
+                              ))}
+                            </select>
+                          )}
                         </motion.div>
 
-                        <motion.div variants={cardAnimation}>
+                        {/* Valaya */}
+                        <motion.div
+                          initial={{ opacity: 0, y: 20 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: 0.35 }}
+                        >
                           <label className="block text-sm font-bold text-[#1C3991] mb-3">
-                            <FiMapPin className="inline-block mr-2 text-[#165BF8]" /> Valaya/Nagar
+                            <FiMapPin className="inline-block mr-2 text-[#165BF8]" /> Valaya
                           </label>
-                          <input
-                            type="text"
-                            name="valayaNagar"
-                            value={formData.valayaNagar}
-                            onChange={handleChange}
-                            readOnly={!isEditing}
-                            className={`block w-full px-4 py-3.5 border-2 rounded-2xl shadow-sm placeholder-[#165BF8]/50 focus:outline-none focus:ring-4 focus:ring-[#165BF8]/20 focus:border-[#165BF8] text-[#1C3991] transition-all duration-300 ${
-                              !isEditing 
-                                ? "bg-gray-100 border-gray-200 cursor-not-allowed" 
-                                : "bg-white border-[#165BF8]/20 hover:border-[#165BF8]/40"
-                            }`}
-                            placeholder="Enter Valaya/Nagar"
-                          />
+                          {loadingOrgs ? (
+                            <div className="flex items-center justify-center p-4 border-2 border-[#165BF8]/20 rounded-2xl bg-gray-100">
+                              <FiLoader className="animate-spin text-[#165BF8] mr-2" />
+                              <span className="text-[#1C3991]">Loading Valaya options...</span>
+                            </div>
+                          ) : (
+                            <select
+                              name="valaya"
+                              value={formData.valaya}
+                              onChange={handleChange}
+                              disabled={!isEditing}
+                              className={`block w-full px-4 py-3.5 border-2 rounded-2xl shadow-sm focus:outline-none focus:ring-4 focus:ring-[#165BF8]/20 focus:border-[#165BF8] text-[#1C3991] transition-all duration-300 ${
+                                !isEditing 
+                                  ? "bg-gray-100 border-gray-200 cursor-not-allowed" 
+                                  : "bg-white border-[#165BF8]/20 hover:border-[#165BF8]/40"
+                              }`}
+                            >
+                              <option value="">Select Valaya</option>
+                              {getOrganizationsByType('valaya').map((org) => (
+                                <option key={org._id} value={org._id}>
+                                  {org.name}
+                                </option>
+                              ))}
+                            </select>
+                          )}
                         </motion.div>
 
-                        <motion.div variants={cardAnimation} className="md:col-span-2">
+                        {/* Khanda */}
+                        <motion.div
+                          initial={{ opacity: 0, y: 20 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: 0.4 }}
+                        >
                           <label className="block text-sm font-bold text-[#1C3991] mb-3">
-                            <FiGlobe className="inline-block mr-2 text-[#165BF8]" /> Khanda/Bhaga
+                            <FiGlobe className="inline-block mr-2 text-[#165BF8]" /> Khanda
                           </label>
-                          <input
-                            type="text"
-                            name="khandaBhaga"
-                            value={formData.khandaBhaga}
-                            onChange={handleChange}
-                            readOnly={!isEditing}
-                            className={`block w-full px-4 py-3.5 border-2 rounded-2xl shadow-sm placeholder-[#165BF8]/50 focus:outline-none focus:ring-4 focus:ring-[#165BF8]/20 focus:border-[#165BF8] text-[#1C3991] transition-all duration-300 ${
-                              !isEditing 
-                                ? "bg-gray-100 border-gray-200 cursor-not-allowed" 
-                                : "bg-white border-[#165BF8]/20 hover:border-[#165BF8]/40"
-                            }`}
-                            placeholder="Enter Khanda/Bhaga"
-                          />
+                          {loadingOrgs ? (
+                            <div className="flex items-center justify-center p-4 border-2 border-[#165BF8]/20 rounded-2xl bg-gray-100">
+                              <FiLoader className="animate-spin text-[#165BF8] mr-2" />
+                              <span className="text-[#1C3991]">Loading Khanda options...</span>
+                            </div>
+                          ) : (
+                            <select
+                              name="khanda"
+                              value={formData.khanda}
+                              onChange={handleChange}
+                              disabled={!isEditing}
+                              className={`block w-full px-4 py-3.5 border-2 rounded-2xl shadow-sm focus:outline-none focus:ring-4 focus:ring-[#165BF8]/20 focus:border-[#165BF8] text-[#1C3991] transition-all duration-300 ${
+                                !isEditing 
+                                  ? "bg-gray-100 border-gray-200 cursor-not-allowed" 
+                                  : "bg-white border-[#165BF8]/20 hover:border-[#165BF8]/40"
+                              }`}
+                            >
+                              <option value="">Select Khanda</option>
+                              {getOrganizationsByType('khanda').map((org) => (
+                                <option key={org._id} value={org._id}>
+                                  {org.name}
+                                </option>
+                              ))}
+                            </select>
+                          )}
+                        </motion.div>
+
+                        {/* Vibhaaga */}
+                        <motion.div
+                          initial={{ opacity: 0, y: 20 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: 0.45 }}
+                        >
+                          <label className="block text-sm font-bold text-[#1C3991] mb-3">
+                            <FiBookOpen className="inline-block mr-2 text-[#165BF8]" /> Vibhaaga
+                          </label>
+                          {loadingOrgs ? (
+                            <div className="flex items-center justify-center p-4 border-2 border-[#165BF8]/20 rounded-2xl bg-gray-100">
+                              <FiLoader className="animate-spin text-[#165BF8] mr-2" />
+                              <span className="text-[#1C3991]">Loading Vibhaaga options...</span>
+                            </div>
+                          ) : (
+                            <select
+                              name="vibhaaga"
+                              value={formData.vibhaaga}
+                              onChange={handleChange}
+                              disabled={!isEditing}
+                              className={`block w-full px-4 py-3.5 border-2 rounded-2xl shadow-sm focus:outline-none focus:ring-4 focus:ring-[#165BF8]/20 focus:border-[#165BF8] text-[#1C3991] transition-all duration-300 ${
+                                !isEditing 
+                                  ? "bg-gray-100 border-gray-200 cursor-not-allowed" 
+                                  : "bg-white border-[#165BF8]/20 hover:border-[#165BF8]/40"
+                              }`}
+                            >
+                              <option value="">Select Vibhaaga</option>
+                              {getOrganizationsByType('vibhaaga').map((org) => (
+                                <option key={org._id} value={org._id}>
+                                  {org.name}
+                                </option>
+                              ))}
+                            </select>
+                          )}
+                        </motion.div>
+
+                        {/* Ghata */}
+                        <motion.div
+                          initial={{ opacity: 0, y: 20 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: 0.5 }}
+                          className="md:col-span-2"
+                        >
+                          <label className="block text-sm font-bold text-[#1C3991] mb-3">
+                            <FiMapPin className="inline-block mr-2 text-[#165BF8]" /> Ghata
+                          </label>
+                          {loadingOrgs ? (
+                            <div className="flex items-center justify-center p-4 border-2 border-[#165BF8]/20 rounded-2xl bg-gray-100">
+                              <FiLoader className="animate-spin text-[#165BF8] mr-2" />
+                              <span className="text-[#1C3991]">Loading Ghata options...</span>
+                            </div>
+                          ) : (
+                            <select
+                              name="ghata"
+                              value={formData.ghata}
+                              onChange={handleChange}
+                              disabled={!isEditing}
+                              className={`block w-full px-4 py-3.5 border-2 rounded-2xl shadow-sm focus:outline-none focus:ring-4 focus:ring-[#165BF8]/20 focus:border-[#165BF8] text-[#1C3991] transition-all duration-300 ${
+                                !isEditing 
+                                  ? "bg-gray-100 border-gray-200 cursor-not-allowed" 
+                                  : "bg-white border-[#165BF8]/20 hover:border-[#165BF8]/40"
+                              }`}
+                            >
+                              <option value="">Select Ghata</option>
+                              {getOrganizationsByType('ghata').map((org) => (
+                                <option key={org._id} value={org._id}>
+                                  {org.name}
+                                </option>
+                              ))}
+                            </select>
+                          )}
                         </motion.div>
                       </div>
                     </motion.div>
@@ -646,7 +806,7 @@ export default function ProfilePage() {
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: 10 }}
-                      variants={cardAnimation}
+                      transition={{ delay: 0.6 }}
                       className="mt-8"
                     >
                       <motion.button
@@ -684,10 +844,9 @@ export default function ProfilePage() {
             {/* Resume Management Section */}
             {currentUser.role === 'job_seeker' && (
               <motion.div
-                initial="hidden"
-                animate="visible"
-                variants={fadeIn}
-                transition={{ delay: 0.2 }}
+                initial={{ opacity: 0, y: 30 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1], delay: 0.2 }}
                 className="bg-white rounded-3xl shadow-2xl border border-[#165BF8]/10 overflow-hidden"
               >
                 <div className="p-8 border-b border-[#165BF8]/10">
@@ -704,7 +863,11 @@ export default function ProfilePage() {
 
                 <div className="p-8">
                   <form onSubmit={handleResumeUpload} className="space-y-6">
-                    <motion.div variants={cardAnimation}>
+                    <motion.div
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.25 }}
+                    >
                       <label className="block text-sm font-bold text-[#1C3991] mb-3">
                         <FiUploadCloud className="inline-block mr-2 text-[#165BF8]" /> Upload New Resume
                       </label>
@@ -723,7 +886,9 @@ export default function ProfilePage() {
 
                     {resume && resume.resumeId && (
                       <motion.div
-                        variants={cardAnimation}
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.3 }}
                         className="flex items-center justify-between p-5 bg-[#165BF8]/5 rounded-2xl border-2 border-[#165BF8]/10"
                       >
                         <span className="flex items-center text-[#1C3991] font-bold">
@@ -784,10 +949,9 @@ export default function ProfilePage() {
 
             {/* Password Change Section */}
             <motion.div
-              initial="hidden"
-              animate="visible"
-              variants={fadeIn}
-              transition={{ delay: 0.3 }}
+              initial={{ opacity: 0, y: 30 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1], delay: 0.3 }}
               className="bg-white rounded-3xl shadow-2xl border border-[#165BF8]/10 overflow-hidden"
             >
               <div className="p-8 border-b border-[#165BF8]/10">
@@ -805,7 +969,11 @@ export default function ProfilePage() {
               <div className="p-8">
                 <form onSubmit={handleChangePassword} className="space-y-6">
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <motion.div variants={cardAnimation}>
+                    <motion.div
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.35 }}
+                    >
                       <label className="block text-sm font-bold text-[#1C3991] mb-3">
                         <FiLock className="inline-block mr-2 text-[#165BF8]" /> Current Password
                       </label>
@@ -821,7 +989,11 @@ export default function ProfilePage() {
                       />
                     </motion.div>
 
-                    <motion.div variants={cardAnimation}>
+                    <motion.div
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.4 }}
+                    >
                       <label className="block text-sm font-bold text-[#1C3991] mb-3">
                         <FiLock className="inline-block mr-2 text-[#165BF8]" /> New Password
                       </label>
@@ -837,7 +1009,11 @@ export default function ProfilePage() {
                       />
                     </motion.div>
 
-                    <motion.div variants={cardAnimation}>
+                    <motion.div
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.45 }}
+                    >
                       <label className="block text-sm font-bold text-[#1C3991] mb-3">
                         <FiLock className="inline-block mr-2 text-[#165BF8]" /> Confirm Password
                       </label>

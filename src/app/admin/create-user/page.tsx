@@ -25,9 +25,11 @@ const initialReferrerData: ReferrerFormData = {
   companyName: '',
   workLocation: '',
   designation: '',
-  milanShakaBhaga: '',
-  valayaNagar: '',
-  khandaBhaga: ''
+  milan: '',
+  valaya: '',
+  khanda: '',
+  vibhaaga: '',
+  ghata: ''
 };
 
 export default function CreateUserPage() {
@@ -215,179 +217,251 @@ export default function CreateUserPage() {
     setGhata('');
   };
 
-// Update the handleSubmit function in your create-user page
-// Update the handleSubmit function in your create-user page
-const handleSubmit = async (e: FormEvent) => {
-  e.preventDefault();
-  setError(null);
-  setMessage(null);
-  setIsLoading(true);
-
-  if (!token) {
-    setError('Authentication token missing. Please log in again.');
-    setIsLoading(false);
-    return;
-  }
-
-  if (!email || !role) {
-    setError('Please provide an email and select a role.');
-    setIsLoading(false);
-    return;
-  }
-
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    setError('Invalid email format.');
-    setIsLoading(false);
-    return;
-  }
-
-  // For referrers, validate all required fields
-  if (role === 'job_referrer') {
-    const requiredFields: (keyof ReferrerFormData)[] = [
-      'fullName', 'mobileNumber', 'residentialAddress', 
-      'companyName', 'workLocation', 'designation'
-    ];
-
-    const missingFields = requiredFields.filter(field => !referrerData[field]?.trim());
+  // Helper function to get organization name by ID
+  const getOrgNameById = (id: string, organizations: Organization[]): string => {
+    if (!id) return '';
     
-    if (missingFields.length > 0) {
-      setError(`Please fill in all required referrer fields: ${missingFields.join(', ')}`);
-      setIsLoading(false);
-      return;
-    }
-
-    // Validate mobile number format
-    const mobileRegex = /^[0-9]{10}$/;
-    if (!mobileRegex.test(referrerData.mobileNumber.replace(/\D/g, ''))) {
-      setError('Please enter a valid 10-digit mobile number.');
-      setIsLoading(false);
-      return;
-    }
-
-    // Validate organization hierarchy for referrers - check the actual fields being used
-    if (!referrerData.milanShakaBhaga || !referrerData.valayaNagar || !referrerData.khandaBhaga) {
-      setError('Please select Khanda, Valaya, and Milan from the organization hierarchy dropdowns.');
-      setIsLoading(false);
-      return;
-    }
-  }
-
-  // Validate organization hierarchy for non-poster roles ONLY
-  if (role !== 'job_poster' && role !== 'job_referrer') {
-    if (!milan.trim()) {
-      setError('Please select a Milan.');
-      setIsLoading(false);
-      return;
-    }
-    if (!valaya.trim()) {
-      setError('Please select a Valaya.');
-      setIsLoading(false);
-      return;
-    }
-    if (!khanda.trim()) {
-      setError('Please select a Khanda.');
-      setIsLoading(false);
-      return;
-    }
-    if (!vibhaaga.trim()) {
-      setError('Please select a Vibhaaga.');
-      setIsLoading(false);
-      return;
-    }
-  }
-
-  try {
-    const payload: any = {
-      email,
-      role: role === 'super_admin' ? 'admin' : role,
-    };
-
-    // Set super admin flag for super_admin role
-    if (role === 'super_admin') {
-      payload.isSuperAdmin = true;
-    }
-
-    // For referrers, include the complete referrer data
-    if (role === 'job_referrer') {
-      // Include hierarchy data directly in the main payload (REQUIRED by schema)
-      payload.milanShakaBhaga = referrerData.milanShakaBhaga;
-      payload.valayaNagar = referrerData.valayaNagar;
-      payload.khandaBhaga = referrerData.khandaBhaga;
+    // Search through all levels of organization hierarchy
+    for (const vibhaaga of organizations) {
+      if (vibhaaga._id === id) return vibhaaga.name;
       
-      // Include optional hierarchy fields
-      if (referrerData.vibhaaga) payload.vibhaaga = referrerData.vibhaaga;
-      if (referrerData.ghata) payload.ghata = referrerData.ghata;
-
-      // Create referrerData object for personal and work details
-      payload.referrerData = {
-        // Personal details (will be used for referrerDetails)
-        name: referrerData.fullName,
-        phone: referrerData.mobileNumber,
-        email: referrerData.email,
-        address: referrerData.residentialAddress,
+      for (const khanda of vibhaaga.khandas || []) {
+        if (khanda._id === id) return khanda.name;
         
-        // Additional fields for work information
-        companyName: referrerData.companyName,
-        workLocation: referrerData.workLocation,
-        designation: referrerData.designation
-      };
-    } else if (role !== 'job_poster') {
-      // For other non-poster roles, use the manually selected hierarchy
-      const selectedVibhaaga = organizations[0]?.vibhaagas?.find(v => v._id === vibhaaga);
-      const selectedKhanda = selectedVibhaaga?.khandas?.find(k => k._id === khanda);
-      const selectedValaya = selectedKhanda?.valayas?.find(v => v._id === valaya);
-      const selectedMilan = selectedValaya?.milans?.find(m => m._id === milan);
-      const selectedGhata = selectedMilan?.ghatas?.find(g => g._id === ghata);
-
-      // Include hierarchy fields
-      if (selectedGhata) payload.ghata = selectedGhata.name;
-      if (selectedMilan) payload.milan = selectedMilan.name;
-      if (selectedValaya) payload.valaya = selectedValaya.name;
-      if (selectedKhanda) payload.khanda = selectedKhanda.name;
-      if (selectedVibhaaga) payload.vibhaaga = selectedVibhaaga.name;
-      
-      // Also include the legacy field names
-      if (selectedMilan) payload.milanShakaBhaga = selectedMilan.name;
-      if (selectedValaya) payload.valayaNagar = selectedValaya.name;
-      if (selectedKhanda) payload.khandaBhaga = selectedKhanda.name;
+        for (const valaya of khanda.valayas || khanda.valays || []) {
+          if (valaya._id === id) return valaya.name;
+          
+          for (const milan of valaya.milans || []) {
+            if (milan._id === id) return milan.name;
+            
+            for (const ghata of milan.ghatas || []) {
+              if (ghata._id === id) return ghata.name;
+            }
+          }
+        }
+      }
     }
+    return '';
+  };
 
-    console.log('Sending payload:', JSON.stringify(payload, null, 2));
-
-    const response = await fetch('/api/admin/create-user', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-      },
-      body: JSON.stringify(payload),
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    console.log('🎯 SUBMIT BUTTON CLICKED - Starting form submission');
+    console.log('🔍 Current state:', {
+      email,
+      role,
+      referrerData,
+      isLoading,
+      hasToken: !!token
     });
+    
+    setError(null);
+    setMessage(null);
+    setIsLoading(true);
 
-    const data = await response.json();
-
-    if (!response.ok) {
-      throw new Error(data.error || 'Failed to create user');
+    if (!token) {
+      console.error('❌ No token found');
+      setError('Authentication token missing. Please log in again.');
+      setIsLoading(false);
+      return;
     }
 
-    setMessage(data.message || 'User created successfully! A temporary password has been sent to their email.');
-    
-    // Reset form
-    setEmail('');
-    setRole('job_seeker');
-    setGhata('');
-    setMilan('');
-    setValaya('');
-    setKhanda('');
-    setVibhaaga('');
-    setReferrerData(initialReferrerData);
+    if (!email || !role) {
+      console.error('❌ Missing email or role:', { email, role });
+      setError('Please provide an email and select a role.');
+      setIsLoading(false);
+      return;
+    }
 
-  } catch (err: any) {
-    console.error('Create user error:', err);
-    setError(err.message || 'An unexpected error occurred.');
-  } finally {
-    setIsLoading(false);
-  }
-};
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      console.error('❌ Invalid email format:', email);
+      setError('Invalid email format.');
+      setIsLoading(false);
+      return;
+    }
+
+    // For referrers, validate all required fields
+    if (role === 'job_referrer') {
+      console.log('🔍 Validating referrer data:', referrerData);
+      
+      const requiredFields: (keyof ReferrerFormData)[] = [
+        'fullName', 'mobileNumber', 'residentialAddress', 
+        'companyName', 'workLocation', 'designation',
+        'milan', 'valaya', 'khanda' // Added hierarchy fields
+      ];
+
+      const missingFields = requiredFields.filter(field => !referrerData[field]?.trim());
+      
+      if (missingFields.length > 0) {
+        console.error('❌ Missing referrer fields:', missingFields);
+        setError(`Please fill in all required referrer fields: ${missingFields.join(', ')}`);
+        setIsLoading(false);
+        return;
+      }
+
+      // Validate mobile number format
+      const mobileRegex = /^[0-9]{10}$/;
+      if (!mobileRegex.test(referrerData.mobileNumber.replace(/\D/g, ''))) {
+        console.error('❌ Invalid mobile number:', referrerData.mobileNumber);
+        setError('Please enter a valid 10-digit mobile number.');
+        setIsLoading(false);
+        return;
+      }
+
+      console.log('✅ All referrer validations passed');
+    }
+
+    try {
+      let apiEndpoint = '/api/admin/create-user';
+      let payload: any = {
+        email,
+        role: role === 'super_admin' ? 'admin' : role,
+      };
+
+      // Set super admin flag for super_admin role
+      if (role === 'super_admin') {
+        payload.isSuperAdmin = true;
+      }
+
+      console.log('🔍 === FRONTEND PAYLOAD CONSTRUCTION ===');
+      console.log('📧 Email:', email);
+      console.log('🎯 Role:', role);
+      console.log('👑 isSuperAdmin:', role === 'super_admin');
+
+      // For referrers, use the dedicated referrer endpoint
+      if (role === 'job_referrer') {
+        apiEndpoint = '/api/admin/create-referrer';
+        
+        console.log('🏛️ Referrer Hierarchy VALUES:', {
+          milan: referrerData.milan,
+          valaya: referrerData.valaya,
+          khanda: referrerData.khanda,
+          vibhaaga: referrerData.vibhaaga,
+          ghata: referrerData.ghata
+        });
+
+        // Create payload for referrer creation - USE DIRECT VALUES
+        payload = {
+          email,
+          // Main hierarchy fields (REQUIRED - use values directly from referrerData)
+          milan: referrerData.milan,
+          valaya: referrerData.valaya,
+          khanda: referrerData.khanda,
+          vibhaaga: referrerData.vibhaaga || '',
+          ghata: referrerData.ghata || '',
+          // Referrer data (personal and work details)
+          referrerData: {
+            name: referrerData.fullName,
+            phone: referrerData.mobileNumber,
+            email: referrerData.email,
+            address: referrerData.residentialAddress,
+            companyName: referrerData.companyName,
+            workLocation: referrerData.workLocation,
+            designation: referrerData.designation,
+          }
+        };
+
+        console.log('🚀 REFERRER PAYLOAD READY');
+      } 
+      // For admin and super_admin roles, include hierarchy data
+      else if (role === 'admin' || role === 'super_admin') {
+        // Get organization NAMES from IDs
+        const milanName = getOrgNameById(milan, organizations);
+        const valayaName = getOrgNameById(valaya, organizations);
+        const khandaName = getOrgNameById(khanda, organizations);
+        const vibhaagaName = getOrgNameById(vibhaaga, organizations);
+        const ghataName = ghata ? getOrgNameById(ghata, organizations) : '';
+
+        console.log('🏛️ Admin Hierarchy NAMES:', {
+          milan: milanName,
+          valaya: valayaName,
+          khanda: khandaName,
+          vibhaaga: vibhaagaName,
+          ghata: ghataName
+        });
+
+        // Include hierarchy fields using NAMES
+        payload.milan = milanName;
+        payload.valaya = valayaName;
+        payload.khanda = khandaName;
+        payload.vibhaaga = vibhaagaName;
+        if (ghataName) payload.ghata = ghataName;
+      }
+      // For job_seeker and job_poster roles, include hierarchy data if available
+      else {
+        const milanName = getOrgNameById(milan, organizations);
+        const valayaName = getOrgNameById(valaya, organizations);
+        const khandaName = getOrgNameById(khanda, organizations);
+        const vibhaagaName = getOrgNameById(vibhaaga, organizations);
+        const ghataName = ghata ? getOrgNameById(ghata, organizations) : '';
+
+        // Include hierarchy fields using NAMES if they exist
+        if (milanName) payload.milan = milanName;
+        if (valayaName) payload.valaya = valayaName;
+        if (khandaName) payload.khanda = khandaName;
+        if (vibhaagaName) payload.vibhaaga = vibhaagaName;
+        if (ghataName) payload.ghata = ghataName;
+      }
+
+      console.log('🚀 === FINAL PAYLOAD TO BACKEND ===');
+      console.log('📤 API Endpoint:', apiEndpoint);
+      console.log('🔍 Role:', role);
+      console.log('📦 Payload:', JSON.stringify(payload, null, 2));
+      console.log('🔑 Has token:', !!token);
+      console.log('🚀 === END PAYLOAD ===');
+
+      console.log('📡 Making API call to:', apiEndpoint);
+      
+      const response = await fetch(apiEndpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
+      });
+
+      console.log('📨 Response Status:', response.status);
+      console.log('📨 Response OK:', response.ok);
+
+      const responseText = await response.text();
+      console.log('📨 Response Text:', responseText);
+
+      let data;
+      try {
+        data = JSON.parse(responseText);
+      } catch (parseError) {
+        console.error('❌ Failed to parse response as JSON:', parseError);
+        throw new Error('Invalid response from server');
+      }
+
+      if (!response.ok) {
+        console.error('❌ API Error Response:', data);
+        throw new Error(data.error || `Failed to create user: ${response.status}`);
+      }
+
+      console.log('✅ API Success Response:', data);
+      setMessage(data.message || 'User created successfully! A temporary password has been sent to their email.');
+      
+      // Reset form
+      console.log('🔄 Resetting form...');
+      setEmail('');
+      setRole('job_seeker');
+      setGhata('');
+      setMilan('');
+      setValaya('');
+      setKhanda('');
+      setVibhaaga('');
+      setReferrerData(initialReferrerData);
+
+    } catch (err: any) {
+      console.error('❌ Create user error:', err);
+      setError(err.message || 'An unexpected error occurred.');
+    } finally {
+      console.log('🏁 Form submission completed');
+      setIsLoading(false);
+    }
+  };
 
   // Animation Variants
   const containerVariants = {
@@ -555,6 +629,10 @@ const handleSubmit = async (e: FormEvent) => {
                       referrerData={referrerData}
                       onReferrerDataChange={setReferrerData}
                       isLoading={isLoading}
+                      organizations={organizations}
+                      loadingHierarchy={loadingHierarchy}
+                      hierarchyError={hierarchyError}
+                      onRetry={retryFetchHierarchy}
                     />
                   )}
 
@@ -611,8 +689,20 @@ const handleSubmit = async (e: FormEvent) => {
                     <motion.button
                       type="submit"
                       disabled={isLoading || 
-                        (role === 'job_referrer' && Object.values(referrerData).some(val => !val?.trim())) ||
-                        (isRequiredForNonPoster && (!organizations.length || hierarchyError))
+                        (role === 'job_referrer' && (
+                          !referrerData.fullName?.trim() ||
+                          !referrerData.mobileNumber?.trim() ||
+                          !referrerData.residentialAddress?.trim() ||
+                          !referrerData.companyName?.trim() ||
+                          !referrerData.workLocation?.trim() ||
+                          !referrerData.designation?.trim() ||
+                          !referrerData.milan?.trim() ||
+                          !referrerData.valaya?.trim() ||
+                          !referrerData.khanda?.trim()
+                        )) ||
+                        ((role === 'admin' || role === 'super_admin') && (
+                          !milan.trim() || !valaya.trim() || !khanda.trim() || !vibhaaga.trim()
+                        ))
                       }
                       whileHover={{ 
                         scale: isLoading ? 1 : 1.02, 

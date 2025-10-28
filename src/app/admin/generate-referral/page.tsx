@@ -261,7 +261,7 @@ export default function GenerateReferralPage() {
 
       const data = await response.json();
 
-      if (!response.ok) throw new Error(data.error || "Failed to fetch referral codes.");
+      if (!response.ok) throw new Error(data.error || "Failed to fetch Access codes.");
       setGeneratedReferrals(data.referralCodes);
     } catch (err: any) {
       setReferralsError(err.message || "An error occurred while fetching codes.");
@@ -339,9 +339,9 @@ export default function GenerateReferralPage() {
 
       const data = await response.json();
 
-      if (!response.ok) throw new Error(data.error || "Failed to generate referral code");
+      if (!response.ok) throw new Error(data.error || "Failed to generate Access code");
 
-      setMessage(data.message || "Referral code generated successfully!");
+      setMessage(data.message || "Access code generated successfully!");
       setGeneratedCode(data.code);
       setExpiresAt(data.expiresAt);
       setEmail("");
@@ -426,7 +426,7 @@ export default function GenerateReferralPage() {
             animate={{ opacity: 1, y: 0 }}
             className="text-2xl font-black bg-gradient-to-r from-[#165BF8] to-[#1C3991] bg-clip-text text-transparent"
           >
-            Referral Manager
+            Access Code Manager
           </motion.h1>
           
           <div className="w-12"></div>
@@ -448,10 +448,10 @@ export default function GenerateReferralPage() {
                 <FiCode className="h-10 w-10 text-white" />
               </motion.div>
               <h1 className="text-4xl md:text-5xl font-black bg-gradient-to-r from-[#165BF8] to-[#1C3991] bg-clip-text text-transparent mb-4">
-                Referral Code Manager
+                Access Code Manager
               </h1>
               <p className="text-lg text-[#165BF8] font-medium max-w-2xl mx-auto">
-                Generate and manage candidate referral codes with advanced tracking and analytics
+                Generate and manage candidate Access codes with advanced tracking and analytics
               </p>
             </motion.div>
 
@@ -471,7 +471,7 @@ export default function GenerateReferralPage() {
                         </div>
                         <div>
                           <h2 className="text-2xl font-black text-[#1C3991]">Generate New Code</h2>
-                          <p className="text-[#165BF8] font-medium">Create referral codes for candidates</p>
+                          <p className="text-[#165BF8] font-medium">Create access codes for candidates</p>
                         </div>
                       </div>
                       <button 
@@ -587,7 +587,7 @@ export default function GenerateReferralPage() {
                               </div>
                               <div className="flex-grow">
                                 <p className="text-sm text-[#165BF8] font-bold mb-2">
-                                  GENERATED REFERRAL CODE:
+                                  GENERATED ACCESS CODE:
                                 </p>
                                 <code className="font-mono text-xl md:text-2xl break-all text-[#1C3991] bg-white/50 p-4 rounded-xl border-2 border-[#165BF8]/10 inline-block font-black tracking-wider">
                                   {generatedCode}
@@ -663,8 +663,8 @@ export default function GenerateReferralPage() {
                       <FiUsers className="h-7 w-7" />
                     </div>
                     <div>
-                      <h2 className="text-2xl font-black text-[#1C3991]">Generated Referral Codes</h2>
-                      <p className="text-[#165BF8] font-medium">Track and manage all your referral codes</p>
+                      <h2 className="text-2xl font-black text-[#1C3991]">Generated Access Codes</h2>
+                      <p className="text-[#165BF8] font-medium">Track and manage all your access codes</p>
                     </div>
                   </div>
                   
@@ -727,8 +727,8 @@ export default function GenerateReferralPage() {
                     <div className="mx-auto w-24 h-24 bg-gradient-to-br from-[#165BF8]/10 to-[#1C3991]/10 rounded-3xl flex items-center justify-center mb-6">
                       <FiCode className="h-12 w-12 text-[#165BF8]" />
                     </div>
-                    <h3 className="text-2xl font-black text-[#1C3991] mb-3">No referral codes found</h3>
-                    <p className="text-[#165BF8] font-medium">Generate your first referral code to get started</p>
+                    <h3 className="text-2xl font-black text-[#1C3991] mb-3">No access codes found</h3>
+                    <p className="text-[#165BF8] font-medium">Generate your first access code to get started</p>
                   </motion.div>
                 ) : (
                   <motion.div
@@ -762,7 +762,7 @@ export default function GenerateReferralPage() {
                               <div className="bg-gradient-to-br from-[#165BF8] to-[#1C3991] p-2 rounded-xl mr-3 shadow-lg">
                                 <FiCode className="text-white h-5 w-5" />
                               </div>
-                              <h3 className="font-black text-[#1C3991] text-lg">Referral Code</h3>
+                              <h3 className="font-black text-[#1C3991] text-lg">Access Code</h3>
                             </div>
                             <motion.button
                               whileHover={{ scale: 1.1 }}

@@ -1,5 +1,5 @@
 import mongoose, { Schema, Document, Types } from 'mongoose';
-import bcrypt from 'bcryptjs'; // Add bcrypt import
+import bcrypt from 'bcryptjs';
 
 export interface IReferrer {
     username: string;
@@ -11,9 +11,14 @@ export interface IReferrer {
     createdBy: Types.ObjectId;
     onboardingStatus: 'not_started' | 'in_progress' | 'completed';
     status: 'active' | 'inactive';
-    milanShakaBhaga: string;
-    valayaNagar: string;
-    khandaBhaga: string;
+    
+    // UPDATED: Changed field names to match API
+    milan: string;
+    valaya: string;
+    khanda: string;
+    vibhaaga?: string;  // Added optional field
+    ghata?: string;     // Added optional field
+    
     referralCode?: string;
     
     // Referrer Personal Details (Captured during onboarding)
@@ -56,9 +61,14 @@ const ReferrerSchema: Schema<IReferrerDocument> = new Schema(
             default: 'active',
             required: true
         },
-        milanShakaBhaga: { type: String, required: true },
-        valayaNagar: { type: String, required: true },
-        khandaBhaga: { type: String, required: true },
+        
+        // UPDATED: Changed field names to match API
+        milan: { type: String, required: true },
+        valaya: { type: String, required: true },
+        khanda: { type: String, required: true },
+        vibhaaga: { type: String, required: false }, // Optional field
+        ghata: { type: String, required: false },    // Optional field
+        
         referralCode: { type: String },
         
         // Referrer Personal Details
@@ -88,13 +98,11 @@ const ReferrerSchema: Schema<IReferrerDocument> = new Schema(
     }
 );
 
-// Add password hashing pre-save hook - THIS IS CRITICAL
+// Add password hashing pre-save hook
 ReferrerSchema.pre('save', async function (next) {
-    // Only hash the password if it has been modified (or is new)
     if (!this.isModified('password') || !this.password) return next();
     
     try {
-        // Hash the password with salt rounds
         const hashedPassword = await bcrypt.hash(this.password, 10);
         this.password = hashedPassword;
         next();

@@ -12,14 +12,11 @@ interface CreateUserRequest {
   email: string;
   role: "job_poster" | "job_seeker" | "job_referrer" | "admin";
   isSuperAdmin?: boolean;
-  milanShakaBhaga?: string;
-  valayaNagar?: string;
-  khandaBhaga?: string;
-  vibhaaga?: string;
-  ghata?: string;
   milan?: string;
   valaya?: string;
   khanda?: string;
+  vibhaaga?: string;
+  ghata?: string;
   referrerData?: any;
 }
 
@@ -59,20 +56,32 @@ export async function POST(request: Request) {
 
   try {
     // 2. Parse and validate request body
+    const requestBody = await request.json();
+    
+    console.log("🚨 === BACKEND RECEIVED REQUEST ===");
+    console.log("📦 Full request body:", JSON.stringify(requestBody, null, 2));
+    console.log("🎯 Role:", requestBody.role);
+    console.log("🏛️ Milan:", requestBody.milan);
+    console.log("🏛️ Valaya:", requestBody.valaya);
+    console.log("🏛️ Khanda:", requestBody.khanda);
+    console.log("🏛️ Vibhaaga:", requestBody.vibhaaga);
+    console.log("🏛️ Ghata:", requestBody.ghata);
+    console.log("📧 Email:", requestBody.email);
+    console.log("👑 isSuperAdmin:", requestBody.isSuperAdmin);
+    console.log("🔍 Referrer Data:", requestBody.referrerData);
+    console.log("🚨 === END BACKEND LOG ===");
+
     const {
       email,
       role,
       isSuperAdmin,
-      milanShakaBhaga,
-      valayaNagar,
-      khandaBhaga,
-      vibhaaga,
-      ghata,
       milan,
       valaya,
       khanda,
+      vibhaaga,
+      ghata,
       referrerData,
-    }: CreateUserRequest = await request.json();
+    }: CreateUserRequest = requestBody;
 
     if (!email || !role) {
       return NextResponse.json(
@@ -130,25 +139,34 @@ export async function POST(request: Request) {
       );
     }
 
-    // FIXED: Conditional validation based on role - GHATA IS OPTIONAL
+    // Conditional validation based on role
+    console.log("🔍 Validating hierarchy fields for role:", role);
+    console.log("🔍 Milan present:", !!milan, "Value:", milan);
+    console.log("🔍 Valaya present:", !!valaya, "Value:", valaya);
+    console.log("🔍 Khanda present:", !!khanda, "Value:", khanda);
+
     if (role === "admin") {
       // For admin roles, require hierarchy fields (GHATA IS OPTIONAL)
-      if (!milanShakaBhaga || !valayaNagar || !khandaBhaga) {
+      if (!milan || !valaya || !khanda) {
+        console.log("❌ VALIDATION FAILED: Missing hierarchy fields for admin role");
+        console.log("❌ Milan missing:", !milan);
+        console.log("❌ Valaya missing:", !valaya);
+        console.log("❌ Khanda missing:", !khanda);
         return NextResponse.json(
           {
-            error: "Milan/Shaka/Bhaga, Valaya/Nagar, and Khanda/Bhaga are required for Admin roles.",
+            error: "Milan, Valaya, and Khanda are required for Admin roles.",
           },
           { status: 400 }
         );
       }
+      console.log("✅ VALIDATION PASSED: All hierarchy fields present for admin role");
       // GHATA IS OPTIONAL - NO VALIDATION NEEDED
     } else if (role === "job_referrer") {
       // For referrers, check hierarchy from multiple sources
-      const hasDirectHierarchy = milanShakaBhaga && valayaNagar && khandaBhaga;
+      const hasDirectHierarchy = milan && valaya && khanda;
       const hasReferrerDataHierarchy = referrerData && referrerData.khanda && referrerData.valaya && referrerData.milan;
-      const hasMappedHierarchy = referrerData && referrerData.khandaBhaga && referrerData.valayaNagar && referrerData.milanShakaBhaga;
       
-      if (!hasDirectHierarchy && !hasReferrerDataHierarchy && !hasMappedHierarchy) {
+      if (!hasDirectHierarchy && !hasReferrerDataHierarchy) {
         return NextResponse.json(
           {
             error: "Referrer hierarchy data (Khanda, Valaya, Milan) is required for Referrer roles.",
@@ -177,39 +195,41 @@ export async function POST(request: Request) {
     let createdUser;
     let userResponse;
 
-    // FIXED: Determine hierarchy values based on role and data source
-    let finalMilanShakaBhaga = milanShakaBhaga;
-    let finalValayaNagar = valayaNagar;
-    let finalKhandaBhaga = khandaBhaga;
+    // Determine hierarchy values based on role and data source
+    let finalMilan = milan;
+    let finalValaya = valaya;
+    let finalKhanda = khanda;
     let finalVibhaaga = vibhaaga;
     let finalGhata = ghata; // GHATA IS OPTIONAL
 
     // For referrers, use data from multiple sources
     if (role === "job_referrer") {
       // Priority 1: Use direct fields from main payload
-      if (milanShakaBhaga) finalMilanShakaBhaga = milanShakaBhaga;
-      if (valayaNagar) finalValayaNagar = valayaNagar;
-      if (khandaBhaga) finalKhandaBhaga = khandaBhaga;
+      if (milan) finalMilan = milan;
+      if (valaya) finalValaya = valaya;
+      if (khanda) finalKhanda = khanda;
       
-      // Priority 2: Use mapped fields from referrerData
+      // Priority 2: Use fields from referrerData
       if (referrerData) {
-        if (referrerData.milanShakaBhaga) finalMilanShakaBhaga = referrerData.milanShakaBhaga;
-        if (referrerData.valayaNagar) finalValayaNagar = referrerData.valayaNagar;
-        if (referrerData.khandaBhaga) finalKhandaBhaga = referrerData.khandaBhaga;
-        
-        // Also check for alternative field names
-        if (referrerData.milan) finalMilanShakaBhaga = referrerData.milan;
-        if (referrerData.valaya) finalValayaNagar = referrerData.valaya;
-        if (referrerData.khanda) finalKhandaBhaga = referrerData.khanda;
+        if (referrerData.milan) finalMilan = referrerData.milan;
+        if (referrerData.valaya) finalValaya = referrerData.valaya;
+        if (referrerData.khanda) finalKhanda = referrerData.khanda;
         
         finalVibhaaga = referrerData.vibhaaga || vibhaaga;
         finalGhata = referrerData.ghata || ghata; // GHATA IS OPTIONAL
       }
     }
 
+    console.log("🎯 Final hierarchy values being stored:");
+    console.log("🏛️ Milan:", finalMilan);
+    console.log("🏛️ Valaya:", finalValaya);
+    console.log("🏛️ Khanda:", finalKhanda);
+    console.log("🏛️ Vibhaaga:", finalVibhaaga);
+    console.log("🏛️ Ghata:", finalGhata);
+
     if (role === "job_referrer") {
       // Create in Referrer collection with onboarding not started
-      const onboardingStatus: OnboardingStatus = "not_started";
+      const onboardingStatus: OnboardingStatus = "completed";
 
       createdUser = await Referrer.create({
         username,
@@ -220,9 +240,10 @@ export async function POST(request: Request) {
         firstLogin: true,
         createdBy: decodedToken.id,
         onboardingStatus,
-        milanShakaBhaga: finalMilanShakaBhaga!,
-        valayaNagar: finalValayaNagar!,
-        khandaBhaga: finalKhandaBhaga!,
+        // STORE WITH FIELD NAMES IN DATABASE
+        milan: finalMilan!,
+        valaya: finalValaya!,
+        khanda: finalKhanda!,
         vibhaaga: finalVibhaaga, // OPTIONAL
         ghata: finalGhata, // OPTIONAL - CAN BE UNDEFINED
         // Initialize empty referrer details for onboarding
@@ -246,9 +267,9 @@ export async function POST(request: Request) {
         role: createdUser.role,
         onboardingStatus: createdUser.onboardingStatus,
         createdAt: createdUser.createdAt,
-        milanShakaBhaga: createdUser.milanShakaBhaga,
-        valayaNagar: createdUser.valayaNagar,
-        khandaBhaga: createdUser.khandaBhaga,
+        milan: createdUser.milan,
+        valaya: createdUser.valaya,
+        khanda: createdUser.khanda,
         vibhaaga: createdUser.vibhaaga,
         ghata: createdUser.ghata,
         referralCode: createdUser.referralCode,
@@ -267,9 +288,10 @@ export async function POST(request: Request) {
         firstLogin: true,
         createdBy: decodedToken.id,
         onboardingStatus,
-        milanShakaBhaga: finalMilanShakaBhaga || undefined,
-        valayaNagar: finalValayaNagar || undefined,
-        khandaBhaga: finalKhandaBhaga || undefined,
+        // STORE WITH FIELD NAMES IN DATABASE
+        milan: finalMilan || undefined,
+        valaya: finalValaya || undefined,
+        khanda: finalKhanda || undefined,
         vibhaaga: finalVibhaaga || undefined,
         ghata: finalGhata || undefined, // OPTIONAL
       });
@@ -280,13 +302,22 @@ export async function POST(request: Request) {
         role: createdUser.role,
         onboardingStatus: createdUser.onboardingStatus,
         createdAt: createdUser.createdAt,
-        milanShakaBhaga: createdUser.milanShakaBhaga,
-        valayaNagar: createdUser.valayaNagar,
-        khandaBhaga: createdUser.khandaBhaga,
+        milan: createdUser.milan,
+        valaya: createdUser.valaya,
+        khanda: createdUser.khanda,
         vibhaaga: createdUser.vibhaaga,
         ghata: createdUser.ghata,
       };
     }
+
+    console.log("✅ User created successfully:", {
+      id: createdUser._id,
+      email: createdUser.email,
+      role: createdUser.role,
+      milan: createdUser.milan,
+      valaya: createdUser.valaya,
+      khanda: createdUser.khanda
+    });
 
     // 6. Send welcome email
     try {
@@ -349,7 +380,7 @@ body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width:
       { status: 201 }
     );
   } catch (error: any) {
-    console.error("User creation error:", error);
+    console.error("❌ User creation error:", error);
     return NextResponse.json(
       { error: "Internal server error", details: error.message },
       { status: 500 }

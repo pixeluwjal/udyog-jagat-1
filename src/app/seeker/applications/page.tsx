@@ -353,7 +353,7 @@ export default function SeekerApplicationsPage() {
                   </p>
                   <div className="flex flex-col sm:flex-row gap-4 justify-center">
                     <Link
-                      href="/seeker/jobs"
+                      href="/seeker/job"
                       className="inline-flex items-center px-6 py-3 border border-transparent shadow-lg text-base font-medium rounded-xl text-white bg-gradient-to-r from-[#1938A8] to-[#2D4FD8] hover:from-[#182E78] hover:to-[#1938A8] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#1938A8] transition-all duration-200 transform hover:scale-105"
                     >
                       <IoRocket className="-ml-1 mr-2 h-5 w-5" />

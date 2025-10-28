@@ -3,9 +3,8 @@
 
 import { motion } from 'framer-motion';
 import { FiUser, FiMail, FiPhone, FiMapPin, FiBriefcase, FiLoader, FiUsers, FiHome, FiAward, FiChevronDown, FiInfo } from 'react-icons/fi';
-import { useState, useEffect } from 'react';
 
-interface ReferrerFormData {
+export interface ReferrerFormData {
   fullName: string;
   email: string;
   mobileNumber: string;
@@ -13,14 +12,11 @@ interface ReferrerFormData {
   companyName: string;
   workLocation: string;
   designation: string;
-  milanShakaBhaga: string;
-  valayaNagar: string;
-  khandaBhaga: string;
+  milan: string;
+  valaya: string;
+  khanda: string;
   vibhaaga?: string;
   ghata?: string;
-  milan?: string;
-  valaya?: string;
-  khanda?: string;
 }
 
 interface Organization {
@@ -58,54 +54,24 @@ interface ReferrerSelectionProps {
   referrerData: ReferrerFormData;
   onReferrerDataChange: (data: ReferrerFormData) => void;
   isLoading: boolean;
+  organizations: Organization[];
+  loadingHierarchy: boolean;
+  hierarchyError: string | null;
+  onRetry: () => void;
 }
 
 export default function ReferrerSelection({
   referrerData,
   onReferrerDataChange,
-  isLoading
+  isLoading,
+  organizations,
+  loadingHierarchy,
+  hierarchyError,
+  onRetry
 }: ReferrerSelectionProps) {
-  const [organizations, setOrganizations] = useState<Organization[]>([]);
-  const [loadingOrganizations, setLoadingOrganizations] = useState(true);
-  const [organizationError, setOrganizationError] = useState<string | null>(null);
-  const [selectedVibhaaga, setSelectedVibhaaga] = useState('');
-  const [selectedKhanda, setSelectedKhanda] = useState('');
-  const [selectedValaya, setSelectedValaya] = useState('');
-  const [selectedMilan, setSelectedMilan] = useState('');
-  const [selectedGhata, setSelectedGhata] = useState('');
-
-  // Fetch organizations from API
-  const fetchOrganizations = async () => {
-    try {
-      setLoadingOrganizations(true);
-      setOrganizationError(null);
-      
-      const response = await fetch('/api/admin/organizations');
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      
-      const data = await response.json();
-      
-      if (data.success && data.organizations) {
-        setOrganizations(data.organizations);
-      } else {
-        throw new Error(data.error || 'Invalid response format from organization API');
-      }
-    } catch (err: any) {
-      console.error('Error fetching organizations:', err);
-      setOrganizationError(err.message || 'Failed to load organization data');
-    } finally {
-      setLoadingOrganizations(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchOrganizations();
-  }, []);
 
   const handleInputChange = (field: keyof ReferrerFormData, value: string) => {
+    console.log(`🔄 Updating ${field}:`, value);
     onReferrerDataChange({
       ...referrerData,
       [field]: value
@@ -114,7 +80,7 @@ export default function ReferrerSelection({
 
   // Get available vibhaagas (organizations)
   const getVibhaagas = () => {
-    if (!organizations.length) return [];
+    if (!organizations || !Array.isArray(organizations)) return [];
     return organizations.map(org => ({
       _id: org._id,
       name: org.name,
@@ -124,94 +90,95 @@ export default function ReferrerSelection({
 
   // Get khandas for selected vibhaaga
   const getKhandas = () => {
-    if (!selectedVibhaaga) return [];
-    const vibhaagaObj = getVibhaagas().find(v => v._id === selectedVibhaaga);
+    if (!referrerData.vibhaaga) return [];
+    const vibhaagaObj = getVibhaagas().find(v => v._id === referrerData.vibhaaga);
     return vibhaagaObj?.khandas || [];
   };
 
   // Get valayas for selected khanda
   const getValayas = () => {
-    if (!selectedKhanda) return [];
-    const khandaObj = getKhandas().find(k => k._id === selectedKhanda);
+    if (!referrerData.khanda) return [];
+    const khandaObj = getKhandas().find(k => k._id === referrerData.khanda);
     return khandaObj?.valays || khandaObj?.valayas || [];
   };
 
   // Get milans for selected valaya
   const getMilans = () => {
-    if (!selectedValaya) return [];
-    const valayaObj = getValayas().find(v => v._id === selectedValaya);
+    if (!referrerData.valaya) return [];
+    const valayaObj = getValayas().find(v => v._id === referrerData.valaya);
     return valayaObj?.milans || [];
   };
 
   // Get ghatas for selected milan
   const getGhatas = () => {
-    if (!selectedMilan) return [];
-    const milanObj = getMilans().find(m => m._id === selectedMilan);
+    if (!referrerData.milan) return [];
+    const milanObj = getMilans().find(m => m._id === referrerData.milan);
     return milanObj?.ghatas || [];
   };
 
   // Handle organization selection changes
   const handleVibhaagaChange = (vibhaagaId: string) => {
-    setSelectedVibhaaga(vibhaagaId);
-    setSelectedKhanda('');
-    setSelectedValaya('');
-    setSelectedMilan('');
-    setSelectedGhata('');
-    
+    console.log('🏛️ Vibhaaga selected:', vibhaagaId);
     const vibhaaga = getVibhaagas().find(v => v._id === vibhaagaId);
-    if (vibhaaga) {
-      handleInputChange('vibhaaga', vibhaaga.name);
-    }
+    
+    onReferrerDataChange({
+      ...referrerData,
+      vibhaaga: vibhaagaId,
+      khanda: '',
+      valaya: '',
+      milan: '',
+      ghata: ''
+    });
   };
 
   const handleKhandaChange = (khandaId: string) => {
-    setSelectedKhanda(khandaId);
-    setSelectedValaya('');
-    setSelectedMilan('');
-    setSelectedGhata('');
-    
+    console.log('🏛️ Khanda selected:', khandaId);
     const khanda = getKhandas().find(k => k._id === khandaId);
-    if (khanda) {
-      handleInputChange('khanda', khanda.name);
-      handleInputChange('khandaBhaga', khanda.name);
-    }
+    
+    onReferrerDataChange({
+      ...referrerData,
+      khanda: khandaId,
+      valaya: '',
+      milan: '',
+      ghata: ''
+    });
   };
 
   const handleValayaChange = (valayaId: string) => {
-    setSelectedValaya(valayaId);
-    setSelectedMilan('');
-    setSelectedGhata('');
-    
+    console.log('🏛️ Valaya selected:', valayaId);
     const valaya = getValayas().find(v => v._id === valayaId);
-    if (valaya) {
-      handleInputChange('valaya', valaya.name);
-      handleInputChange('valayaNagar', valaya.name);
-    }
+    
+    onReferrerDataChange({
+      ...referrerData,
+      valaya: valayaId,
+      milan: '',
+      ghata: ''
+    });
   };
 
   const handleMilanChange = (milanId: string) => {
-    setSelectedMilan(milanId);
-    setSelectedGhata('');
-    
+    console.log('🏛️ Milan selected:', milanId);
     const milan = getMilans().find(m => m._id === milanId);
-    if (milan) {
-      handleInputChange('milan', milan.name);
-      handleInputChange('milanShakaBhaga', milan.name);
-    }
+    
+    onReferrerDataChange({
+      ...referrerData,
+      milan: milanId,
+      ghata: ''
+    });
   };
 
   const handleGhataChange = (ghataId: string) => {
-    setSelectedGhata(ghataId);
-    
+    console.log('🏛️ Ghata selected:', ghataId);
     const ghata = getGhatas().find(g => g._id === ghataId);
-    if (ghata) {
-      handleInputChange('ghata', ghata.name);
-    }
+    
+    onReferrerDataChange({
+      ...referrerData,
+      ghata: ghataId
+    });
   };
 
-  const retryFetchOrganizations = () => {
-    fetchOrganizations();
-  };
+  // Debug: Log current referrerData state
+  console.log('📊 Current Referrer Data:', referrerData);
 
   return (
     <motion.div
@@ -237,9 +204,9 @@ export default function ReferrerSelection({
           <h3 className="text-xl font-bold text-purple-900">Referrer Details</h3>
           <p className="text-purple-700 text-sm">Enter referrer personal and work information</p>
         </div>
-        {organizationError && (
+        {hierarchyError && (
           <motion.button
-            onClick={retryFetchOrganizations}
+            onClick={onRetry}
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
             className="ml-auto flex items-center space-x-2 px-3 py-1 bg-yellow-100 text-yellow-800 rounded-lg text-sm font-medium hover:bg-yellow-200 transition-colors"
@@ -250,7 +217,7 @@ export default function ReferrerSelection({
         )}
       </div>
 
-      {organizationError && (
+      {hierarchyError && (
         <motion.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
@@ -260,7 +227,7 @@ export default function ReferrerSelection({
             <FiInfo className="h-4 w-4 mt-0.5 flex-shrink-0" />
             <div>
               <p className="font-medium">Note: Organization data issue</p>
-              <p className="text-xs mt-1">{organizationError}</p>
+              <p className="text-xs mt-1">{hierarchyError}</p>
             </div>
           </div>
         </motion.div>
@@ -458,7 +425,7 @@ export default function ReferrerSelection({
             Khanda, Valaya, and Milan are required for Referrer roles
           </p>
           
-          {loadingOrganizations ? (
+          {loadingHierarchy ? (
             <div className="flex justify-center items-center py-8">
               <FiLoader className="animate-spin h-8 w-8 text-purple-500 mr-3" />
               <span className="text-purple-900 font-medium">Loading organization data...</span>
@@ -472,30 +439,15 @@ export default function ReferrerSelection({
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
               {/* Vibhaaga Dropdown */}
-              <motion.div
-                variants={{
-                  hidden: { opacity: 0, y: 20 },
-                  visible: { 
-                    opacity: 1, 
-                    y: 0, 
-                    transition: { 
-                      duration: 0.5, 
-                      ease: [0.16, 1, 0.3, 1] 
-                    } 
-                  },
-                }}
-                className="md:col-span-2 lg:col-span-3 xl:col-span-1"
-              >
+              <div className="md:col-span-2 lg:col-span-3 xl:col-span-1">
                 <label className="block text-sm font-semibold text-purple-900 mb-2 flex items-center space-x-2">
                   <FiUsers className="h-4 w-4 text-purple-600" />
                   <span>Vibhaaga</span>
-                  <span className="text-red-500 ml-1">*</span>
                 </label>
                 <div className="relative">
                   <select
-                    required
                     className="block w-full px-4 py-3 border-2 border-purple-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500/30 focus:border-purple-500 text-gray-900 transition-all duration-200 hover:border-purple-300 appearance-none bg-white cursor-pointer"
-                    value={selectedVibhaaga}
+                    value={referrerData.vibhaaga || ''}
                     onChange={(e) => handleVibhaagaChange(e.target.value)}
                     disabled={isLoading}
                   >
@@ -510,36 +462,21 @@ export default function ReferrerSelection({
                     <FiChevronDown className="h-5 w-5 text-purple-600" />
                   </div>
                 </div>
-              </motion.div>
+              </div>
 
               {/* Khanda Dropdown */}
-              <motion.div
-                variants={{
-                  hidden: { opacity: 0, y: 20 },
-                  visible: { 
-                    opacity: 1, 
-                    y: 0, 
-                    transition: { 
-                      duration: 0.5, 
-                      delay: 0.1,
-                      ease: [0.16, 1, 0.3, 1] 
-                    } 
-                  },
-                }}
-                className="md:col-span-2 lg:col-span-3 xl:col-span-1"
-              >
+              <div className="md:col-span-2 lg:col-span-3 xl:col-span-1">
                 <label className="block text-sm font-semibold text-purple-900 mb-2 flex items-center space-x-2">
                   <FiUsers className="h-4 w-4 text-purple-600" />
-                  <span>Khanda</span>
-                  <span className="text-red-500 ml-1">*</span>
+                  <span>Khanda *</span>
                 </label>
                 <div className="relative">
                   <select
                     required
                     className="block w-full px-4 py-3 border-2 border-purple-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500/30 focus:border-purple-500 text-gray-900 transition-all duration-200 hover:border-purple-300 appearance-none bg-white cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                    value={selectedKhanda}
+                    value={referrerData.khanda || ''}
                     onChange={(e) => handleKhandaChange(e.target.value)}
-                    disabled={isLoading || !selectedVibhaaga || getKhandas().length === 0}
+                    disabled={isLoading || !referrerData.vibhaaga || getKhandas().length === 0}
                   >
                     <option value="">Select Khanda</option>
                     {getKhandas().map((khanda) => (
@@ -552,36 +489,21 @@ export default function ReferrerSelection({
                     <FiChevronDown className="h-5 w-5 text-purple-600" />
                   </div>
                 </div>
-              </motion.div>
+              </div>
 
               {/* Valaya Dropdown */}
-              <motion.div
-                variants={{
-                  hidden: { opacity: 0, y: 20 },
-                  visible: { 
-                    opacity: 1, 
-                    y: 0, 
-                    transition: { 
-                      duration: 0.5, 
-                      delay: 0.2,
-                      ease: [0.16, 1, 0.3, 1] 
-                    } 
-                  },
-                }}
-                className="md:col-span-2 lg:col-span-3 xl:col-span-1"
-              >
+              <div className="md:col-span-2 lg:col-span-3 xl:col-span-1">
                 <label className="block text-sm font-semibold text-purple-900 mb-2 flex items-center space-x-2">
                   <FiMapPin className="h-4 w-4 text-purple-600" />
-                  <span>Valaya</span>
-                  <span className="text-red-500 ml-1">*</span>
+                  <span>Valaya *</span>
                 </label>
                 <div className="relative">
                   <select
                     required
                     className="block w-full px-4 py-3 border-2 border-purple-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500/30 focus:border-purple-500 text-gray-900 transition-all duration-200 hover:border-purple-300 appearance-none bg-white cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                    value={selectedValaya}
+                    value={referrerData.valaya || ''}
                     onChange={(e) => handleValayaChange(e.target.value)}
-                    disabled={isLoading || !selectedKhanda || getValayas().length === 0}
+                    disabled={isLoading || !referrerData.khanda || getValayas().length === 0}
                   >
                     <option value="">Select Valaya</option>
                     {getValayas().map((valaya) => (
@@ -594,36 +516,21 @@ export default function ReferrerSelection({
                     <FiChevronDown className="h-5 w-5 text-purple-600" />
                   </div>
                 </div>
-              </motion.div>
+              </div>
 
               {/* Milan Dropdown */}
-              <motion.div
-                variants={{
-                  hidden: { opacity: 0, y: 20 },
-                  visible: { 
-                    opacity: 1, 
-                    y: 0, 
-                    transition: { 
-                      duration: 0.5, 
-                      delay: 0.3,
-                      ease: [0.16, 1, 0.3, 1] 
-                    } 
-                  },
-                }}
-                className="md:col-span-2 lg:col-span-3 xl:col-span-1"
-              >
+              <div className="md:col-span-2 lg:col-span-3 xl:col-span-1">
                 <label className="block text-sm font-semibold text-purple-900 mb-2 flex items-center space-x-2">
                   <FiUsers className="h-4 w-4 text-purple-600" />
-                  <span>Milan</span>
-                  <span className="text-red-500 ml-1">*</span>
+                  <span>Milan *</span>
                 </label>
                 <div className="relative">
                   <select
                     required
                     className="block w-full px-4 py-3 border-2 border-purple-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500/30 focus:border-purple-500 text-gray-900 transition-all duration-200 hover:border-purple-300 appearance-none bg-white cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                    value={selectedMilan}
+                    value={referrerData.milan || ''}
                     onChange={(e) => handleMilanChange(e.target.value)}
-                    disabled={isLoading || !selectedValaya || getMilans().length === 0}
+                    disabled={isLoading || !referrerData.valaya || getMilans().length === 0}
                   >
                     <option value="">Select Milan</option>
                     {getMilans().map((milan) => (
@@ -636,24 +543,10 @@ export default function ReferrerSelection({
                     <FiChevronDown className="h-5 w-5 text-purple-600" />
                   </div>
                 </div>
-              </motion.div>
+              </div>
 
               {/* Ghata Dropdown */}
-              <motion.div
-                variants={{
-                  hidden: { opacity: 0, y: 20 },
-                  visible: { 
-                    opacity: 1, 
-                    y: 0, 
-                    transition: { 
-                      duration: 0.5, 
-                      delay: 0.4,
-                      ease: [0.16, 1, 0.3, 1] 
-                    } 
-                  },
-                }}
-                className="md:col-span-2 lg:col-span-3 xl:col-span-1"
-              >
+              <div className="md:col-span-2 lg:col-span-3 xl:col-span-1">
                 <label className="block text-sm font-semibold text-purple-900 mb-2 flex items-center space-x-2">
                   <FiHome className="h-4 w-4 text-purple-600" />
                   <span>Ghata</span>
@@ -661,9 +554,9 @@ export default function ReferrerSelection({
                 <div className="relative">
                   <select
                     className="block w-full px-4 py-3 border-2 border-purple-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500/30 focus:border-purple-500 text-gray-900 transition-all duration-200 hover:border-purple-300 appearance-none bg-white cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                    value={selectedGhata}
+                    value={referrerData.ghata || ''}
                     onChange={(e) => handleGhataChange(e.target.value)}
-                    disabled={isLoading || !selectedMilan || getGhatas().length === 0}
+                    disabled={isLoading || !referrerData.milan || getGhatas().length === 0}
                   >
                     <option value="">Select Ghata</option>
                     {getGhatas().map((ghata) => (
@@ -676,12 +569,12 @@ export default function ReferrerSelection({
                     <FiChevronDown className="h-5 w-5 text-purple-600" />
                   </div>
                 </div>
-              </motion.div>
+              </div>
             </div>
           )}
 
           {/* Current Selection Display */}
-          {(selectedVibhaaga || selectedKhanda || selectedValaya || selectedMilan || selectedGhata) && (
+          {(referrerData.vibhaaga || referrerData.khanda || referrerData.valaya || referrerData.milan || referrerData.ghata) && (
             <motion.div
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
@@ -689,34 +582,35 @@ export default function ReferrerSelection({
             >
               <h4 className="text-sm font-semibold text-purple-900 mb-2">Current Selection:</h4>
               <div className="flex flex-wrap gap-2">
-                {selectedVibhaaga && (
+                {referrerData.vibhaaga && (
                   <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
-                    Vibhaaga: {getVibhaagas().find(v => v._id === selectedVibhaaga)?.name}
+                    Vibhaaga: {getVibhaagas().find(v => v._id === referrerData.vibhaaga)?.name}
                   </span>
                 )}
-                {selectedKhanda && (
+                {referrerData.khanda && (
                   <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">
-                    Khanda: {getKhandas().find(k => k._id === selectedKhanda)?.name}
+                    Khanda: {getKhandas().find(k => k._id === referrerData.khanda)?.name}
                   </span>
                 )}
-                {selectedValaya && (
+                {referrerData.valaya && (
                   <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-pink-100 text-pink-800">
-                    Valaya: {getValayas().find(v => v._id === selectedValaya)?.name}
+                    Valaya: {getValayas().find(v => v._id === referrerData.valaya)?.name}
                   </span>
                 )}
-                {selectedMilan && (
+                {referrerData.milan && (
                   <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                    Milan: {getMilans().find(m => m._id === selectedMilan)?.name}
+                    Milan: {getMilans().find(m => m._id === referrerData.milan)?.name}
                   </span>
                 )}
-                {selectedGhata && (
+                {referrerData.ghata && (
                   <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                    Ghata: {getGhatas().find(g => g._id === selectedGhata)?.name}
+                    Ghata: {getGhatas().find(g => g._id === referrerData.ghata)?.name}
                   </span>
                 )}
               </div>
             </motion.div>
           )}
+
         </motion.div>
       </div>
 
