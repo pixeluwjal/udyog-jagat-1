@@ -607,7 +607,42 @@ export default function AdminDashboardPage() {
                         <p className="text-gray-600 flex items-center">
                           <FiMail className="w-4 h-4 mr-2 text-[#2245ae]" />
                           {item.email}
-                        </p>                    
+                        </p>
+                        
+                        {/* Role Badge - FIXED: Now shows proper role */}
+                        <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${
+                          getRoleColor(item.role)
+                        }`}>
+                          {item?.role?.replace('_', ' ').toUpperCase() || 'Referrer'}
+                        </span>
+                        
+                        {'status' in item ? (
+                          <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${
+                            item.status === 'active' 
+                              ? 'bg-green-100 text-green-700' 
+                              : 'bg-red-100 text-red-700'
+                          }`}>
+                            {item.status === 'active' ? (
+                              <FiCheckCircle className="w-3 h-3 mr-1" />
+                            ) : (
+                              <FiXCircle className="w-3 h-3 mr-1" />
+                            )}
+                            {item.status}
+                          </span>
+                        ) : (
+                          <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${
+                            item.onboardingStatus === 'completed'
+                              ? 'bg-green-100 text-green-700'
+                              : 'bg-amber-100 text-amber-700'
+                          }`}>
+                            {item.onboardingStatus === 'completed' ? (
+                              <FiCheckCircle className="w-3 h-3 mr-1" />
+                            ) : (
+                              <FiClock className="w-3 h-3 mr-1" />
+                            )}
+                            {item.onboardingStatus}
+                          </span>
+                        )}
                       </div>
 
                       {/* Referrer Specific Details */}

@@ -1,36 +1,19 @@
 // app/referrer/dashboard/page.tsx
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/app/context/AuthContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   FiMessageCircle,
   FiSearch,
-  FiUser,
   FiLogOut,
   FiMoreVertical,
   FiMenu,
-  FiX,
-  FiCheckCircle,
-  FiClock,
-  FiPaperclip,
-  FiSmile,
-  FiSend,
-  FiInfo,
-  FiEdit3,
-  FiTrash2,
-  FiImage,
-  FiFile,
-  FiMic,
   FiArrowLeft,
-  FiSettings,
-  FiHome,
-  FiBriefcase,
   FiUsers,
-  FiAward,
-  FiDollarSign
+  FiAward
 } from 'react-icons/fi';
 import {
   Chat,
@@ -39,7 +22,6 @@ import {
   MessageList,
   MessageInput,
   Thread,
-  useMessageContext,
 } from 'stream-chat-react';
 import 'stream-chat-react/dist/css/v2/index.css';
 import { useStreamChat } from '@/hooks/useStreamChat';
@@ -70,34 +52,6 @@ interface ChatChannel {
   isOnline?: boolean;
 }
 
-// Custom Message Component with attractive styling
-const CustomMessage = (props: any) => {
-  const { message, isMyMessage } = useMessageContext();
-  
-  return (
-    <div className={`flex ${isMyMessage ? 'justify-end' : 'justify-start'} mb-4`}>
-      <div
-        className={`max-w-xs lg:max-w-md px-4 py-3 rounded-2xl shadow-sm ${
-          isMyMessage
-            ? 'bg-[#1e40a7] text-white rounded-br-none'
-            : 'bg-white text-gray-800 rounded-bl-none border border-gray-200'
-        }`}
-      >
-        <p className="text-sm whitespace-pre-wrap">{message.text}</p>
-        <div className={`flex justify-end mt-1 ${isMyMessage ? 'text-blue-100' : 'text-gray-500'}`}>
-          <span className="text-xs">
-            {new Date(message.created_at).toLocaleTimeString('en-US', {
-              hour: 'numeric',
-              minute: '2-digit',
-              hour12: true
-            })}
-          </span>
-        </div>
-      </div>
-    </div>
-  );
-};
-
 export default function ReferrerDashboard() {
   const [currentChannel, setCurrentChannel] = useState<any>(null);
   const [jobSeekers, setJobSeekers] = useState<JobSeeker[]>([]);
@@ -107,22 +61,16 @@ export default function ReferrerDashboard() {
   const [selectedSeeker, setSelectedSeeker] = useState<JobSeeker | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [mobileView, setMobileView] = useState<'list' | 'chat'>('list');
-  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
-  const [seekerInfoOpen, setSeekerInfoOpen] = useState(false);
   
-  const { user, logout, loading: authLoading, refreshUser } = useAuth();
+  const { user, logout, loading: authLoading } = useAuth();
   const router = useRouter();
   
   const {
     chatClient,
     isConnected,
-    connectionError,
     connectUser,
-    startChannel,
     setConnectionError
   } = useStreamChat();
-
-  const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Handle logout
   const handleLogout = async () => {
@@ -272,6 +220,13 @@ export default function ReferrerDashboard() {
     }
   };
 
+  // Handle mobile back button
+  const handleMobileBack = () => {
+    setSelectedSeeker(null);
+    setCurrentChannel(null);
+    setMobileView('list');
+  };
+
   // Format time for chat list
   const formatTime = (timestamp?: string) => {
     if (!timestamp) return '';
@@ -286,30 +241,6 @@ export default function ReferrerDashboard() {
     if (diff < 604800000) return `${Math.floor(diff / 86400000)}d`;
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   };
-
-  // Format last seen
-  const formatLastSeen = (timestamp?: string) => {
-    if (!timestamp) return 'Never';
-    
-    const date = new Date(timestamp);
-    const now = new Date();
-    const diff = now.getTime() - date.getTime();
-    
-    if (diff < 60000) return 'Just now';
-    if (diff < 3600000) return `Last seen ${Math.floor(diff / 60000)} minutes ago`;
-    if (diff < 86400000) return `Last seen ${Math.floor(diff / 3600000)} hours ago`;
-    if (diff < 172800000) return 'Last seen yesterday';
-    return `Last seen ${date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
-  };
-
-  // Scroll to bottom of messages
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
-
-  useEffect(() => {
-    scrollToBottom();
-  }, [currentChannel]);
 
   // Redirect if not authenticated or not completed onboarding
   useEffect(() => {
@@ -422,11 +353,7 @@ export default function ReferrerDashboard() {
         <div className="flex items-center justify-between">
           {mobileView === 'chat' ? (
             <button 
-              onClick={() => {
-                setMobileView('list');
-                setSelectedSeeker(null);
-                setCurrentChannel(null);
-              }}
+              onClick={handleMobileBack}
               className="p-2 hover:bg-white/10 rounded-lg transition-colors"
             >
               <FiArrowLeft className="h-5 w-5" />
@@ -441,7 +368,7 @@ export default function ReferrerDashboard() {
           )}
           
           <h1 className="text-lg font-bold">
-            {mobileView === 'chat' ? selectedSeeker?.candidateDetails?.fullName : 'Referrer Dashboard'}
+            {mobileView === 'chat' ? 'Chat' : 'Referrer Dashboard'}
           </h1>
           
           <button 
@@ -473,8 +400,8 @@ export default function ReferrerDashboard() {
                 </p>
               </div>
               <button 
-                onClick={() => setProfileMenuOpen(!profileMenuOpen)}
-                className="p-2 hover:bg-white/10 rounded-xl transition-colors"
+                onClick={() => setSidebarOpen(true)}
+                className="p-2 hover:bg-white/10 rounded-xl transition-colors md:hidden"
               >
                 <FiMoreVertical className="h-5 w-5" />
               </button>
@@ -558,7 +485,7 @@ export default function ReferrerDashboard() {
           animate={{ opacity: 1, x: 0 }}
           className={`${
             mobileView === 'chat' ? 'flex' : 'hidden'
-          } md:flex flex-1 flex-col bg-gradient-to-br from-gray-50 to-blue-50 h-full relative`}
+          } md:flex flex-1 flex-col bg-white h-full`}
         >
           <AnimatePresence mode="wait">
             {/* Active Chat View */}
@@ -570,138 +497,20 @@ export default function ReferrerDashboard() {
                 exit={{ opacity: 0 }}
                 className="flex-1 flex flex-col h-full"
               >
-                {/* Chat Header */}
-                <div className="bg-white px-6 py-4 border-b border-gray-200 flex items-center justify-between shadow-sm">
-                  <div className="flex items-center space-x-4">
-                    <button 
-                      onClick={() => {
-                        setSelectedSeeker(null);
-                        setCurrentChannel(null);
-                        if (window.innerWidth < 768) {
-                          setMobileView('list');
-                        }
-                      }}
-                      className="p-2 text-gray-600 hover:text-gray-800 md:hidden"
-                    >
-                      <FiArrowLeft className="h-5 w-5" />
-                    </button>
-                    <div className="relative">
-                      <div 
-                        className="w-12 h-12 bg-gradient-to-br from-[#1e40a7] to-[#3b82f6] rounded-2xl flex items-center justify-center text-white font-bold cursor-pointer shadow-lg"
-                        onClick={() => setSeekerInfoOpen(!seekerInfoOpen)}
-                      >
-                        {selectedSeeker.candidateDetails?.fullName?.charAt(0) || selectedSeeker.username.charAt(0)}
-                      </div>
-                      {selectedSeeker.isOnline && (
-                        <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white shadow-sm"></div>
-                      )}
-                    </div>
-                    <div 
-                      className="cursor-pointer"
-                      onClick={() => setSeekerInfoOpen(!seekerInfoOpen)}
-                    >
-                      <h3 className="font-bold text-gray-900 text-lg">
-                        {selectedSeeker.candidateDetails?.fullName || selectedSeeker.username}
-                      </h3>
-                      <p className="text-gray-600 text-sm">
-                        {selectedSeeker.isOnline ? 'Online' : formatLastSeen(selectedSeeker.lastSeen)}
-                      </p>
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center space-x-2">
-                    <button 
-                      className="p-3 text-gray-600 hover:text-[#1e40a7] hover:bg-gray-100 rounded-xl transition-colors"
-                      onClick={() => setSeekerInfoOpen(!seekerInfoOpen)}
-                    >
-                      <FiInfo className="h-5 w-5" />
-                    </button>
-                  </div>
-                </div>
-
-                {/* Chat Messages Area */}
-                <div className="flex-1 overflow-y-auto bg-gradient-to-b from-gray-50 to-blue-50 p-4">
-                  {chatClient && (
-                    <Chat client={chatClient} theme="messaging light">
-                      <Channel channel={currentChannel} Message={CustomMessage}>
+                {/* Stream Chat - Pure Components */}
+                {chatClient && (
+                  <Chat client={chatClient} theme="messaging light">
+                    <Channel channel={currentChannel}>
+                      <div className="flex-1 flex flex-col h-full">
                         <Window>
                           <MessageList />
                           <MessageInput />
                         </Window>
                         <Thread />
-                      </Channel>
-                    </Chat>
-                  )}
-                  <div ref={messagesEndRef} />
-                </div>
-
-                {/* Seeker Info Panel */}
-                <AnimatePresence>
-                  {seekerInfoOpen && (
-                    <>
-                      <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        className="absolute inset-0 bg-black/50 z-10"
-                        onClick={() => setSeekerInfoOpen(false)}
-                      />
-                      <motion.div
-                        initial={{ x: '100%' }}
-                        animate={{ x: 0 }}
-                        exit={{ x: '100%' }}
-                        className="absolute right-0 top-0 bottom-0 w-80 bg-white z-20 shadow-2xl"
-                      >
-                        <div className="p-6 bg-gradient-to-r from-[#1e40a7] to-[#3b82f6] text-white">
-                          <div className="flex items-center justify-between mb-6">
-                            <h2 className="text-lg font-bold">Candidate Info</h2>
-                            <button onClick={() => setSeekerInfoOpen(false)}>
-                              <FiX className="h-6 w-6" />
-                            </button>
-                          </div>
-                          <div className="text-center">
-                            <div className="w-20 h-20 bg-white/20 rounded-2xl flex items-center justify-center text-white font-bold text-2xl mx-auto mb-4 border-2 border-white/30">
-                              {selectedSeeker.candidateDetails?.fullName?.charAt(0) || selectedSeeker.username.charAt(0)}
-                            </div>
-                            <h3 className="font-bold text-xl mb-1">
-                              {selectedSeeker.candidateDetails?.fullName || selectedSeeker.username}
-                            </h3>
-                            <p className="text-white/80 text-sm">{selectedSeeker.email}</p>
-                          </div>
-                        </div>
-                        
-                        <div className="p-6 space-y-6">
-                          {selectedSeeker.candidateDetails?.phone && (
-                            <div>
-                              <p className="text-sm text-gray-600 mb-2 font-medium">Phone</p>
-                              <p className="font-semibold text-gray-900">{selectedSeeker.candidateDetails.phone}</p>
-                            </div>
-                          )}
-                          
-                          {selectedSeeker.candidateDetails?.skills && selectedSeeker.candidateDetails.skills.length > 0 && (
-                            <div>
-                              <p className="text-sm text-gray-600 mb-3 font-medium">Skills</p>
-                              <div className="flex flex-wrap gap-2">
-                                {selectedSeeker.candidateDetails.skills.slice(0, 6).map((skill, idx) => (
-                                  <span key={idx} className="text-xs bg-blue-50 text-[#1e40a7] px-3 py-2 rounded-lg font-medium">
-                                    {skill}
-                                  </span>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                          
-                          {selectedSeeker.candidateDetails?.experience && (
-                            <div>
-                              <p className="text-sm text-gray-600 mb-2 font-medium">Experience</p>
-                              <p className="font-semibold text-gray-900">{selectedSeeker.candidateDetails.experience}</p>
-                            </div>
-                          )}
-                        </div>
-                      </motion.div>
-                    </>
-                  )}
-                </AnimatePresence>
+                      </div>
+                    </Channel>
+                  </Chat>
+                )}
               </motion.div>
             ) : (
               /* Welcome State */
@@ -710,7 +519,7 @@ export default function ReferrerDashboard() {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className="flex-1 flex flex-col items-center justify-center p-8 text-center h-full"
+                className="flex-1 flex flex-col items-center justify-center p-8 text-center h-full bg-gradient-to-br from-gray-50 to-blue-50"
               >
                 <div className="w-48 h-48 bg-gradient-to-br from-[#1e40a7] to-[#3b82f6] rounded-3xl flex items-center justify-center mb-8 shadow-2xl">
                   <FiMessageCircle className="h-20 w-20 text-white" />
