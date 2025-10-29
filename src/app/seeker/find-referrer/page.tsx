@@ -17,16 +17,22 @@ import {
   FiUsers,
   FiMail,
   FiInbox,
-  FiClock
+  FiClock,
+  FiSend,
+  FiPaperclip,
+  FiSmile,
+  FiMoreVertical,
+  FiHome,
+  FiMenu
 } from 'react-icons/fi';
 import {
   Chat,
   Channel,
-  Window,
-  ChannelHeader,
   MessageList,
   MessageInput,
-  Thread,
+  useMessageContext,
+  MessageSimple,
+  Avatar
 } from 'stream-chat-react';
 import 'stream-chat-react/dist/css/v2/index.css';
 import Sidebar from '@/app/components/Sidebar';
@@ -67,6 +73,81 @@ interface ChatChannel {
 
 type ViewMode = 'search' | 'results' | 'chat' | 'inbox';
 
+// Custom Message Component with better styling
+// Replace the CustomMessage component with this fixed version:
+
+// Custom Message Component with better styling and error handling
+const CustomMessage = (props: any) => {
+  const { message, isMyMessage } = props;
+  
+  // Safe access to user properties with fallbacks
+  const userName = message.user?.name || message.user?.username || message.user?.id || 'User';
+  const userInitial = userName.charAt(0).toUpperCase();
+  
+  return (
+    <div className={`flex ${isMyMessage ? 'justify-end' : 'justify-start'} mb-4`}>
+      <div className={`flex max-w-[70%] ${isMyMessage ? 'flex-row-reverse' : 'flex-row'} items-end space-x-2`}>
+        {!isMyMessage && (
+          <div className="w-8 h-8 bg-gradient-to-br from-[#2042AA] to-[#3B82F6] rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0">
+            {userInitial}
+          </div>
+        )}
+        <div className={`rounded-2xl px-4 py-2 ${
+          isMyMessage 
+            ? 'bg-gradient-to-r from-[#2042AA] to-[#3B82F6] text-white rounded-br-none' 
+            : 'bg-gray-100 text-gray-800 rounded-bl-none'
+        }`}>
+          <p className="text-sm">{message.text}</p>
+          <p className={`text-xs mt-1 ${isMyMessage ? 'text-blue-100' : 'text-gray-500'}`}>
+            {message.created_at ? new Date(message.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Now'}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Custom Message Input with better styling
+const CustomMessageInput = () => {
+  const [message, setMessage] = useState('');
+
+  const sendMessage = () => {
+    if (message.trim()) {
+      // This would be handled by Stream Chat's MessageInput normally
+      setMessage('');
+    }
+  };
+
+  return (
+    <div className="p-4 bg-white border-t border-gray-200">
+      <div className="flex items-center space-x-3">
+        <button className="p-2 text-gray-500 hover:text-[#2042AA] hover:bg-gray-100 rounded-xl transition-colors">
+          <FiPaperclip className="h-5 w-5" />
+        </button>
+        <div className="flex-1">
+          <input
+            type="text"
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            placeholder="Type your message..."
+            className="w-full px-4 py-3 bg-gray-100 border-0 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2042AA] resize-none text-sm lg:text-base"
+            onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
+          />
+        </div>
+        <button className="p-2 text-gray-500 hover:text-[#2042AA] hover:bg-gray-100 rounded-xl transition-colors">
+          <FiSmile className="h-5 w-5" />
+        </button>
+        <button
+          onClick={sendMessage}
+          className="p-3 bg-gradient-to-r from-[#2042AA] to-[#3B82F6] text-white rounded-xl hover:shadow-lg transition-all duration-300"
+        >
+          <FiSend className="h-5 w-5" />
+        </button>
+      </div>
+    </div>
+  );
+};
+
 export default function FindReferrerPage() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [referrers, setReferrers] = useState<Referrer[]>([]);
@@ -78,6 +159,7 @@ export default function FindReferrerPage() {
   const [searchFocused, setSearchFocused] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>('search');
   const [selectedReferrer, setSelectedReferrer] = useState<Referrer | null>(null);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   
   const { user, logout, loading: authLoading } = useAuth();
   const router = useRouter();
@@ -133,9 +215,8 @@ export default function FindReferrerPage() {
           for (const referrer of data.referrers) {
             try {
               await ensureStreamUser(referrer._id, referrer);
-              console.log(`✅ Ensured Stream user for referrer: ${referrer.referrerDetails?.fullName || referrer.username}`);
             } catch (error) {
-              console.error(`❌ Failed to ensure Stream user for referrer ${referrer._id}:`, error);
+              console.error(`Failed to ensure Stream user for referrer ${referrer._id}:`, error);
             }
           }
         }
@@ -146,78 +227,7 @@ export default function FindReferrerPage() {
       }
     } catch (error) {
       console.error('Failed to fetch referrers:', error);
-      // Fallback mock data for demo
-      setReferrers([
-        {
-          _id: 'referrer-1',
-          username: 'johnreferrer',
-          email: 'john@company.com',
-          referralCode: 'REF123456',
-          referrerDetails: {
-            fullName: 'John Smith',
-            mobileNumber: '+1234567890',
-            personalEmail: 'john.personal@email.com',
-            residentialAddress: 'Mumbai, India'
-          },
-          workDetails: {
-            companyName: 'Tech Solutions Inc',
-            workLocation: 'Mumbai',
-            designation: 'Senior HR Manager'
-          },
-          jobReferrerDetails: {
-            totalReferrals: 15,
-            successfulReferrals: 12,
-            commissionEarned: 50000
-          },
-          isOnline: true
-        },
-        {
-          _id: 'referrer-2',
-          username: 'priyareferrer',
-          email: 'priya@techcorp.com',
-          referralCode: 'REF789012',
-          referrerDetails: {
-            fullName: 'Priya Patel',
-            mobileNumber: '+1234567891',
-            personalEmail: 'priya.personal@email.com',
-            residentialAddress: 'Bangalore, India'
-          },
-          workDetails: {
-            companyName: 'TechCorp',
-            workLocation: 'Bangalore',
-            designation: 'Talent Acquisition Lead'
-          },
-          jobReferrerDetails: {
-            totalReferrals: 8,
-            successfulReferrals: 6,
-            commissionEarned: 30000
-          },
-          isOnline: false
-        },
-        {
-          _id: 'referrer-3',
-          username: 'rahulreferrer',
-          email: 'rahul@innovate.com',
-          referralCode: 'REF345678',
-          referrerDetails: {
-            fullName: 'Rahul Sharma',
-            mobileNumber: '+1234567892',
-            personalEmail: 'rahul.personal@email.com',
-            residentialAddress: 'Delhi, India'
-          },
-          workDetails: {
-            companyName: 'Innovate Tech',
-            workLocation: 'Delhi',
-            designation: 'Tech Lead'
-          },
-          jobReferrerDetails: {
-            totalReferrals: 20,
-            successfulReferrals: 18,
-            commissionEarned: 75000
-          },
-          isOnline: true
-        }
-      ]);
+      setReferrers([]);
     } finally {
       setReferrersLoading(false);
     }
@@ -228,7 +238,6 @@ export default function FindReferrerPage() {
     if (!chatClient || !user) return;
 
     try {
-      // Get all channels where user is a member
       const filter = { 
         type: 'messaging', 
         members: { $in: [user._id] } 
@@ -245,7 +254,6 @@ export default function FindReferrerPage() {
       const seenUserIds = new Set();
 
       for (const channel of channels) {
-        // Get the other member (not the current user)
         const otherMembers = Object.values(channel.state.members).filter(
           (member: any) => member.user.id !== user._id
         );
@@ -255,16 +263,12 @@ export default function FindReferrerPage() {
         const otherMember = otherMembers[0];
         const userId = otherMember.user.id;
         
-        // Skip if we've already processed this user
         if (seenUserIds.has(userId)) continue;
-        
         seenUserIds.add(userId);
 
-        // Find referrer in our referrers list
         let referrer = referrers.find(r => r._id === userId);
         
         if (!referrer) {
-          // Create referrer object from channel data if not found in API
           referrer = {
             _id: userId,
             username: otherMember.user.username || userId,
@@ -276,9 +280,8 @@ export default function FindReferrerPage() {
           };
         }
 
-        // Get last message for preview
         const lastMessage = channel.state.messages[channel.state.messages.length - 1];
-        const lastMessageText = lastMessage?.text || 'No messages yet';
+        const lastMessageText = lastMessage?.text || 'Start a conversation...';
 
         updatedChats.push({
           id: channel.id,
@@ -302,25 +305,17 @@ export default function FindReferrerPage() {
       setConnectionError('');
       setSelectedReferrer(referrer);
       
-      console.log('🟡 Starting chat with referrer:', referrer._id);
-      
-      // Ensure we're connected first
       if (!isConnected) {
         await connectUser(user._id, user);
       }
 
-      // First, check if we already have a channel with this user
       const existingChat = recentChats.find(chat => chat.referrer._id === referrer._id);
       
       let channel;
       
       if (existingChat) {
-        // Use existing channel
-        console.log('🟡 Using existing channel:', existingChat.id);
         channel = await startChannel(existingChat.id);
       } else {
-        // Create new channel using the API
-        console.log('🟡 Creating new channel with referrer:', referrer._id);
         const response = await fetch('/api/chat/create-channel', {
           method: 'POST',
           headers: {
@@ -340,10 +335,8 @@ export default function FindReferrerPage() {
           throw new Error(result.error || 'Failed to create channel');
         }
 
-        // Start the new channel
         channel = await startChannel(result.channelId);
         
-        // Add to recent chats immediately
         const newChat: ChatChannel = {
           id: result.channelId,
           referrer,
@@ -358,6 +351,7 @@ export default function FindReferrerPage() {
 
       setCurrentChannel(channel);
       setViewMode('chat');
+      setMobileMenuOpen(false);
       
     } catch (error: any) {
       console.error('Failed to create channel with referrer:', error);
@@ -434,11 +428,9 @@ export default function FindReferrerPage() {
 
   // Filter recent chats based on search
   const filteredChats = recentChats.filter((chat, index, self) => {
-    // Remove duplicates by user ID
     const isDuplicate = self.findIndex(c => c.referrer._id === chat.referrer._id) !== index;
     if (isDuplicate) return false;
     
-    // Apply search filter
     if (!searchTerm.trim()) return true;
     
     const searchLower = searchTerm.toLowerCase();
@@ -473,7 +465,6 @@ export default function FindReferrerPage() {
       if (!user) return;
 
       try {
-        console.log('🟡 Initializing Stream Chat for user:', user._id);
         await connectUser(user._id, user);
         await ensureStreamUser(user._id, user);
         await fetchReferrers();
@@ -494,7 +485,6 @@ export default function FindReferrerPage() {
     if (chatClient && user && referrers.length > 0) {
       updateRecentChats();
       
-      // Set up interval to update chats periodically
       const interval = setInterval(updateRecentChats, 30000);
       
       return () => clearInterval(interval);
@@ -551,8 +541,83 @@ export default function FindReferrerPage() {
         setIsOpen={setSidebarOpen}
       />
 
+      {/* Mobile Header */}
+      <div className="lg:hidden fixed top-0 left-0 right-0 z-40 bg-white/90 backdrop-blur-lg border-b border-gray-200">
+        <div className="flex items-center justify-between p-4">
+          <button
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            className="p-2 rounded-lg bg-gradient-to-r from-[#2042AA] to-[#3B82F6] text-white"
+          >
+            <FiMenu className="h-5 w-5" />
+          </button>
+          
+          <h1 className="text-lg font-black bg-gradient-to-r from-[#2042AA] to-[#3B82F6] bg-clip-text text-transparent">
+            Find Referrers
+          </h1>
+
+          <button
+            onClick={goToInbox}
+            className="relative p-2 text-[#2042AA]"
+          >
+            <FiInbox className="h-5 w-5" />
+            {totalUnread > 0 && (
+              <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center">
+                {totalUnread}
+              </span>
+            )}
+          </button>
+        </div>
+
+        {/* Mobile Navigation */}
+        <AnimatePresence>
+          {mobileMenuOpen && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              className="bg-white border-t border-gray-200"
+            >
+              <div className="p-4 space-y-2">
+                <button
+                  onClick={() => {
+                    setViewMode('search');
+                    setMobileMenuOpen(false);
+                  }}
+                  className="w-full flex items-center space-x-3 p-3 rounded-xl bg-blue-50 text-[#2042AA] font-semibold"
+                >
+                  <FiSearch className="h-5 w-5" />
+                  <span>Find Referrers</span>
+                </button>
+                
+                <button
+                  onClick={() => {
+                    goToInbox();
+                    setMobileMenuOpen(false);
+                  }}
+                  className="w-full flex items-center space-x-3 p-3 rounded-xl hover:bg-gray-50 text-gray-700"
+                >
+                  <FiInbox className="h-5 w-5" />
+                  <span>Inbox {totalUnread > 0 && `(${totalUnread})`}</span>
+                </button>
+                
+                <button
+                  onClick={() => {
+                    setViewMode('search');
+                    setMobileMenuOpen(false);
+                  }}
+                  className="w-full flex items-center space-x-3 p-3 rounded-xl hover:bg-gray-50 text-gray-700"
+                >
+                  <FiHome className="h-5 w-5" />
+                  <span>Home</span>
+                </button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+
       {/* Main Content */}
-      <div className="flex-1 flex flex-col overflow-hidden relative lg:ml-0">
+      <div className="flex-1 flex flex-col overflow-hidden relative lg:ml-0 pt-16 lg:pt-0">
         {/* Main Content Area */}
         <main className="flex-1 overflow-hidden">
           <AnimatePresence mode="wait">
@@ -563,26 +628,26 @@ export default function FindReferrerPage() {
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 1.05 }}
-                className="h-full flex flex-col items-center justify-center p-6"
+                className="h-full flex flex-col items-center justify-center p-4 lg:p-6"
               >
                 {/* Header */}
-                <div className="text-center mb-12">
-                  <h1 className="text-4xl md:text-5xl font-black bg-gradient-to-r from-[#2042AA] to-[#3B82F6] bg-clip-text text-transparent mb-4">
+                <div className="text-center mb-8 lg:mb-12">
+                  <h1 className="text-3xl lg:text-5xl font-black bg-gradient-to-r from-[#2042AA] to-[#3B82F6] bg-clip-text text-transparent mb-4">
                     Find Your Referrer
                   </h1>
-                  <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+                  <p className="text-base lg:text-lg text-gray-600 max-w-2xl mx-auto px-4">
                     Connect with experienced professionals who can refer you to top companies. 
                     Search by name, company, position, or username.
                   </p>
                 </div>
 
                 {/* Action Buttons */}
-                <div className="flex gap-4 mb-8">
+                <div className="flex flex-col sm:flex-row gap-4 mb-8 w-full max-w-md">
                   <motion.button
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
                     onClick={() => setViewMode('search')}
-                    className="bg-[#2042AA] text-white px-6 py-3 rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all duration-300"
+                    className="bg-[#2042AA] text-white px-6 py-4 rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all duration-300"
                   >
                     Find New Referrers
                   </motion.button>
@@ -591,10 +656,11 @@ export default function FindReferrerPage() {
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
                     onClick={goToInbox}
-                    className="bg-white text-[#2042AA] border-2 border-[#2042AA] px-6 py-3 rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all duration-300 flex items-center gap-2"
+                    className="bg-white text-[#2042AA] border-2 border-[#2042AA] px-6 py-4 rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all duration-300 flex items-center justify-center gap-2"
                   >
                     <FiInbox className="h-5 w-5" />
-                    Inbox {totalUnread > 0 && (
+                    <span>Inbox</span>
+                    {totalUnread > 0 && (
                       <span className="bg-red-500 text-white text-xs px-2 py-1 rounded-full">
                         {totalUnread}
                       </span>
@@ -603,7 +669,7 @@ export default function FindReferrerPage() {
                 </div>
 
                 {/* Big Search Bar */}
-                <div className="w-full max-w-4xl mx-auto">
+                <div className="w-full max-w-4xl mx-auto px-4">
                   <form onSubmit={handleSearch} className="relative">
                     <motion.div
                       animate={{
@@ -612,7 +678,7 @@ export default function FindReferrerPage() {
                       transition={{ duration: 0.2 }}
                       className="relative"
                     >
-                      <FiSearch className="absolute left-6 top-1/2 transform -translate-y-1/2 h-6 w-6 text-[#2042AA] z-10" />
+                      <FiSearch className="absolute left-4 lg:left-6 top-1/2 transform -translate-y-1/2 h-5 lg:h-6 w-5 lg:w-6 text-[#2042AA] z-10" />
                       <input
                         type="text"
                         placeholder="Search referrers by name, company, position, or username..."
@@ -620,15 +686,15 @@ export default function FindReferrerPage() {
                         onChange={(e) => setSearchTerm(e.target.value)}
                         onFocus={() => setSearchFocused(true)}
                         onBlur={() => setSearchFocused(false)}
-                        className="w-full pl-16 pr-6 py-6 bg-white/90 backdrop-blur-lg rounded-2xl border-2 border-[#2042AA]/20 focus:outline-none focus:border-[#2042AA] focus:ring-4 focus:ring-[#2042AA]/20 text-lg text-gray-800 placeholder-gray-500 transition-all duration-300 shadow-2xl"
+                        className="w-full pl-12 lg:pl-16 pr-24 lg:pr-32 py-4 lg:py-6 bg-white/90 backdrop-blur-lg rounded-2xl border-2 border-[#2042AA]/20 focus:outline-none focus:border-[#2042AA] focus:ring-4 focus:ring-[#2042AA]/20 text-base lg:text-lg text-gray-800 placeholder-gray-500 transition-all duration-300 shadow-2xl"
                       />
                       {searchTerm && (
                         <button
                           type="button"
                           onClick={clearSearch}
-                          className="absolute right-4 top-1/2 transform -translate-y-1/2 p-2 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                          className="absolute right-20 lg:right-28 top-1/2 transform -translate-y-1/2 p-2 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
                         >
-                          <FiX className="h-5 w-5 text-gray-500" />
+                          <FiX className="h-4 w-4 lg:h-5 lg:w-5 text-gray-500" />
                         </button>
                       )}
                     </motion.div>
@@ -637,7 +703,7 @@ export default function FindReferrerPage() {
                       type="submit"
                       whileHover={{ scale: 1.05 }}
                       whileTap={{ scale: 0.95 }}
-                      className="absolute right-2 top-1/2 transform -translate-y-1/2 bg-gradient-to-r from-[#2042AA] to-[#3B82F6] text-white px-8 py-4 rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all duration-300"
+                      className="absolute right-2 top-1/2 transform -translate-y-1/2 bg-gradient-to-r from-[#2042AA] to-[#3B82F6] text-white px-4 lg:px-8 py-3 lg:py-4 rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all duration-300 text-sm lg:text-base"
                     >
                       Search
                     </motion.button>
@@ -648,9 +714,9 @@ export default function FindReferrerPage() {
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.3 }}
-                    className="mt-8 text-center"
+                    className="mt-6 lg:mt-8 text-center"
                   >
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-2xl mx-auto">
+                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4 max-w-2xl mx-auto">
                       {[
                         { icon: FiUser, text: 'Name' },
                         { icon: FiBriefcase, text: 'Company' },
@@ -681,33 +747,33 @@ export default function FindReferrerPage() {
                 initial={{ opacity: 0, x: 50 }}
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -50 }}
-                className="h-full flex flex-col p-6"
+                className="h-full flex flex-col p-4 lg:p-6"
               >
                 {/* Back Button and Header */}
-                <div className="flex items-center justify-between mb-8">
+                <div className="flex items-center justify-between mb-6 lg:mb-8">
                   <button
                     onClick={goBackToSearch}
-                    className="flex items-center space-x-2 px-4 py-2 text-[#2042AA] hover:bg-[#2042AA]/10 rounded-xl transition-colors"
+                    className="flex items-center space-x-2 px-3 lg:px-4 py-2 text-[#2042AA] hover:bg-[#2042AA]/10 rounded-xl transition-colors"
                   >
-                    <FiChevronLeft className="h-5 w-5" />
-                    <span>Back to Search</span>
+                    <FiChevronLeft className="h-4 w-4 lg:h-5 lg:w-5" />
+                    <span className="text-sm lg:text-base">Back</span>
                   </button>
                   
                   <div className="text-center flex-1 max-w-2xl">
-                    <h2 className="text-2xl font-black bg-gradient-to-r from-[#2042AA] to-[#3B82F6] bg-clip-text text-transparent">
+                    <h2 className="text-xl lg:text-2xl font-black bg-gradient-to-r from-[#2042AA] to-[#3B82F6] bg-clip-text text-transparent">
                       Search Results
                     </h2>
-                    <p className="text-gray-600">
+                    <p className="text-gray-600 text-sm lg:text-base">
                       Found {filteredReferrers.length} referrers {searchTerm && `matching "${searchTerm}"`}
                     </p>
                   </div>
 
                   <button
                     onClick={goToInbox}
-                    className="flex items-center space-x-2 px-4 py-2 text-[#2042AA] hover:bg-[#2042AA]/10 rounded-xl transition-colors"
+                    className="flex items-center space-x-2 px-3 lg:px-4 py-2 text-[#2042AA] hover:bg-[#2042AA]/10 rounded-xl transition-colors"
                   >
-                    <FiInbox className="h-5 w-5" />
-                    <span>Inbox {totalUnread > 0 && `(${totalUnread})`}</span>
+                    <FiInbox className="h-4 w-4 lg:h-5 lg:w-5" />
+                    <span className="text-sm lg:text-base">Inbox {totalUnread > 0 && `(${totalUnread})`}</span>
                   </button>
                 </div>
 
@@ -719,8 +785,8 @@ export default function FindReferrerPage() {
                     </div>
                   ) : filteredReferrers.length === 0 ? (
                     <div className="text-center py-12 text-gray-500">
-                      <FiUser className="h-16 w-16 mx-auto mb-4 opacity-50" />
-                      <p className="text-lg">No referrers found</p>
+                      <FiUser className="h-12 w-12 lg:h-16 lg:w-16 mx-auto mb-4 opacity-50" />
+                      <p className="text-base lg:text-lg">No referrers found</p>
                       <p className="text-sm mt-2">Try different search terms</p>
                       <button
                         onClick={goBackToSearch}
@@ -730,30 +796,35 @@ export default function FindReferrerPage() {
                       </button>
                     </div>
                   ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pb-6">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 lg:gap-6 pb-6">
                       {filteredReferrers.map((referrer, index) => (
                         <motion.div
                           key={referrer._id}
                           initial={{ opacity: 0, y: 20 }}
                           animate={{ opacity: 1, y: 0 }}
                           transition={{ delay: index * 0.1 }}
-                          className="bg-white/80 backdrop-blur-lg rounded-2xl shadow-lg border border-[#2042AA]/20 p-6 hover:shadow-xl transition-all duration-300"
+                          className="bg-white/80 backdrop-blur-lg rounded-2xl shadow-lg border border-[#2042AA]/20 p-4 lg:p-6 hover:shadow-xl transition-all duration-300"
                         >
-                          <div className="flex items-start space-x-4 mb-4">
-                            <div className="w-16 h-16 bg-gradient-to-br from-[#2042AA] to-[#3B82F6] rounded-2xl flex items-center justify-center text-white font-bold text-xl shadow-md flex-shrink-0">
-                              {referrer.referrerDetails?.fullName?.charAt(0) || referrer.username.charAt(0)}
+                          <div className="flex items-start space-x-3 lg:space-x-4 mb-4">
+                            <div className="relative">
+                              <div className="w-12 h-12 lg:w-16 lg:h-16 bg-gradient-to-br from-[#2042AA] to-[#3B82F6] rounded-2xl flex items-center justify-center text-white font-bold text-lg lg:text-xl shadow-md flex-shrink-0">
+                                {referrer.referrerDetails?.fullName?.charAt(0) || referrer.username.charAt(0)}
+                              </div>
+                              {referrer.isOnline && (
+                                <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></div>
+                              )}
                             </div>
                             <div className="flex-1 min-w-0">
-                              <h3 className="font-bold text-[#2042AA] text-lg truncate">
+                              <h3 className="font-bold text-[#2042AA] text-base lg:text-lg truncate">
                                 {referrer.referrerDetails?.fullName || referrer.username}
                               </h3>
                               {referrer.workDetails?.designation && (
-                                <p className="text-gray-600 font-medium truncate">
+                                <p className="text-gray-600 font-medium text-sm lg:text-base truncate">
                                   {referrer.workDetails.designation}
                                 </p>
                               )}
                               {referrer.workDetails?.companyName && (
-                                <p className="text-gray-500 text-sm truncate">
+                                <p className="text-gray-500 text-xs lg:text-sm truncate">
                                   {referrer.workDetails.companyName}
                                 </p>
                               )}
@@ -762,8 +833,15 @@ export default function FindReferrerPage() {
 
                           {referrer.workDetails?.workLocation && (
                             <div className="flex items-center space-x-2 text-gray-500 mb-4">
-                              <FiMapPin className="h-4 w-4" />
-                              <span className="text-sm">{referrer.workDetails.workLocation}</span>
+                              <FiMapPin className="h-3 w-3 lg:h-4 lg:w-4" />
+                              <span className="text-xs lg:text-sm">{referrer.workDetails.workLocation}</span>
+                            </div>
+                          )}
+
+                          {referrer.jobReferrerDetails && (
+                            <div className="flex items-center justify-between text-xs lg:text-sm text-gray-600 mb-4">
+                              <span>Referrals: {referrer.jobReferrerDetails.successfulReferrals || 0}/{referrer.jobReferrerDetails.totalReferrals || 0}</span>
+                              <span>Success: {Math.round(((referrer.jobReferrerDetails.successfulReferrals || 0) / (referrer.jobReferrerDetails.totalReferrals || 1)) * 100)}%</span>
                             </div>
                           )}
 
@@ -789,36 +867,36 @@ export default function FindReferrerPage() {
                 initial={{ opacity: 0, x: 50 }}
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -50 }}
-                className="h-full flex flex-col p-6"
+                className="h-full flex flex-col p-4 lg:p-6"
               >
                 {/* Back Button and Header */}
-                <div className="flex items-center justify-between mb-8">
+                <div className="flex items-center justify-between mb-6 lg:mb-8">
                   <button
                     onClick={goBackToSearch}
-                    className="flex items-center space-x-2 px-4 py-2 text-[#2042AA] hover:bg-[#2042AA]/10 rounded-xl transition-colors"
+                    className="flex items-center space-x-2 px-3 lg:px-4 py-2 text-[#2042AA] hover:bg-[#2042AA]/10 rounded-xl transition-colors"
                   >
-                    <FiChevronLeft className="h-5 w-5" />
-                    <span>Back to Search</span>
+                    <FiChevronLeft className="h-4 w-4 lg:h-5 lg:w-5" />
+                    <span className="text-sm lg:text-base">Back</span>
                   </button>
                   
                   <div className="text-center flex-1 max-w-2xl">
-                    <h2 className="text-2xl font-black bg-gradient-to-r from-[#2042AA] to-[#3B82F6] bg-clip-text text-transparent">
+                    <h2 className="text-xl lg:text-2xl font-black bg-gradient-to-r from-[#2042AA] to-[#3B82F6] bg-clip-text text-transparent">
                       Your Inbox
                     </h2>
-                    <p className="text-gray-600">
-                      {filteredChats.length} conversation{filteredChats.length !== 1 ? 's' : ''} • {totalUnread} unread message{totalUnread !== 1 ? 's' : ''}
+                    <p className="text-gray-600 text-sm lg:text-base">
+                      {filteredChats.length} conversation{filteredChats.length !== 1 ? 's' : ''} • {totalUnread} unread
                     </p>
                   </div>
 
-                  <div className="w-32"></div>
+                  <div className="w-20 lg:w-32"></div>
                 </div>
 
                 {/* Recent Chats List */}
                 <div className="flex-1 overflow-auto">
                   {filteredChats.length === 0 ? (
                     <div className="text-center py-12 text-gray-500">
-                      <FiInbox className="h-16 w-16 mx-auto mb-4 opacity-50" />
-                      <p className="text-lg">No conversations yet</p>
+                      <FiInbox className="h-12 w-12 lg:h-16 lg:w-16 mx-auto mb-4 opacity-50" />
+                      <p className="text-base lg:text-lg">No conversations yet</p>
                       <p className="text-sm mt-2">Start chatting with referrers to see them here</p>
                       <button
                         onClick={goBackToSearch}
@@ -828,7 +906,7 @@ export default function FindReferrerPage() {
                       </button>
                     </div>
                   ) : (
-                    <div className="space-y-4 max-w-4xl mx-auto">
+                    <div className="space-y-3 lg:space-y-4 max-w-4xl mx-auto">
                       {filteredChats.map((chat, index) => (
                         <motion.button
                           key={`${chat.id}-${chat.referrer._id}`}
@@ -836,26 +914,26 @@ export default function FindReferrerPage() {
                           animate={{ opacity: 1, y: 0 }}
                           transition={{ delay: index * 0.05 }}
                           onClick={() => startChatWithReferrer(chat.referrer)}
-                          className="w-full text-left bg-white/80 backdrop-blur-lg rounded-2xl shadow-lg border border-[#2042AA]/20 p-6 hover:shadow-xl transition-all duration-300"
+                          className="w-full text-left bg-white/80 backdrop-blur-lg rounded-2xl shadow-lg border border-[#2042AA]/20 p-4 lg:p-6 hover:shadow-xl transition-all duration-300"
                         >
-                          <div className="flex items-start space-x-4">
+                          <div className="flex items-start space-x-3 lg:space-x-4">
                             <div className="relative">
-                              <div className="w-16 h-16 bg-gradient-to-br from-[#2042AA] to-[#3B82F6] rounded-2xl flex items-center justify-center text-white font-bold text-xl shadow-md">
+                              <div className="w-12 h-12 lg:w-16 lg:h-16 bg-gradient-to-br from-[#2042AA] to-[#3B82F6] rounded-2xl flex items-center justify-center text-white font-bold text-lg lg:text-xl shadow-md">
                                 {chat.referrer.referrerDetails?.fullName?.charAt(0) || chat.referrer.username.charAt(0)}
                               </div>
                               {chat.isOnline && (
-                                <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></div>
+                                <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></div>
                               )}
                             </div>
                             
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center justify-between mb-2">
-                                <h3 className="font-bold text-[#2042AA] text-lg">
+                                <h3 className="font-bold text-[#2042AA] text-base lg:text-lg truncate">
                                   {chat.referrer.referrerDetails?.fullName || chat.referrer.username}
                                 </h3>
                                 <div className="flex items-center space-x-2">
                                   {chat.timestamp && (
-                                    <span className="text-sm text-gray-500 flex items-center space-x-1">
+                                    <span className="text-xs lg:text-sm text-gray-500 flex items-center space-x-1">
                                       <FiClock className="h-3 w-3" />
                                       <span>{formatTime(chat.timestamp)}</span>
                                     </span>
@@ -868,20 +946,20 @@ export default function FindReferrerPage() {
                                 </div>
                               </div>
                               
-                              <p className="text-gray-600 mb-2 line-clamp-2">
+                              <p className="text-gray-600 mb-2 line-clamp-2 text-sm lg:text-base">
                                 {chat.lastMessage}
                               </p>
                               
                               {chat.referrer.workDetails && (
-                                <div className="flex items-center space-x-4 text-sm text-gray-500">
+                                <div className="flex items-center space-x-2 lg:space-x-4 text-xs lg:text-sm text-gray-500">
                                   {chat.referrer.workDetails.designation && (
                                     <span className="flex items-center space-x-1">
                                       <FiBriefcase className="h-3 w-3" />
-                                      <span>{chat.referrer.workDetails.designation}</span>
+                                      <span className="truncate">{chat.referrer.workDetails.designation}</span>
                                     </span>
                                   )}
                                   {chat.referrer.workDetails.companyName && (
-                                    <span>at {chat.referrer.workDetails.companyName}</span>
+                                    <span className="truncate">at {chat.referrer.workDetails.companyName}</span>
                                   )}
                                 </div>
                               )}
@@ -895,94 +973,122 @@ export default function FindReferrerPage() {
               </motion.div>
             )}
 
-            {/* CHAT VIEW */}
-            {viewMode === 'chat' && selectedReferrer && (
-              <motion.div
-                key="chat"
-                initial={{ opacity: 0, x: 50 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -50 }}
-                className="h-full flex flex-col"
-              >
-                {/* Chat Header with Back Button */}
-                <div className="flex items-center justify-between p-4 border-b border-[#2042AA]/10 bg-white/80 backdrop-blur-lg">
-                  <button
-                    onClick={viewMode === 'chat' && recentChats.length > 0 ? goToInbox : goBackToResults}
-                    className="flex items-center space-x-2 px-4 py-2 text-[#2042AA] hover:bg-[#2042AA]/10 rounded-xl transition-colors"
-                  >
-                    <FiChevronLeft className="h-5 w-5" />
-                    <span>{recentChats.length > 0 ? 'Back to Inbox' : 'Back to Results'}</span>
-                  </button>
-
-                  <div className="flex items-center space-x-3">
-                    <div className="w-10 h-10 bg-gradient-to-br from-[#2042AA] to-[#3B82F6] rounded-lg flex items-center justify-center text-white font-bold">
-                      {selectedReferrer.referrerDetails?.fullName?.charAt(0) || selectedReferrer.username.charAt(0)}
-                    </div>
-                    <div className="text-center">
-                      <h4 className="font-bold text-[#2042AA]">
-                        {selectedReferrer.referrerDetails?.fullName || selectedReferrer.username}
-                      </h4>
-                      <p className="text-sm text-gray-600">
-                        {selectedReferrer.workDetails?.designation} at {selectedReferrer.workDetails?.companyName}
-                      </p>
-                    </div>
-                  </div>
-
-                  <button
-                    onClick={goToInbox}
-                    className="flex items-center space-x-2 px-4 py-2 text-[#2042AA] hover:bg-[#2042AA]/10 rounded-xl transition-colors"
-                  >
-                    <FiInbox className="h-5 w-5" />
-                    <span>Inbox {totalUnread > 0 && `(${totalUnread})`}</span>
-                  </button>
-                </div>
-
-                {/* Chat Container */}
-                <div className="flex-1 overflow-hidden">
-                  {connectionError ? (
-                    <div className="flex-1 flex flex-col items-center justify-center p-8">
-                      <div className="w-20 h-20 bg-red-100 rounded-2xl flex items-center justify-center mb-4 shadow-lg">
-                        <FiMessageCircle className="h-10 w-10 text-red-500" />
-                      </div>
-                      <h3 className="text-xl font-bold text-red-600 mb-2">Connection Error</h3>
-                      <p className="text-red-500 text-center mb-6">{connectionError}</p>
-                      <button
-                        onClick={() => setConnectionError('')}
-                        className="px-6 py-3 bg-red-500 text-white rounded-xl hover:bg-red-600 transition-colors shadow-lg"
-                      >
-                        Try Again
-                      </button>
-                    </div>
-                  ) : currentChannel && isConnected ? (
-                    <div className="h-full flex flex-col">
-                      <Chat client={chatClient} theme="messaging light">
-                        <Channel channel={currentChannel}>
-                          <Window>
-                            <ChannelHeader />
-                            <MessageList />
-                            <MessageInput />
-                          </Window>
-                          <Thread />
-                        </Channel>
-                      </Chat>
-                    </div>
-                  ) : (
-                    <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
-                      <div className="w-20 h-20 bg-gray-100 rounded-2xl flex items-center justify-center mb-4 shadow-lg">
-                        <FiMessageCircle className="h-10 w-10 text-gray-400" />
-                      </div>
-                      <h3 className="text-xl font-bold text-gray-600 mb-2">Connecting...</h3>
-                      <p className="text-gray-500">Setting up your chat connection</p>
-                    </div>
-                  )}
-                </div>
-              </motion.div>
+            {/* CHAT VIEW - FULL WIDTH & CUSTOM STYLING */}
+         {/* CHAT VIEW - SIMPLE & WORKING */}
+{viewMode === 'chat' && selectedReferrer && (
+  <motion.div
+    key="chat"
+    initial={{ opacity: 0, x: 50 }}
+    animate={{ opacity: 1, x: 0 }}
+    exit={{ opacity: 0, x: -50 }}
+    className="h-full flex flex-col bg-white w-full"
+  >
+    {/* Chat Header */}
+    <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-gradient-to-r from-[#2042AA] to-[#3B82F6] text-white shadow-lg w-full">
+      <div className="flex items-center space-x-3 lg:space-x-4">
+        <button
+          onClick={recentChats.length > 0 ? goToInbox : goBackToResults}
+          className="p-2 hover:bg-white/20 rounded-lg transition-colors"
+        >
+          <FiChevronLeft className="h-5 w-5 lg:h-6 lg:w-6" />
+        </button>
+        
+        <div className="flex items-center space-x-3">
+          <div className="relative">
+            <div className="w-10 h-10 lg:w-12 lg:h-12 bg-white/20 rounded-xl flex items-center justify-center text-white font-bold text-base lg:text-lg border-2 border-white/30">
+              {selectedReferrer.referrerDetails?.fullName?.charAt(0) || selectedReferrer.username.charAt(0)}
+            </div>
+            {selectedReferrer.isOnline && (
+              <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-400 rounded-full border-2 border-[#2042AA]"></div>
             )}
+          </div>
+          <div>
+            <h4 className="font-bold text-base lg:text-lg">
+              {selectedReferrer.referrerDetails?.fullName || selectedReferrer.username}
+            </h4>
+            <p className="text-white/80 text-xs lg:text-sm">
+              {selectedReferrer.workDetails?.designation} • {selectedReferrer.workDetails?.companyName}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex items-center space-x-2">
+        <button className="p-2 hover:bg-white/20 rounded-lg transition-colors">
+          <FiMoreVertical className="h-4 w-4 lg:h-5 lg:w-5" />
+        </button>
+      </div>
+    </div>
+
+    {/* Chat Container - Full Width */}
+    <div className="flex-1 overflow-hidden bg-gradient-to-br from-blue-50/50 to-indigo-50/50 w-full">
+      {connectionError ? (
+        <div className="flex-1 flex flex-col items-center justify-center p-6 lg:p-8 w-full">
+          <div className="w-16 h-16 lg:w-20 lg:h-20 bg-red-100 rounded-2xl flex items-center justify-center mb-4 shadow-lg">
+            <FiMessageCircle className="h-8 w-8 lg:h-10 lg:w-10 text-red-500" />
+          </div>
+          <h3 className="text-lg lg:text-xl font-bold text-red-600 mb-2 text-center">Connection Error</h3>
+          <p className="text-red-500 text-center mb-6 text-sm lg:text-base">{connectionError}</p>
+          <button
+            onClick={() => setConnectionError('')}
+            className="px-6 py-3 bg-red-500 text-white rounded-xl hover:bg-red-600 transition-colors shadow-lg text-sm lg:text-base"
+          >
+            Try Again
+          </button>
+        </div>
+      ) : currentChannel && isConnected ? (
+        <div className="h-full flex flex-col w-full">
+          <Chat client={chatClient} theme="messaging light">
+            <Channel channel={currentChannel}>
+              <div className="h-full flex flex-col w-full">
+                {/* Message List - Full Width */}
+                <div className="flex-1 overflow-auto w-full">
+                  <MessageList 
+                    hideDeletedMessages
+                    messageActions={['edit', 'delete', 'react', 'reply']}
+                  />
+                </div>
+                
+                {/* Message Input - Full Width */}
+                <div className="w-full p-4 border-t border-gray-200 bg-white/80 backdrop-blur-lg">
+                  <MessageInput 
+                    focus
+                    additionalTextareaProps={{
+                      placeholder: "Type your message...",
+                      rows: 1,
+                      className: "w-full px-4 py-3 bg-gray-100 border-0 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2042AA] resize-none text-sm lg:text-base"
+                    }}
+                  />
+                </div>
+              </div>
+            </Channel>
+          </Chat>
+        </div>
+      ) : (
+        <div className="flex-1 flex flex-col items-center justify-center p-6 lg:p-8 text-center w-full">
+          <motion.div
+            animate={{
+              scale: [1, 1.1, 1],
+            }}
+            transition={{ duration: 2, repeat: Infinity }}
+            className="w-16 h-16 lg:w-20 lg:h-20 bg-gradient-to-br from-[#2042AA] to-[#3B82F6] rounded-2xl flex items-center justify-center mb-4 shadow-lg"
+          >
+            <FiMessageCircle className="h-8 w-8 lg:h-10 lg:w-10 text-white" />
+          </motion.div>
+          <h3 className="text-lg lg:text-xl font-bold text-gray-600 mb-2">Connecting...</h3>
+          <p className="text-gray-500 text-sm lg:text-base">
+            Setting up your chat with {selectedReferrer.referrerDetails?.fullName || selectedReferrer.username}
+          </p>
+        </div>
+      )}
+    </div>
+  </motion.div>
+)}
           </AnimatePresence>
         </main>
       </div>
 
-      <style jsx>{`
+      <style jsx global>{`
         @keyframes blob {
           0% { transform: translate(0px, 0px) scale(1); }
           33% { transform: translate(30px, -50px) scale(1.1); }
@@ -997,6 +1103,67 @@ export default function FindReferrerPage() {
         }
         .animation-delay-4000 {
           animation-delay: 4s;
+        }
+        
+        /* Custom scrollbar */
+        .overflow-auto::-webkit-scrollbar {
+          width: 6px;
+        }
+        .overflow-auto::-webkit-scrollbar-track {
+          background: #f1f1f1;
+          border-radius: 10px;
+        }
+        .overflow-auto::-webkit-scrollbar-thumb {
+          background: #c1c1c1;
+          border-radius: 10px;
+        }
+        .overflow-auto::-webkit-scrollbar-thumb:hover {
+          background: #a1a1a1;
+        }
+
+        /* Stream Chat Overrides for Full Width */
+        .str-chat {
+          width: 100% !important;
+          max-width: 100% !important;
+        }
+
+        .str-chat__container {
+          width: 100% !important;
+          max-width: 100% !important;
+        }
+
+        .str-chat__channel {
+          width: 100% !important;
+        }
+
+        .str-chat__main-panel {
+          width: 100% !important;
+          padding: 0 !important;
+        }
+
+        .str-chat__message-list {
+          width: 100% !important;
+          padding: 1rem !important;
+        }
+
+        .str-chat__list {
+          width: 100% !important;
+        }
+
+        .str-chat__ul {
+          width: 100% !important;
+        }
+
+        .str-chat__message {
+          max-width: 100% !important;
+        }
+
+        .str-chat__message-textarea {
+          width: 100% !important;
+        }
+
+        .str-chat__input-footer {
+          width: 100% !important;
         }
       `}</style>
     </div>

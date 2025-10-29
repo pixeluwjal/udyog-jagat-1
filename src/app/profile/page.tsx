@@ -5,6 +5,7 @@ import { useState, useEffect, FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/app/context/AuthContext";
 import Sidebar from "@/app/components/Sidebar";
+import OrganizationHierarchy from "../components/create-user/OrganizationHierarchy";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   FiUser,
@@ -26,6 +27,12 @@ import {
   FiShield,
   FiAward,
   FiKey,
+  FiUsers,
+  FiRefreshCw,
+  FiBriefcase,
+  FiHome,
+  FiPhone,
+  FiMap,
 } from "react-icons/fi";
 
 // Brand colors
@@ -35,8 +42,30 @@ const darkBlue = "#1C3991";
 interface Organization {
   _id: string;
   name: string;
-  type: 'milan' | 'valaya' | 'khanda' | 'vibhaaga' | 'ghata';
+  type: 'milan' | 'valaya' | 'khanda' | 'vibhaaga';
   parentId?: string;
+}
+
+interface UserData {
+  role: "job_poster" | "job_seeker" | "admin" | "job_referrer" | "super_admin";
+  email: string;
+  username: string;
+  milan?: string;
+  valaya?: string;
+  khanda?: string;
+  vibhaaga?: string;
+  // Referrer specific fields
+  referrerDetails?: {
+    fullName: string;
+    mobileNumber: string;
+    personalEmail: string;
+    residentialAddress: string;
+  };
+  workDetails?: {
+    companyName: string;
+    workLocation: string;
+    designation: string;
+  };
 }
 
 export default function ProfilePage() {
@@ -58,7 +87,14 @@ export default function ProfilePage() {
     valaya: "",
     khanda: "",
     vibhaaga: "",
-    ghata: "",
+    // Referrer specific fields
+    fullName: "",
+    mobileNumber: "",
+    personalEmail: "",
+    residentialAddress: "",
+    companyName: "",
+    workLocation: "",
+    designation: "",
   });
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -68,6 +104,7 @@ export default function ProfilePage() {
   const [resumeFile, setResumeFile] = useState<File | null>(null);
 
   const [organizations, setOrganizations] = useState<Organization[]>([]);
+  const [userData, setUserData] = useState<UserData | null>(null);
   const [loading, setLoading] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
@@ -75,6 +112,109 @@ export default function ProfilePage() {
   const [message, setMessage] = useState<string | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [loadingOrgs, setLoadingOrgs] = useState(false);
+
+  // Fetch user data with proper role detection
+  const fetchUserData = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        router.push("/login");
+        return;
+      }
+
+      console.log('🟡 Fetching user data with role detection...');
+
+      // First check if user is super admin
+      const superAdminResponse = await fetch('/api/auth/check-super-admin', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (superAdminResponse.ok) {
+        const superAdminData = await superAdminResponse.json();
+        console.log('🔍 Super admin check result:', superAdminData);
+        
+        if (superAdminData.isSuperAdmin) {
+          const userData: UserData = {
+            role: 'super_admin',
+            email: superAdminData.user.email,
+            username: superAdminData.user.username,
+            milan: superAdminData.user.milan,
+            valaya: superAdminData.user.valaya,
+            khanda: superAdminData.user.khanda,
+            vibhaaga: superAdminData.user.vibhaaga,
+            referrerDetails: superAdminData.user.referrerDetails,
+            workDetails: superAdminData.user.workDetails
+          };
+          setUserData(userData);
+          setFormData({
+            username: userData.username,
+            email: userData.email,
+            milan: userData.milan || "",
+            valaya: userData.valaya || "",
+            khanda: userData.khanda || "",
+            vibhaaga: userData.vibhaaga || "",
+            fullName: userData.referrerDetails?.fullName || "",
+            mobileNumber: userData.referrerDetails?.mobileNumber || "",
+            personalEmail: userData.referrerDetails?.personalEmail || "",
+            residentialAddress: userData.referrerDetails?.residentialAddress || "",
+            companyName: userData.workDetails?.companyName || "",
+            workLocation: userData.workDetails?.workLocation || "",
+            designation: userData.workDetails?.designation || "",
+          });
+          console.log('✅ Set as Super Admin:', userData);
+          return;
+        }
+      }
+
+      // If not super admin, get regular user data
+      const response = await fetch('/api/auth/me', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log('🔍 Regular user data:', data);
+        const userData: UserData = {
+          role: data.user.role,
+          email: data.user.email,
+          username: data.user.username,
+          milan: data.user.milan,
+          valaya: data.user.valaya,
+          khanda: data.user.khanda,
+          vibhaaga: data.user.vibhaaga,
+          referrerDetails: data.user.referrerDetails,
+          workDetails: data.user.workDetails
+        };
+        setUserData(userData);
+        setFormData({
+          username: userData.username,
+          email: userData.email,
+          milan: userData.milan || "",
+          valaya: userData.valaya || "",
+          khanda: userData.khanda || "",
+          vibhaaga: userData.vibhaaga || "",
+          fullName: userData.referrerDetails?.fullName || "",
+          mobileNumber: userData.referrerDetails?.mobileNumber || "",
+          personalEmail: userData.referrerDetails?.personalEmail || "",
+          residentialAddress: userData.referrerDetails?.residentialAddress || "",
+          companyName: userData.workDetails?.companyName || "",
+          workLocation: userData.workDetails?.workLocation || "",
+          designation: userData.workDetails?.designation || "",
+        });
+        console.log('✅ Set as Regular User:', userData);
+      } else {
+        console.error('❌ Failed to fetch user data');
+        router.push('/login');
+      }
+    } catch (error) {
+      console.error('❌ Error fetching user data:', error);
+      router.push('/login');
+    }
+  };
 
   // Fetch organizations from API
   const fetchOrganizations = async () => {
@@ -105,15 +245,15 @@ export default function ProfilePage() {
     }
   };
 
-  // Filter organizations by type
-  const getOrganizationsByType = (type: Organization['type']) => {
-    const filtered = organizations.filter(org => org.type === type);
-    console.log(`🟡 Organizations of type ${type}:`, filtered);
-    return filtered;
+  // Get organization name by ID
+  const getOrganizationName = (id: string, type: string): string => {
+    if (!id || !organizations.length) return "Not set";
+    const org = organizations.find(o => o._id === id && o.type === type);
+    return org?.name || "Not found";
   };
 
   const fetchResumeDetails = async () => {
-    if (!token || !currentUser || currentUser.role !== 'job_seeker') return;
+    if (!token || !userData || userData.role !== 'job_seeker') return;
 
     try {
       const response = await fetch("/api/resumes", {
@@ -145,29 +285,22 @@ export default function ProfilePage() {
       if (!isAuthenticated || !currentUser) {
         router.push("/login");
       } else {
-        setFormData({
-          username: currentUser.username || "",
-          email: currentUser.email || "",
-          milan: currentUser.milan || "",
-          valaya: currentUser.valaya || "",
-          khanda: currentUser.khanda || "",
-          vibhaaga: currentUser.vibhaaga || "",
-          ghata: currentUser.ghata || "",
-        });
-        
-        // Fetch organizations data
+        fetchUserData();
         fetchOrganizations();
-        
-        if (currentUser.role === 'job_seeker') {
-          fetchResumeDetails();
-        }
       }
     }
-  }, [authLoading, isAuthenticated, currentUser, router, token]);
+  }, [authLoading, isAuthenticated, currentUser, router]);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+  useEffect(() => {
+    if (userData && userData.role === 'job_seeker') {
+      fetchResumeDetails();
+    }
+  }, [userData, token]);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
+    console.log(`🟡 Form data updated - ${name}: ${value}`);
   };
 
   const handlePasswordChangeInput = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -183,6 +316,45 @@ export default function ProfilePage() {
     }
   };
 
+  // Organization hierarchy handlers
+  const handleVibhaagaChange = (vibhaagaId: string) => {
+    console.log('🟡 Vibhaaga changed to:', vibhaagaId);
+    setFormData(prev => ({
+      ...prev,
+      vibhaaga: vibhaagaId,
+      khanda: "",
+      valaya: "",
+      milan: ""
+    }));
+  };
+
+  const handleKhandaChange = (khandaId: string) => {
+    console.log('🟡 Khanda changed to:', khandaId);
+    setFormData(prev => ({
+      ...prev,
+      khanda: khandaId,
+      valaya: "",
+      milan: ""
+    }));
+  };
+
+  const handleValayaChange = (valayaId: string) => {
+    console.log('🟡 Valaya changed to:', valayaId);
+    setFormData(prev => ({
+      ...prev,
+      valaya: valayaId,
+      milan: ""
+    }));
+  };
+
+  const handleMilanChange = (milanId: string) => {
+    console.log('🟡 Milan changed to:', milanId);
+    setFormData(prev => ({
+      ...prev,
+      milan: milanId
+    }));
+  };
+
   const handleSaveProfile = async (e: FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -196,23 +368,33 @@ export default function ProfilePage() {
     }
 
     try {
-      const payload: {
-        username: string;
-        milan?: string;
-        valaya?: string;
-        khanda?: string;
-        vibhaaga?: string;
-        ghata?: string;
-      } = {
+      // Prepare the payload with ALL fields
+      const payload: any = {
         username: formData.username,
       };
 
-      // Add the new organization hierarchy fields
-      payload.milan = formData.milan;
-      payload.valaya = formData.valaya;
-      payload.khanda = formData.khanda;
-      payload.vibhaaga = formData.vibhaaga;
-      payload.ghata = formData.ghata;
+      // Always include organization fields if they exist in the form
+      if (formData.milan) payload.milan = formData.milan;
+      if (formData.valaya) payload.valaya = formData.valaya;
+      if (formData.khanda) payload.khanda = formData.khanda;
+      if (formData.vibhaaga) payload.vibhaaga = formData.vibhaaga;
+
+      // Include referrer details if user is a referrer
+      if (userData?.role === 'job_referrer') {
+        payload.referrerDetails = {
+          fullName: formData.fullName,
+          mobileNumber: formData.mobileNumber,
+          personalEmail: formData.personalEmail,
+          residentialAddress: formData.residentialAddress,
+        };
+        payload.workDetails = {
+          companyName: formData.companyName,
+          workLocation: formData.workLocation,
+          designation: formData.designation,
+        };
+      }
+
+      console.log('🟡 Sending profile update payload:', payload);
 
       const response = await fetch("/api/profile", {
         method: "PUT",
@@ -224,15 +406,69 @@ export default function ProfilePage() {
       });
 
       const data = await response.json();
+      console.log('🟢 Profile update response:', data);
 
       if (!response.ok) {
         throw new Error(data.error || "Failed to update profile.");
       }
 
-      updateUser(data.user);
+      // Update both local state and auth context
+      if (userData) {
+        const updatedUserData = {
+          ...userData,
+          username: formData.username,
+          milan: formData.milan,
+          valaya: formData.valaya,
+          khanda: formData.khanda,
+          vibhaaga: formData.vibhaaga,
+          referrerDetails: userData.role === 'job_referrer' ? {
+            fullName: formData.fullName,
+            mobileNumber: formData.mobileNumber,
+            personalEmail: formData.personalEmail,
+            residentialAddress: formData.residentialAddress,
+          } : userData.referrerDetails,
+          workDetails: userData.role === 'job_referrer' ? {
+            companyName: formData.companyName,
+            workLocation: formData.workLocation,
+            designation: formData.designation,
+          } : userData.workDetails,
+        };
+        setUserData(updatedUserData);
+        
+        // Also update auth context if needed
+        if (updateUser) {
+          updateUser({
+            ...currentUser,
+            username: formData.username,
+            milan: formData.milan,
+            valaya: formData.valaya,
+            khanda: formData.khanda,
+            vibhaaga: formData.vibhaaga,
+            referrerDetails: userData.role === 'job_referrer' ? {
+              fullName: formData.fullName,
+              mobileNumber: formData.mobileNumber,
+              personalEmail: formData.personalEmail,
+              residentialAddress: formData.residentialAddress,
+            } : currentUser.referrerDetails,
+            workDetails: userData.role === 'job_referrer' ? {
+              companyName: formData.companyName,
+              workLocation: formData.workLocation,
+              designation: formData.designation,
+            } : currentUser.workDetails,
+          });
+        }
+      }
+
       setMessage("Profile updated successfully!");
       setIsEditing(false);
+      
+      // Refresh user data to ensure consistency
+      setTimeout(() => {
+        fetchUserData();
+      }, 1000);
+      
     } catch (err: any) {
+      console.error('❌ Profile update error:', err);
       setError(err.message || "An unexpected error occurred during profile update.");
     } finally {
       setLoading(false);
@@ -374,7 +610,35 @@ export default function ProfilePage() {
     }
   };
 
-  if (authLoading || !isAuthenticated || !currentUser) {
+  const handleRetryOrganizations = () => {
+    fetchOrganizations();
+  };
+
+  // Debug function to check current state
+  const debugCurrentState = () => {
+    const shouldDisplayAdditionalFields = userData ? 
+      userData.role === 'job_seeker' ||
+      userData.role === 'admin' ||
+      userData.role === 'super_admin' ||
+      userData.role === 'job_referrer' : false;
+
+    console.log('🔍 Current State Debug:', {
+      userData,
+      formData,
+      organizations: organizations.length,
+      isEditing,
+      shouldDisplayAdditionalFields
+    });
+  };
+
+  // Add debug button (remove in production)
+  useEffect(() => {
+    if (userData) {
+      debugCurrentState();
+    }
+  }, [userData, formData, organizations, isEditing]);
+
+  if (authLoading || !isAuthenticated || !currentUser || !userData) {
     return (
       <div className="flex h-screen bg-gradient-to-br from-[#f6f9ff] to-[#eef2ff] justify-center items-center">
         <motion.div
@@ -406,31 +670,41 @@ export default function ProfilePage() {
   }
 
   const shouldDisplayAdditionalFields =
-    currentUser.role === 'job_seeker' ||
-    currentUser.role === 'admin' ||
-    currentUser.role === 'job_referrer';
+    userData.role === 'job_seeker' ||
+    userData.role === 'admin' ||
+    userData.role === 'super_admin' ||
+    userData.role === 'job_referrer';
 
   const getRoleIcon = (role: string) => {
     switch (role) {
       case 'admin': return <FiShield className="h-5 w-5" />;
+      case 'super_admin': return <FiShield className="h-5 w-5 text-yellow-500" />;
       case 'job_poster': return <FiUser className="h-5 w-5" />;
       case 'job_seeker': return <FiAward className="h-5 w-5" />;
+      case 'job_referrer': return <FiUsers className="h-5 w-5" />;
       default: return <FiUser className="h-5 w-5" />;
     }
   };
 
-  // Debug info
-  console.log('🟡 Current organizations state:', organizations);
-  console.log('🟡 Loading organizations:', loadingOrgs);
+  const getRoleDisplayName = (role: string) => {
+    switch (role) {
+      case 'super_admin': return 'Super Administrator';
+      case 'job_poster': return 'Job Poster';
+      case 'job_seeker': return 'Job Seeker';
+      case 'job_referrer': return 'Job Referrer';
+      case 'admin': return 'Administrator';
+      default: return role.replace('_', ' ');
+    }
+  };
 
   return (
     <div className="flex h-screen bg-gradient-to-br from-[#f6f9ff] to-[#eef2ff] overflow-hidden font-inter">
       <Sidebar
-        userRole={currentUser.role}
+        userRole={userData.role}
         onLogout={logout}
         isOpen={isSidebarOpen}
         setIsOpen={setIsSidebarOpen}
-        userEmail={currentUser.email}
+        userEmail={userData.email}
       />
 
       <div className="flex-1 flex flex-col overflow-y-auto">
@@ -453,11 +727,18 @@ export default function ProfilePage() {
             My Profile
           </motion.h1>
           
-          <div className="w-12"></div>
+          {/* Debug button - remove in production */}
+          <button 
+            onClick={debugCurrentState}
+            className="p-2 text-xs bg-gray-200 rounded"
+            title="Debug State"
+          >
+            🐛
+          </button>
         </div>
 
         <div className="flex-1 overflow-y-auto p-4 md:p-8">
-          <div className="max-w-4xl mx-auto space-y-8">
+          <div className="max-w-6xl mx-auto space-y-8">
             {/* Page Header */}
             <motion.div
               initial={{ opacity: 0, y: 30 }}
@@ -544,6 +825,7 @@ export default function ProfilePage() {
                 </AnimatePresence>
 
                 <form onSubmit={handleSaveProfile} className="space-y-8">
+                  {/* Basic Information */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     {/* Username */}
                     <motion.div
@@ -595,209 +877,208 @@ export default function ProfilePage() {
                       <label className="block text-sm font-bold text-[#1C3991] mb-3 uppercase tracking-wide">
                         <FiTag className="inline-block mr-2 text-[#165BF8]" /> Role
                       </label>
-                      <div className="flex items-center space-x-3 p-3.5 bg-[#165BF8]/5 border-2 border-[#165BF8]/10 rounded-2xl">
-                        {getRoleIcon(currentUser.role)}
-                        <span className="text-[#1C3991] font-bold capitalize">
-                          {currentUser.role.replace('_', ' ')}
+                      <div className={`flex items-center space-x-3 p-3.5 border-2 rounded-2xl ${
+                        userData.role === 'super_admin' 
+                          ? 'bg-yellow-50 border-yellow-200 text-yellow-800'
+                          : 'bg-[#165BF8]/5 border-[#165BF8]/10 text-[#1C3991]'
+                      }`}>
+                        {getRoleIcon(userData.role)}
+                        <span className="font-bold capitalize">
+                          {getRoleDisplayName(userData.role)}
                         </span>
+                        {userData.role === 'super_admin' && (
+                          <span className="text-xs bg-yellow-200 text-yellow-800 px-2 py-1 rounded-full">
+                            SUPER ADMIN
+                          </span>
+                        )}
                       </div>
                     </motion.div>
                   </div>
 
+                  {/* Referrer Personal Details */}
+                  {userData.role === 'job_referrer' && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.25 }}
+                      className="pt-8 border-t border-[#165BF8]/10"
+                    >
+                      <h3 className="text-xl font-black text-[#1C3991] mb-6 flex items-center">
+                        <FiUser className="mr-3 text-[#165BF8]" />
+                        Personal Details
+                      </h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                          <label className="block text-sm font-bold text-[#1C3991] mb-3">
+                            <FiUser className="inline-block mr-2 text-[#165BF8]" /> Full Name
+                          </label>
+                          <input
+                            type="text"
+                            name="fullName"
+                            value={formData.fullName}
+                            onChange={handleChange}
+                            readOnly={!isEditing}
+                            className={`block w-full px-4 py-3.5 border-2 rounded-2xl shadow-sm placeholder-[#165BF8]/50 focus:outline-none focus:ring-4 focus:ring-[#165BF8]/20 focus:border-[#165BF8] text-[#1C3991] transition-all duration-300 ${
+                              !isEditing 
+                                ? "bg-gray-100 border-gray-200 cursor-not-allowed" 
+                                : "bg-white border-[#165BF8]/20 hover:border-[#165BF8]/40"
+                            }`}
+                            placeholder="Enter your full name"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-bold text-[#1C3991] mb-3">
+                            <FiPhone className="inline-block mr-2 text-[#165BF8]" /> Mobile Number
+                          </label>
+                          <input
+                            type="tel"
+                            name="mobileNumber"
+                            value={formData.mobileNumber}
+                            onChange={handleChange}
+                            readOnly={!isEditing}
+                            className={`block w-full px-4 py-3.5 border-2 rounded-2xl shadow-sm placeholder-[#165BF8]/50 focus:outline-none focus:ring-4 focus:ring-[#165BF8]/20 focus:border-[#165BF8] text-[#1C3991] transition-all duration-300 ${
+                              !isEditing 
+                                ? "bg-gray-100 border-gray-200 cursor-not-allowed" 
+                                : "bg-white border-[#165BF8]/20 hover:border-[#165BF8]/40"
+                            }`}
+                            placeholder="Enter your mobile number"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-bold text-[#1C3991] mb-3">
+                            <FiMail className="inline-block mr-2 text-[#165BF8]" /> Personal Email
+                          </label>
+                          <input
+                            type="email"
+                            name="personalEmail"
+                            value={formData.personalEmail}
+                            onChange={handleChange}
+                            readOnly={!isEditing}
+                            className={`block w-full px-4 py-3.5 border-2 rounded-2xl shadow-sm placeholder-[#165BF8]/50 focus:outline-none focus:ring-4 focus:ring-[#165BF8]/20 focus:border-[#165BF8] text-[#1C3991] transition-all duration-300 ${
+                              !isEditing 
+                                ? "bg-gray-100 border-gray-200 cursor-not-allowed" 
+                                : "bg-white border-[#165BF8]/20 hover:border-[#165BF8]/40"
+                            }`}
+                            placeholder="Enter your personal email"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-bold text-[#1C3991] mb-3">
+                            <FiHome className="inline-block mr-2 text-[#165BF8]" /> Residential Address
+                          </label>
+                          <textarea
+                            name="residentialAddress"
+                            value={formData.residentialAddress}
+                            onChange={handleChange}
+                            readOnly={!isEditing}
+                            rows={3}
+                            className={`block w-full px-4 py-3.5 border-2 rounded-2xl shadow-sm placeholder-[#165BF8]/50 focus:outline-none focus:ring-4 focus:ring-[#165BF8]/20 focus:border-[#165BF8] text-[#1C3991] transition-all duration-300 resize-none ${
+                              !isEditing 
+                                ? "bg-gray-100 border-gray-200 cursor-not-allowed" 
+                                : "bg-white border-[#165BF8]/20 hover:border-[#165BF8]/40"
+                            }`}
+                            placeholder="Enter your residential address"
+                          />
+                        </div>
+                      </div>
+                    </motion.div>
+                  )}
+
+                  {/* Referrer Work Details */}
+                  {userData.role === 'job_referrer' && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.3 }}
+                      className="pt-8 border-t border-[#165BF8]/10"
+                    >
+                      <h3 className="text-xl font-black text-[#1C3991] mb-6 flex items-center">
+                        <FiBriefcase className="mr-3 text-[#165BF8]" />
+                        Work Details
+                      </h3>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div>
+                          <label className="block text-sm font-bold text-[#1C3991] mb-3">
+                            <FiBriefcase className="inline-block mr-2 text-[#165BF8]" /> Company Name
+                          </label>
+                          <input
+                            type="text"
+                            name="companyName"
+                            value={formData.companyName}
+                            onChange={handleChange}
+                            readOnly={!isEditing}
+                            className={`block w-full px-4 py-3.5 border-2 rounded-2xl shadow-sm placeholder-[#165BF8]/50 focus:outline-none focus:ring-4 focus:ring-[#165BF8]/20 focus:border-[#165BF8] text-[#1C3991] transition-all duration-300 ${
+                              !isEditing 
+                                ? "bg-gray-100 border-gray-200 cursor-not-allowed" 
+                                : "bg-white border-[#165BF8]/20 hover:border-[#165BF8]/40"
+                            }`}
+                            placeholder="Enter company name"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-bold text-[#1C3991] mb-3">
+                            <FiMapPin className="inline-block mr-2 text-[#165BF8]" /> Work Location
+                          </label>
+                          <input
+                            type="text"
+                            name="workLocation"
+                            value={formData.workLocation}
+                            onChange={handleChange}
+                            readOnly={!isEditing}
+                            className={`block w-full px-4 py-3.5 border-2 rounded-2xl shadow-sm placeholder-[#165BF8]/50 focus:outline-none focus:ring-4 focus:ring-[#165BF8]/20 focus:border-[#165BF8] text-[#1C3991] transition-all duration-300 ${
+                              !isEditing 
+                                ? "bg-gray-100 border-gray-200 cursor-not-allowed" 
+                                : "bg-white border-[#165BF8]/20 hover:border-[#165BF8]/40"
+                            }`}
+                            placeholder="Enter work location"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-bold text-[#1C3991] mb-3">
+                            <FiUser className="inline-block mr-2 text-[#165BF8]" /> Designation
+                          </label>
+                          <input
+                            type="text"
+                            name="designation"
+                            value={formData.designation}
+                            onChange={handleChange}
+                            readOnly={!isEditing}
+                            className={`block w-full px-4 py-3.5 border-2 rounded-2xl shadow-sm placeholder-[#165BF8]/50 focus:outline-none focus:ring-4 focus:ring-[#165BF8]/20 focus:border-[#165BF8] text-[#1C3991] transition-all duration-300 ${
+                              !isEditing 
+                                ? "bg-gray-100 border-gray-200 cursor-not-allowed" 
+                                : "bg-white border-[#165BF8]/20 hover:border-[#165BF8]/40"
+                            }`}
+                            placeholder="Enter your designation"
+                          />
+                        </div>
+                      </div>
+                    </motion.div>
+                  )}
+
+                  {/* Organization Hierarchy Component */}
                   {shouldDisplayAdditionalFields && (
                     <motion.div 
                       initial={{ opacity: 0, y: 20 }}
                       animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.25 }}
-                      className="pt-8 border-t border-[#165BF8]/10 mt-8 space-y-6"
+                      transition={{ delay: 0.35 }}
+                      className="pt-8 border-t border-[#165BF8]/10 mt-8"
                     >
-                      <h3 className="text-xl font-black text-[#1C3991] flex items-center">
-                        <FiAward className="mr-3 text-[#165BF8]" />
-                        Organization Hierarchy
-                      </h3>
-                      
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        {/* Milan */}
-                        <motion.div
-                          initial={{ opacity: 0, y: 20 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          transition={{ delay: 0.3 }}
-                        >
-                          <label className="block text-sm font-bold text-[#1C3991] mb-3">
-                            <FiBookOpen className="inline-block mr-2 text-[#165BF8]" /> Milan
-                          </label>
-                          {loadingOrgs ? (
-                            <div className="flex items-center justify-center p-4 border-2 border-[#165BF8]/20 rounded-2xl bg-gray-100">
-                              <FiLoader className="animate-spin text-[#165BF8] mr-2" />
-                              <span className="text-[#1C3991]">Loading Milan options...</span>
-                            </div>
-                          ) : (
-                            <select
-                              name="milan"
-                              value={formData.milan}
-                              onChange={handleChange}
-                              disabled={!isEditing}
-                              className={`block w-full px-4 py-3.5 border-2 rounded-2xl shadow-sm focus:outline-none focus:ring-4 focus:ring-[#165BF8]/20 focus:border-[#165BF8] text-[#1C3991] transition-all duration-300 ${
-                                !isEditing 
-                                  ? "bg-gray-100 border-gray-200 cursor-not-allowed" 
-                                  : "bg-white border-[#165BF8]/20 hover:border-[#165BF8]/40"
-                              }`}
-                            >
-                              <option value="">Select Milan</option>
-                              {getOrganizationsByType('milan').map((org) => (
-                                <option key={org._id} value={org._id}>
-                                  {org.name}
-                                </option>
-                              ))}
-                            </select>
-                          )}
-                        </motion.div>
-
-                        {/* Valaya */}
-                        <motion.div
-                          initial={{ opacity: 0, y: 20 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          transition={{ delay: 0.35 }}
-                        >
-                          <label className="block text-sm font-bold text-[#1C3991] mb-3">
-                            <FiMapPin className="inline-block mr-2 text-[#165BF8]" /> Valaya
-                          </label>
-                          {loadingOrgs ? (
-                            <div className="flex items-center justify-center p-4 border-2 border-[#165BF8]/20 rounded-2xl bg-gray-100">
-                              <FiLoader className="animate-spin text-[#165BF8] mr-2" />
-                              <span className="text-[#1C3991]">Loading Valaya options...</span>
-                            </div>
-                          ) : (
-                            <select
-                              name="valaya"
-                              value={formData.valaya}
-                              onChange={handleChange}
-                              disabled={!isEditing}
-                              className={`block w-full px-4 py-3.5 border-2 rounded-2xl shadow-sm focus:outline-none focus:ring-4 focus:ring-[#165BF8]/20 focus:border-[#165BF8] text-[#1C3991] transition-all duration-300 ${
-                                !isEditing 
-                                  ? "bg-gray-100 border-gray-200 cursor-not-allowed" 
-                                  : "bg-white border-[#165BF8]/20 hover:border-[#165BF8]/40"
-                              }`}
-                            >
-                              <option value="">Select Valaya</option>
-                              {getOrganizationsByType('valaya').map((org) => (
-                                <option key={org._id} value={org._id}>
-                                  {org.name}
-                                </option>
-                              ))}
-                            </select>
-                          )}
-                        </motion.div>
-
-                        {/* Khanda */}
-                        <motion.div
-                          initial={{ opacity: 0, y: 20 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          transition={{ delay: 0.4 }}
-                        >
-                          <label className="block text-sm font-bold text-[#1C3991] mb-3">
-                            <FiGlobe className="inline-block mr-2 text-[#165BF8]" /> Khanda
-                          </label>
-                          {loadingOrgs ? (
-                            <div className="flex items-center justify-center p-4 border-2 border-[#165BF8]/20 rounded-2xl bg-gray-100">
-                              <FiLoader className="animate-spin text-[#165BF8] mr-2" />
-                              <span className="text-[#1C3991]">Loading Khanda options...</span>
-                            </div>
-                          ) : (
-                            <select
-                              name="khanda"
-                              value={formData.khanda}
-                              onChange={handleChange}
-                              disabled={!isEditing}
-                              className={`block w-full px-4 py-3.5 border-2 rounded-2xl shadow-sm focus:outline-none focus:ring-4 focus:ring-[#165BF8]/20 focus:border-[#165BF8] text-[#1C3991] transition-all duration-300 ${
-                                !isEditing 
-                                  ? "bg-gray-100 border-gray-200 cursor-not-allowed" 
-                                  : "bg-white border-[#165BF8]/20 hover:border-[#165BF8]/40"
-                              }`}
-                            >
-                              <option value="">Select Khanda</option>
-                              {getOrganizationsByType('khanda').map((org) => (
-                                <option key={org._id} value={org._id}>
-                                  {org.name}
-                                </option>
-                              ))}
-                            </select>
-                          )}
-                        </motion.div>
-
-                        {/* Vibhaaga */}
-                        <motion.div
-                          initial={{ opacity: 0, y: 20 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          transition={{ delay: 0.45 }}
-                        >
-                          <label className="block text-sm font-bold text-[#1C3991] mb-3">
-                            <FiBookOpen className="inline-block mr-2 text-[#165BF8]" /> Vibhaaga
-                          </label>
-                          {loadingOrgs ? (
-                            <div className="flex items-center justify-center p-4 border-2 border-[#165BF8]/20 rounded-2xl bg-gray-100">
-                              <FiLoader className="animate-spin text-[#165BF8] mr-2" />
-                              <span className="text-[#1C3991]">Loading Vibhaaga options...</span>
-                            </div>
-                          ) : (
-                            <select
-                              name="vibhaaga"
-                              value={formData.vibhaaga}
-                              onChange={handleChange}
-                              disabled={!isEditing}
-                              className={`block w-full px-4 py-3.5 border-2 rounded-2xl shadow-sm focus:outline-none focus:ring-4 focus:ring-[#165BF8]/20 focus:border-[#165BF8] text-[#1C3991] transition-all duration-300 ${
-                                !isEditing 
-                                  ? "bg-gray-100 border-gray-200 cursor-not-allowed" 
-                                  : "bg-white border-[#165BF8]/20 hover:border-[#165BF8]/40"
-                              }`}
-                            >
-                              <option value="">Select Vibhaaga</option>
-                              {getOrganizationsByType('vibhaaga').map((org) => (
-                                <option key={org._id} value={org._id}>
-                                  {org.name}
-                                </option>
-                              ))}
-                            </select>
-                          )}
-                        </motion.div>
-
-                        {/* Ghata */}
-                        <motion.div
-                          initial={{ opacity: 0, y: 20 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          transition={{ delay: 0.5 }}
-                          className="md:col-span-2"
-                        >
-                          <label className="block text-sm font-bold text-[#1C3991] mb-3">
-                            <FiMapPin className="inline-block mr-2 text-[#165BF8]" /> Ghata
-                          </label>
-                          {loadingOrgs ? (
-                            <div className="flex items-center justify-center p-4 border-2 border-[#165BF8]/20 rounded-2xl bg-gray-100">
-                              <FiLoader className="animate-spin text-[#165BF8] mr-2" />
-                              <span className="text-[#1C3991]">Loading Ghata options...</span>
-                            </div>
-                          ) : (
-                            <select
-                              name="ghata"
-                              value={formData.ghata}
-                              onChange={handleChange}
-                              disabled={!isEditing}
-                              className={`block w-full px-4 py-3.5 border-2 rounded-2xl shadow-sm focus:outline-none focus:ring-4 focus:ring-[#165BF8]/20 focus:border-[#165BF8] text-[#1C3991] transition-all duration-300 ${
-                                !isEditing 
-                                  ? "bg-gray-100 border-gray-200 cursor-not-allowed" 
-                                  : "bg-white border-[#165BF8]/20 hover:border-[#165BF8]/40"
-                              }`}
-                            >
-                              <option value="">Select Ghata</option>
-                              {getOrganizationsByType('ghata').map((org) => (
-                                <option key={org._id} value={org._id}>
-                                  {org.name}
-                                </option>
-                              ))}
-                            </select>
-                          )}
-                        </motion.div>
-                      </div>
+                      <OrganizationHierarchy
+                        organizations={organizations}
+                        loadingHierarchy={loadingOrgs}
+                        hierarchyError={error}
+                        vibhaaga={formData.vibhaaga}
+                        khanda={formData.khanda}
+                        valaya={formData.valaya}
+                        milan={formData.milan}
+                        onVibhaagaChange={handleVibhaagaChange}
+                        onKhandaChange={handleKhandaChange}
+                        onValayaChange={handleValayaChange}
+                        onMilanChange={handleMilanChange}
+                        onRetry={handleRetryOrganizations}
+                        isLoading={loading || !isEditing}
+                        isRequired={true}
+                      />
                     </motion.div>
                   )}
 
@@ -842,7 +1123,7 @@ export default function ProfilePage() {
             </motion.div>
 
             {/* Resume Management Section */}
-            {currentUser.role === 'job_seeker' && (
+            {userData.role === 'job_seeker' && (
               <motion.div
                 initial={{ opacity: 0, y: 30 }}
                 animate={{ opacity: 1, y: 0 }}

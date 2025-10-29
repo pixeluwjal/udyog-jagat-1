@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server';
-import dbConnect from '@/lib/dbConnect'; // Assuming you have a dbConnect utility
-import UserModel from '@/models/User'; // Your Mongoose User model
-import jwt from 'jsonwebtoken'; // For token verification
-import { headers } from 'next/headers'; // To access request headers
+import dbConnect from '@/lib/dbConnect';
+import UserModel from '@/models/User';
+import jwt from 'jsonwebtoken';
+import { headers } from 'next/headers';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret'; // Use an environment variable!
+const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret';
 
 // Utility to verify admin status
 async function verifyAdmin(requestHeaders: Headers): Promise<{ user: any | null, error: string | null }> {
@@ -20,7 +20,6 @@ async function verifyAdmin(requestHeaders: Headers): Promise<{ user: any | null,
 
     try {
         const decoded: any = jwt.verify(token, JWT_SECRET);
-        // Ensure the user role from token is 'admin'
         if (decoded.role !== 'admin') {
             return { user: null, error: 'Unauthorized: Not an admin' };
         }
@@ -46,10 +45,7 @@ export async function GET(request: Request, { params }: { params: { id: string }
     const { id } = params;
 
     try {
-        // Fetch the user. Password will be excluded by schema's select: false.
-        // All other fields will be included by default.
         const user = await UserModel.findById(id);
-
         if (!user) {
             return NextResponse.json({ error: 'User not found' }, { status: 404 });
         }
@@ -76,40 +72,41 @@ export async function PUT(request: Request, { params }: { params: { id: string }
     const { id } = params;
     const updates = await request.json();
 
+    console.log('🟡 Received update data:', updates); // Debug log
+
     try {
-        // Find the user first to get their existing email, firstLogin, isSuperAdmin, onboardingStatus
-        // as these are no longer sent from the client-side form for editing
         const existingUser = await UserModel.findById(id).select('email firstLogin isSuperAdmin onboardingStatus role');
         if (!existingUser) {
             return NextResponse.json({ error: 'User not found' }, { status: 404 });
         }
 
-        // NEW: Conditional validation for 'admin' and 'job_referrer' roles
+        // FIXED: Use the correct field names that match the frontend
         if (updates.role === 'admin' || updates.role === 'job_referrer') {
-            if (!updates.milanShakaBhaga || !updates.valayaNagar || !updates.khandaBhaga) {
+            if (!updates.vibhaaga || !updates.khanda || !updates.valaya || !updates.milan) {
                 return NextResponse.json(
-                    { error: "Milan/Shaka/Bhaga, Valaya/Nagar, and Khanda/Bhaga are required for Admin and Referrer roles." },
+                    { error: "Organization hierarchy (Vibhaaga, Khanda, Valaya, Milan) is required for Admin and Referrer roles." },
                     { status: 400 }
                 );
             }
         }
 
-        // Prepare updates, explicitly listing only allowed editable fields
+        // Prepare updates with correct field names
         const allowedUpdates: any = {
             username: updates.username,
             role: updates.role,
             status: updates.status,
-            // NEW: Include the new fields from the updates payload
-            milanShakaBhaga: updates.milanShakaBhaga,
-            valayaNagar: updates.valayaNagar,
-            khandaBhaga: updates.khandaBhaga,
+            // FIXED: Use the correct field names that match User model and frontend
+            vibhaaga: updates.vibhaaga,
+            khanda: updates.khanda,
+            valaya: updates.valaya,
+            milan: updates.milan,
+            ghata: updates.ghata || '', // Include ghata if needed
         };
 
         // Initialize $unset object
         const unsetFields: { [key: string]: number } = {};
 
         // Conditionally add nested fields if they exist and are for the correct role
-        // Also handle clearing previous role-specific details if the role changes.
         if (updates.role === 'job_seeker') {
             allowedUpdates.candidateDetails = updates.candidateDetails || {};
             if (allowedUpdates.candidateDetails.skills && typeof allowedUpdates.candidateDetails.skills === 'string') {
@@ -125,8 +122,8 @@ export async function PUT(request: Request, { params }: { params: { id: string }
             if (existingUser.role === 'job_seeker') {
                 unsetFields.candidateDetails = 1;
             }
-        } else { // Admin or Job Referrer role
-            // Clear both if role changes from job_seeker or job_poster
+        } else { 
+            // Admin or Job Referrer role - clear role-specific details
             if (existingUser.role === 'job_seeker') {
                 unsetFields.candidateDetails = 1;
             }
@@ -146,10 +143,12 @@ export async function PUT(request: Request, { params }: { params: { id: string }
             finalUpdatePayload.$unset = unsetFields;
         }
 
+        console.log('🟡 Final update payload:', finalUpdatePayload); // Debug log
+
         const updatedUser = await UserModel.findByIdAndUpdate(
             id,
             finalUpdatePayload,
-            { new: true, runValidators: true, select: '-password' } // Return the updated document and run schema validators
+            { new: true, runValidators: true, select: '-password' }
         );
 
         if (!updatedUser) {
@@ -186,7 +185,6 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
             return NextResponse.json({ error: 'User not found' }, { status: 404 });
         }
 
-        // IMPORTANT: Prevent an admin from deleting their OWN account
         if (adminUser && adminUser.id === id) {
             return NextResponse.json({ error: 'Cannot delete your own admin account.' }, { status: 403 });
         }

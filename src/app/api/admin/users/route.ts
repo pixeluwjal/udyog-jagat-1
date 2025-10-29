@@ -53,6 +53,7 @@ export async function GET(request: NextRequest) {
         const createdById = searchParams.get('createdBy');
         const statusFilter = searchParams.get('status') || 'all';
         const rolesParam = searchParams.get('roles');
+        const allUsers = searchParams.get('all'); // Check if we want all users including admins
 
         const query: any = {};
         const now = new Date();
@@ -62,13 +63,13 @@ export async function GET(request: NextRequest) {
             query.role = { $in: rolesArray };
         }
 
+        // FIX: Include super admins in the query by not filtering them out
         if (createdById) {
-            if (rolesParam || (!rolesParam && !searchParams.get('all') && query.role?.['$ne'] !== 'admin')) {
-                // This condition is simplified as per previous discussions to prevent a regular admin from filtering users they didn't create, unless explicitly allowed by other filters.
+            if (rolesParam || (!rolesParam && !allUsers && query.role?.['$ne'] !== 'admin')) {
                 query.createdBy = createdById;
             }
-        } else if (!rolesParam && !searchParams.get('all') && query.role?.['$ne'] !== 'admin') {
-            // Apply this logic only if no specific roles or createdBy filter are present
+        } else if (!rolesParam && !allUsers && query.role?.['$ne'] !== 'admin') {
+            // Only apply this filter if we're not specifically asking for all users
             query.role = { $ne: 'admin' };
         }
         
@@ -81,10 +82,20 @@ export async function GET(request: NextRequest) {
             ];
         }
 
-        // Fetch users from the database first
-        const users = await User.find(query).select('_id username email role status firstLogin').lean();
+        console.log('🟡 Database query:', query);
+
+        // FIX: Include isSuperAdmin field in the select
+        const users = await User.find(query).select('_id username email role status firstLogin isSuperAdmin createdAt lastActive').lean();
         console.log(`API: Fetched ${users.length} users with initial query filters.`);
         
+        // Debug: Log the raw data from database
+        console.log('🔍 Raw users data from DB:', users.map(user => ({
+            email: user.email,
+            role: user.role,
+            isSuperAdmin: user.isSuperAdmin,
+            hasIsSuperAdmin: 'isSuperAdmin' in user
+        })));
+
         // Dynamically update status for job seekers based on referral code expiration
         const usersWithDynamicStatus = await Promise.all(users.map(async (user: any) => {
             let userStatus = user.status || 'active'; // Default to active
@@ -98,7 +109,12 @@ export async function GET(request: NextRequest) {
             }
             
             // Return user object with the dynamically updated status
-            return { ...user, status: userStatus };
+            return { 
+                ...user, 
+                status: userStatus,
+                // Ensure isSuperAdmin is properly included
+                isSuperAdmin: user.isSuperAdmin || false
+            };
         }));
 
         // Filter based on the dynamic status before returning the final list
@@ -107,6 +123,14 @@ export async function GET(request: NextRequest) {
         });
 
         console.log(`API: Successfully retrieved ${filteredUsers.length} users after processing.`);
+        
+        // Final debug log
+        console.log('✅ Final users data being returned:', filteredUsers.map(user => ({
+            email: user.email,
+            role: user.role,
+            isSuperAdmin: user.isSuperAdmin
+        })));
+        
         return NextResponse.json({ users: filteredUsers }, { status: 200 });
 
     } catch (error: any) {

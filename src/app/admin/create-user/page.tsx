@@ -140,14 +140,6 @@ export default function CreateUserPage() {
   const getRoleOptions = () => {
     const baseOptions = [
       { 
-        value: 'job_seeker', 
-        label: 'Job Seeker', 
-        icon: <FiUser className="h-6 w-6" />,
-        description: 'Browse and apply for jobs',
-        gradient: 'from-blue-500 to-cyan-500',
-        color: '#3B82F6'
-      },
-      { 
         value: 'job_poster', 
         label: 'Job Poster', 
         icon: <FiBriefcase className="h-6 w-6" />,
@@ -165,8 +157,19 @@ export default function CreateUserPage() {
       },
     ];
 
-    // Only show admin option for super admins
+    // Only show job seeker and admin options for super admins
     if (currentUser?.isSuperAdmin) {
+      baseOptions.unshift(
+        { 
+          value: 'job_seeker', 
+          label: 'Job Seeker', 
+          icon: <FiUser className="h-6 w-6" />,
+          description: 'Browse and apply for jobs',
+          gradient: 'from-blue-500 to-cyan-500',
+          color: '#3B82F6'
+        }
+      );
+      
       baseOptions.push(
         { 
           value: 'admin', 
@@ -189,6 +192,17 @@ export default function CreateUserPage() {
 
     return baseOptions;
   };
+
+  // Set default role based on user privileges
+  useEffect(() => {
+    if (currentUser) {
+      const roleOptions = getRoleOptions();
+      if (roleOptions.length > 0) {
+        // Set default role to first available option
+        setRole(roleOptions[0].value as any);
+      }
+    }
+  }, [currentUser]);
 
   // Reset dependent fields when parent field changes
   const handleVibhaagaChange = (vibhaagaId: string) => {
@@ -446,7 +460,15 @@ export default function CreateUserPage() {
       // Reset form
       console.log('🔄 Resetting form...');
       setEmail('');
-      setRole('job_seeker');
+      
+      // Set default role based on available options
+      const roleOptions = getRoleOptions();
+      if (roleOptions.length > 0) {
+        setRole(roleOptions[0].value as any);
+      } else {
+        setRole('job_poster');
+      }
+      
       setGhata('');
       setMilan('');
       setValaya('');
@@ -580,7 +602,7 @@ export default function CreateUserPage() {
                   <p className="text-blue-100 text-lg lg:text-xl max-w-2xl">
                     {currentUser.isSuperAdmin 
                       ? "Create user accounts with appropriate roles and permissions across the platform"
-                      : "Create Job Seekers, Job Posters, and Referrers to expand your talent network"
+                      : "Create Job Posters and Referrers to expand your talent network"
                     }
                   </p>
                 </div>

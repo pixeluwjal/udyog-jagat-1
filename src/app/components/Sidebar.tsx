@@ -179,10 +179,7 @@ export default function Sidebar({
             : []),
         ...(userRole === "job_referrer"
             ? [
-                { href: "/referrer/dashboard", icon: <FiHome className="h-5 w-5" />, text: "Referral Dashboard" },
-                { href: "/referrer/generate", icon: <FiLink className="h-6 w-6" />, text: "Generate Referral Link" },
-                { href: "/referrer/messages", icon: <FiTrendingUp className="h-5 w-5" />, text: "Messages", badge: unreadCount },
-                { href: "/referrer/connections", icon: <FiUsers className="h-5 w-5" />, text: "My Connections" },
+                { href: "/referrer/dashboard", icon: <FiTrendingUp className="h-5 w-5" />, text: "Messages", badge: unreadCount },
             ]
             : []),
         profileLink,

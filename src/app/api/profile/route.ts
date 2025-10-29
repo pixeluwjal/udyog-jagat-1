@@ -1,7 +1,8 @@
-// app/api/user/profile/route.ts
+// app/api/profile/route.ts
 import { NextResponse } from 'next/server';
 import dbConnect from '@/lib/dbConnect';
 import User from '@/models/User';
+import ReferrerModel from '@/models/Referrer'; // Import the Referrer model
 import jwt from 'jsonwebtoken';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret';
@@ -19,28 +20,24 @@ const verifyToken = (req: Request) => {
     }
 
     try {
-        // Attempt to decode the token.
         const decoded = jwt.verify(token, JWT_SECRET) as { id?: string; userId?: string; _id?: string; email: string; username: string; role: string; iat: number; exp: number };
 
-        // Prioritize 'decoded.id'
         const userIdFromToken = decoded.id || decoded.userId || decoded._id;
 
         console.log('Server-side: Token decoded successfully.');
-        console.log('Server-side: Decoded payload:', decoded); // Log the full decoded payload
-        console.log('Server-side: Extracted User ID from token:', userIdFromToken); // Log the extracted ID
+        console.log('Server-side: Extracted User ID from token:', userIdFromToken);
+        console.log('Server-side: User role from token:', decoded.role);
 
         if (!userIdFromToken) {
             console.error("Server-side: User ID (id, userId, or _id) is missing in the decoded token payload.");
             return { error: 'User ID missing in token', status: 403 };
         }
 
-        // Check if token is expired
         if (decoded.exp < Date.now() / 1000) {
             return { error: 'Token expired', status: 403 };
         }
 
-        // Return the extracted userIdFromToken
-        return { decodedUserId: userIdFromToken, status: 200 };
+        return { decodedUserId: userIdFromToken, userRole: decoded.role, status: 200 };
     } catch (err) {
         console.error('Server-side: Token verification failed:', err);
         return { error: 'Invalid or expired token', status: 403 };
@@ -54,10 +51,17 @@ export async function GET(req: Request) {
     if (tokenVerification.error) {
         return NextResponse.json({ error: tokenVerification.error }, { status: tokenVerification.status });
     }
-    const { decodedUserId } = tokenVerification;
+    const { decodedUserId, userRole } = tokenVerification;
 
     try {
-        const user = await User.findById(decodedUserId).select('-password');
+        // Choose the correct model based on user role
+        let user;
+        if (userRole === 'job_referrer') {
+            user = await ReferrerModel.findById(decodedUserId).select('-password');
+        } else {
+            user = await User.findById(decodedUserId).select('-password');
+        }
+        
         if (!user) {
             console.warn(`Server-side: User with ID ${decodedUserId} not found in DB.`);
             return NextResponse.json({ error: 'User not found' }, { status: 404 });
@@ -77,13 +81,27 @@ export async function PUT(req: Request) {
     if (tokenVerification.error) {
         return NextResponse.json({ error: tokenVerification.error }, { status: tokenVerification.status });
     }
-    const { decodedUserId } = tokenVerification;
+    const { decodedUserId, userRole } = tokenVerification;
 
     try {
         const body = await req.json();
 
-        // Updated: Include new fields in allowedFields
-        const allowedFields = ['username', 'milanShakaBhaga', 'valayaNagar', 'khandaBhaga'];
+        console.log('Server-side: Received update data:', body);
+        console.log('Server-side: User role:', userRole);
+
+        // FIXED: Updated allowedFields to include all possible fields
+        const allowedFields = [
+            'username', 
+            'milan', 
+            'valaya', 
+            'khanda', 
+            'vibhaaga'
+        ];
+
+        // Add referrer-specific fields if user is a referrer
+        if (userRole === 'job_referrer') {
+            allowedFields.push('referrerDetails', 'workDetails');
+        }
 
         const updateData: { [key: string]: any } = {};
         for (const field of allowedFields) {
@@ -92,8 +110,32 @@ export async function PUT(req: Request) {
             }
         }
 
+        // Handle nested referrer details
+        if (userRole === 'job_referrer') {
+            if (body.fullName || body.mobileNumber || body.personalEmail || body.residentialAddress) {
+                updateData.referrerDetails = {
+                    ...(body.fullName && { fullName: body.fullName }),
+                    ...(body.mobileNumber && { mobileNumber: body.mobileNumber }),
+                    ...(body.personalEmail && { personalEmail: body.personalEmail }),
+                    ...(body.residentialAddress && { residentialAddress: body.residentialAddress })
+                };
+            }
+
+            // Handle nested work details
+            if (body.companyName || body.workLocation || body.designation) {
+                updateData.workDetails = {
+                    ...(body.companyName && { companyName: body.companyName }),
+                    ...(body.workLocation && { workLocation: body.workLocation }),
+                    ...(body.designation && { designation: body.designation })
+                };
+            }
+        }
+
         if (body.email) {
-            const currentUser = await User.findById(decodedUserId).select('email');
+            const currentUser = userRole === 'job_referrer' 
+                ? await ReferrerModel.findById(decodedUserId).select('email')
+                : await User.findById(decodedUserId).select('email');
+                
             if (currentUser && body.email !== currentUser.email) {
                 return NextResponse.json({ error: "Email cannot be changed directly via profile update." }, { status: 400 });
             }
@@ -103,22 +145,27 @@ export async function PUT(req: Request) {
             return NextResponse.json({ error: "User role cannot be changed directly." }, { status: 400 });
         }
 
-        // Ensure that if a field is sent as an empty string, it's explicitly set to null or undefined
-        // to clear it in the database if your schema allows it. Mongoose will typically handle
-        // empty strings as empty strings, but if you want to remove the field, you'd use $unset.
-        // For now, we'll allow empty strings to be saved as empty strings.
-
         if (Object.keys(updateData).length === 0) {
             return NextResponse.json({ error: 'No valid fields provided for update.' }, { status: 400 });
         }
 
         console.log(`Server-side: Attempting to update user ${decodedUserId} with data:`, updateData);
 
-        const updatedUser = await User.findByIdAndUpdate(
-            decodedUserId,
-            { $set: updateData },
-            { new: true, runValidators: true }
-        ).select('-password');
+        // Choose the correct model based on user role
+        let updatedUser;
+        if (userRole === 'job_referrer') {
+            updatedUser = await ReferrerModel.findByIdAndUpdate(
+                decodedUserId,
+                { $set: updateData },
+                { new: true, runValidators: true }
+            ).select('-password');
+        } else {
+            updatedUser = await User.findByIdAndUpdate(
+                decodedUserId,
+                { $set: updateData },
+                { new: true, runValidators: true }
+            ).select('-password');
+        }
 
         if (!updatedUser) {
             console.error(`Server-side: Failed to find and update user with ID ${decodedUserId}.`);
@@ -126,7 +173,10 @@ export async function PUT(req: Request) {
         }
 
         console.log(`Server-side: Profile updated successfully for user: ${updatedUser.username}`);
-        return NextResponse.json({ message: 'Profile updated successfully', user: updatedUser }, { status: 200 });
+        return NextResponse.json({ 
+            message: 'Profile updated successfully', 
+            user: updatedUser 
+        }, { status: 200 });
 
     } catch (error: any) {
         console.error('Server-side: Error updating user profile:', error);

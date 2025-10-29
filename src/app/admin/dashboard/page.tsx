@@ -228,7 +228,7 @@ export default function AdminDashboardPage() {
   }, []);
 
   /**
-   * Fetches the list of users from the API
+   * Fetches the list of users from the API - COMPLETELY FIXED VERSION
    */
   const fetchUsers = useCallback(async (showRefresh = false) => {
     if (showRefresh) {
@@ -250,6 +250,8 @@ export default function AdminDashboardPage() {
       if (searchQuery) params.append('search', searchQuery);
       if (filterStatus !== 'all') params.append('status', filterStatus);
 
+      console.log('🟡 Fetching users from API...');
+
       // Fetch users
       const usersResponse = await fetch(`/api/admin/users?${params.toString()}`, {
         headers: { 'Authorization': `Bearer ${token}` },
@@ -259,6 +261,8 @@ export default function AdminDashboardPage() {
       const usersData = await usersResponse.json();
 
       if (!usersResponse.ok) throw new Error(usersData.error || 'Failed to fetch users');
+
+      console.log('🟢 Users API response:', usersData);
 
       // Fetch referrers
       const referrersResponse = await fetch('/api/referrers', {
@@ -270,9 +274,40 @@ export default function AdminDashboardPage() {
 
       if (!referrersResponse.ok) throw new Error(referrersData.error || 'Failed to fetch referrers');
 
+      console.log('🟢 Referrers API response:', referrersData);
+
       if (Array.isArray(usersData.users)) {
-        // Filter out the currently logged-in admin
-        let filteredUsers = usersData.users.filter((u: UserDisplay) => u._id !== user._id);
+        // Filter out the currently logged-in admin and process user roles
+        let filteredUsers = usersData.users
+          .filter((u: UserDisplay) => u._id !== user._id)
+          .map((userItem: UserDisplay) => {
+            // DEBUG: Log the raw data for each user
+            console.log(`🔍 Raw user data for ${userItem.email}:`, {
+              role: userItem.role,
+              isSuperAdmin: userItem.isSuperAdmin,
+              hasIsSuperAdmin: 'isSuperAdmin' in userItem
+            });
+
+            // Determine the actual role - FIXED LOGIC
+            let actualRole = userItem.role;
+            let actualIsSuperAdmin = userItem.isSuperAdmin;
+
+            // If user has isSuperAdmin flag set to true, override role to super_admin
+            if (userItem.isSuperAdmin === true) {
+              actualRole = 'super_admin';
+              actualIsSuperAdmin = true;
+            }
+
+            console.log(`✅ Processed: ${userItem.email} -> role: ${actualRole}, isSuperAdmin: ${actualIsSuperAdmin}`);
+
+            return {
+              ...userItem,
+              role: actualRole,
+              isSuperAdmin: actualIsSuperAdmin
+            };
+          });
+
+        console.log('🟢 Final processed users:', filteredUsers);
         setUsers(filteredUsers);
         
         // Set referrers
@@ -455,6 +490,9 @@ export default function AdminDashboardPage() {
   };
 
   const renderUsersList = () => {
+    // DEBUG: Log current users data
+    console.log('🔍 CURRENT USERS DATA FOR DISPLAY:', users);
+
     if (fetchLoading && !refreshing) {
       return (
         <div className="space-y-4">
@@ -521,133 +559,96 @@ export default function AdminDashboardPage() {
     return (
       <div className="space-y-4">
         <AnimatePresence>
-          {currentData.map((item) => (
-            <motion.div
-              key={item._id}
-              initial={{ opacity: 0, y: 20, scale: 0.95 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: -20, scale: 0.95 }}
-              whileHover={hoverEffect}
-              transition={{ 
-                type: "spring", 
-                stiffness: 400, 
-                damping: 25 
-              }}
-              className="bg-white rounded-2xl border border-[#2245ae]/10 p-6 transition-all duration-300 group"
-            >
-              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-                <div className="flex items-center space-x-4 flex-1 min-w-0">
-                  <motion.div
-                    whileHover={{ scale: 1.1, rotate: 5 }}
-                    className="relative"
-                  >
-                    <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-[#2245ae]/10 to-[#1a3a9c]/10 flex items-center justify-center text-[#2245ae] font-bold text-lg">
-                      {item.username?.charAt(0).toUpperCase() || item.email.charAt(0).toUpperCase()}
-                    </div>
-                    {'status' in item && item.status === 'active' && (
-                      <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 border-2 border-white rounded-full"></div>
-                    )}
-                  </motion.div>
+          {currentData.map((item) => {
+            // DEBUG: Log each item being rendered
+            console.log(`🎯 Rendering user card for:`, {
+              email: item.email,
+              role: item.role,
+              isSuperAdmin: item.isSuperAdmin,
+              hasIsSuperAdmin: 'isSuperAdmin' in item
+            });
 
-                  <div className="flex-1 min-w-0">
-                    <div className="flex flex-col sm:flex-row sm:items-center gap-2 mb-3">
-                      <h4 className="text-lg font-bold text-[#1a3a9c] truncate">
-                        {item.username || 'Unnamed User'}
-                      </h4>
-                      <div className="flex flex-wrap gap-2">
-                        {'isSuperAdmin' in item && item.isSuperAdmin && (
-                          <span className="px-3 py-1 bg-gradient-to-r from-yellow-500 to-amber-500 text-white text-xs font-bold rounded-full flex items-center gap-1">
-                            <FiShield className="w-3 h-3" />
-                            SUPER ADMIN
-                          </span>
-                        )}
-                        {'firstLogin' in item && item.firstLogin && (
-                          <span className="px-3 py-1 bg-blue-100 text-blue-700 text-xs font-medium rounded-full">
-                            First Login
-                          </span>
-                        )}
+            return (
+              <motion.div
+                key={item._id}
+                initial={{ opacity: 0, y: 20, scale: 0.95 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -20, scale: 0.95 }}
+                whileHover={hoverEffect}
+                transition={{ 
+                  type: "spring", 
+                  stiffness: 400, 
+                  damping: 25 
+                }}
+                className="bg-white rounded-2xl border border-[#2245ae]/10 p-6 transition-all duration-300 group"
+              >
+                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                  <div className="flex items-center space-x-4 flex-1 min-w-0">
+                    <motion.div
+                      whileHover={{ scale: 1.1, rotate: 5 }}
+                      className="relative"
+                    >
+                      <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-[#2245ae]/10 to-[#1a3a9c]/10 flex items-center justify-center text-[#2245ae] font-bold text-lg">
+                        {item.username?.charAt(0).toUpperCase() || item.email.charAt(0).toUpperCase()}
                       </div>
-                    </div>
-                    
-                    <div className="flex flex-col sm:flex-row sm:items-center gap-4 text-sm">
-                      <p className="text-gray-600 flex items-center">
-                        <FiMail className="w-4 h-4 mr-2 text-[#2245ae]" />
-                        {item.email}
-                      </p>
+                      {'status' in item && item.status === 'active' && (
+                        <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 border-2 border-white rounded-full"></div>
+                      )}
+                    </motion.div>
+
+                    <div className="flex-1 min-w-0">
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-2 mb-3">
+                        <h4 className="text-lg font-bold text-[#1a3a9c] truncate">
+                          {item.username || 'Unnamed User'}
+                        </h4>
+                      </div>
                       
-                      <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${
-                        getRoleColor('role' in item ? item.role : 'job_referrer')
-                      }`}>
-                        {'role' in item ? item.role.replace('_', ' ') : 'Job Referrer'}
-                      </span>
-                      
-                      {'status' in item ? (
-                        <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${
-                          item.status === 'active' 
-                            ? 'bg-green-100 text-green-700' 
-                            : 'bg-red-100 text-red-700'
-                        }`}>
-                          {item.status === 'active' ? (
-                            <FiCheckCircle className="w-3 h-3 mr-1" />
-                          ) : (
-                            <FiXCircle className="w-3 h-3 mr-1" />
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-4 text-sm">
+                        <p className="text-gray-600 flex items-center">
+                          <FiMail className="w-4 h-4 mr-2 text-[#2245ae]" />
+                          {item.email}
+                        </p>                    
+                      </div>
+
+                      {/* Referrer Specific Details */}
+                      {'referrerDetails' in item && item.referrerDetails && (
+                        <div className="mt-3 flex flex-wrap gap-4 text-xs text-gray-600">
+                          {item.referrerDetails.company && (
+                            <span className="flex items-center">
+                              <FiTarget className="w-3 h-3 mr-1" />
+                              {item.referrerDetails.company}
+                            </span>
                           )}
-                          {item.status}
-                        </span>
-                      ) : (
-                        <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${
-                          item.onboardingStatus === 'completed'
-                            ? 'bg-green-100 text-green-700'
-                            : 'bg-amber-100 text-amber-700'
-                        }`}>
-                          {item.onboardingStatus === 'completed' ? (
-                            <FiCheckCircle className="w-3 h-3 mr-1" />
-                          ) : (
-                            <FiClock className="w-3 h-3 mr-1" />
+                          {item.referrerDetails.position && (
+                            <span>{item.referrerDetails.position}</span>
                           )}
-                          {item.onboardingStatus}
-                        </span>
+                          {item.workDetails?.jobTitle && (
+                            <span>{item.workDetails.jobTitle}</span>
+                          )}
+                        </div>
                       )}
                     </div>
-
-                    {/* Referrer Specific Details */}
-                    {'referrerDetails' in item && item.referrerDetails && (
-                      <div className="mt-3 flex flex-wrap gap-4 text-xs text-gray-600">
-                        {item.referrerDetails.company && (
-                          <span className="flex items-center">
-                            <FiTarget className="w-3 h-3 mr-1" />
-                            {item.referrerDetails.company}
-                          </span>
-                        )}
-                        {item.referrerDetails.position && (
-                          <span>{item.referrerDetails.position}</span>
-                        )}
-                        {item.workDetails?.jobTitle && (
-                          <span>{item.workDetails.jobTitle}</span>
-                        )}
-                      </div>
-                    )}
                   </div>
+
+                  {/* Edit Button - Only show for users (not referrers) and if current user is super admin */}
+                  {'role' in item && isSuperAdmin && (
+                    <div className="flex items-center gap-3">
+                      <motion.div
+                        whileHover={{ scale: 1.1 }}
+                        whileTap={{ scale: 0.9 }}
+                      >
+                        <Link href={`/admin/edit-user/${item._id}`} passHref>
+                          <button className="p-3 bg-[#2245ae]/10 text-[#2245ae] rounded-xl hover:bg-[#2245ae]/20 transition-all duration-200 group" title="Edit">
+                            <FiEdit className="w-5 h-5" />
+                          </button>
+                        </Link>
+                      </motion.div>
+                    </div>
+                  )}
                 </div>
-
-                {/* Edit Button - Only show for users (not referrers) and if current user is super admin */}
-                {'role' in item && isSuperAdmin && (
-                  <div className="flex items-center gap-3">
-                    <motion.div
-                      whileHover={{ scale: 1.1 }}
-                      whileTap={{ scale: 0.9 }}
-                    >
-                      <Link href={`/admin/edit-user/${item._id}`} passHref>
-                        <button className="p-3 bg-[#2245ae]/10 text-[#2245ae] rounded-xl hover:bg-[#2245ae]/20 transition-all duration-200 group" title="Edit">
-                          <FiEdit className="w-5 h-5" />
-                        </button>
-                      </Link>
-                    </motion.div>
-                  </div>
-                )}
-              </div>
-            </motion.div>
-          ))}
+              </motion.div>
+            );
+          })}
         </AnimatePresence>
       </div>
     );

@@ -1,4 +1,3 @@
-// app/admin/edit-user/[id]/page.tsx
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
@@ -8,9 +7,10 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
     FiUser, FiMail, FiTag, FiSave, FiArrowLeft, FiHardDrive, 
     FiMenu, FiActivity, FiXCircle, FiBookOpen, FiMapPin, FiGlobe, FiLoader,
-    FiBriefcase // <-- FiBriefcase has been added to the imports
+    FiBriefcase, FiCheckCircle, FiUsers
 } from 'react-icons/fi';
 import Sidebar from '@/app/components/Sidebar';
+import OrganizationHierarchy from '@/app/components/create-user/OrganizationHierarchy';
 
 // Brand colors
 const primaryBlue = "#165BF8";
@@ -22,9 +22,11 @@ interface UserDisplay {
     email: string;
     role: 'job_seeker' | 'job_poster' | 'admin' | 'job_referrer';
     status: 'active' | 'inactive';
-    milanShakaBhaga?: string;
-    valayaNagar?: string;
-    khandaBhaga?: string;
+    milan?: string;
+    valaya?: string;
+    khanda?: string;
+    vibhaaga?: string;
+    ghata?: string;
     resumeGridFsId?: string;
     candidateDetails?: {
         fullName?: string;
@@ -36,6 +38,35 @@ interface UserDisplay {
         companyName?: string;
     };
     jobReferrerDetails?: {};
+    isSuperAdmin?: boolean;
+    firstLogin?: boolean;
+    onboardingStatus?: string;
+}
+
+// Organization types
+interface Organization {
+    _id: string;
+    name: string;
+    khandas?: Khanda[];
+}
+
+interface Khanda {
+    _id: string;
+    name: string;
+    code?: string;
+    valayas?: Valaya[];
+    valays?: Valaya[];
+}
+
+interface Valaya {
+    _id: string;
+    name: string;
+    milans?: Milan[];
+}
+
+interface Milan {
+    _id: string;
+    name: string;
 }
 
 const fadeIn = {
@@ -60,15 +91,10 @@ const pulseEffect = {
     },
 };
 
-const buttonHover = {
-    scale: 1.02, 
-    boxShadow: `0 8px 16px ${primaryBlue}20`
-};
-
 export default function EditUserPage({ params }: { params: { id: string } }) {
     const { id } = params;
     const router = useRouter();
-    const { user: currentUser, loading: authLoading, isAuthenticated, token,logout } = useAuth();
+    const { user: currentUser, loading: authLoading, isAuthenticated, token, logout } = useAuth();
 
     const [userData, setUserData] = useState<UserDisplay | null>(null);
     const [loading, setLoading] = useState(true);
@@ -76,6 +102,42 @@ export default function EditUserPage({ params }: { params: { id: string } }) {
     const [message, setMessage] = useState<string | null>(null);
     const [isSaving, setIsSaving] = useState(false);
     const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+    
+    // Organization hierarchy state
+    const [organizations, setOrganizations] = useState<Organization[]>([]);
+    const [loadingHierarchy, setLoadingHierarchy] = useState(false);
+    const [hierarchyError, setHierarchyError] = useState<string | null>(null);
+    const [selectedVibhaaga, setSelectedVibhaaga] = useState('');
+    const [selectedKhanda, setSelectedKhanda] = useState('');
+    const [selectedValaya, setSelectedValaya] = useState('');
+    const [selectedMilan, setSelectedMilan] = useState('');
+
+    // Fetch organization hierarchy
+    const fetchOrganizationHierarchy = useCallback(async () => {
+        if (!token) return;
+        
+        setLoadingHierarchy(true);
+        setHierarchyError(null);
+        
+        try {
+            const response = await fetch('/api/admin/organizations', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            
+            const data = await response.json();
+            
+            if (!response.ok) {
+                throw new Error(data.error || 'Failed to fetch organization hierarchy');
+            }
+            
+            setOrganizations(data.organizations || []);
+        } catch (err: any) {
+            console.error('Error fetching organization hierarchy:', err);
+            setHierarchyError(err.message || 'Failed to load organization data');
+        } finally {
+            setLoadingHierarchy(false);
+        }
+    }, [token]);
 
     const fetchUserData = useCallback(async () => {
         setLoading(true);
@@ -99,23 +161,36 @@ export default function EditUserPage({ params }: { params: { id: string } }) {
                 throw new Error(data.error || 'Failed to fetch user data.');
             }
 
+            console.log('🟢 User data from API:', data.user);
+
             const fetchedUser: UserDisplay = {
                 _id: data.user._id,
                 username: data.user.username,
                 email: data.user.email,
                 role: data.user.role,
                 status: (data.user.status === 'active' || data.user.status === 'inactive') ? data.user.status : 'active',
-                milanShakaBhaga: data.user.milanShakaBhaga || '',
-                valayaNagar: data.user.valayaNagar || '',
-                khandaBhaga: data.user.khandaBhaga || '',
-                
+                milan: data.user.milan || '',
+                valaya: data.user.valaya || '',
+                khanda: data.user.khanda || '',
+                vibhaaga: data.user.vibhaaga || '',
+                ghata: data.user.ghata || '',
                 resumeGridFsId: data.user.resumeGridFsId,
                 candidateDetails: data.user.candidateDetails,
                 jobPosterDetails: data.user.jobPosterDetails,
                 jobReferrerDetails: data.user.jobReferrerDetails,
+                isSuperAdmin: data.user.isSuperAdmin || false,
+                firstLogin: data.user.firstLogin || false,
+                onboardingStatus: data.user.onboardingStatus || 'not_started'
             };
 
             setUserData(fetchedUser);
+            
+            // Set organization hierarchy fields if they exist
+            if (data.user.vibhaaga) setSelectedVibhaaga(data.user.vibhaaga);
+            if (data.user.khanda) setSelectedKhanda(data.user.khanda);
+            if (data.user.valaya) setSelectedValaya(data.user.valaya);
+            if (data.user.milan) setSelectedMilan(data.user.milan);
+
         } catch (err: any) {
             setError(err.message || 'Failed to fetch user data. Please try again.');
         } finally {
@@ -129,9 +204,33 @@ export default function EditUserPage({ params }: { params: { id: string } }) {
                 router.push('/login');
             } else {
                 fetchUserData();
+                fetchOrganizationHierarchy();
             }
         }
-    }, [authLoading, isAuthenticated, currentUser, router, fetchUserData]);
+    }, [authLoading, isAuthenticated, currentUser, router, fetchUserData, fetchOrganizationHierarchy]);
+
+    // Organization hierarchy handlers
+    const handleVibhaagaChange = (vibhaagaId: string) => {
+        setSelectedVibhaaga(vibhaagaId);
+        setSelectedKhanda('');
+        setSelectedValaya('');
+        setSelectedMilan('');
+    };
+
+    const handleKhandaChange = (khandaId: string) => {
+        setSelectedKhanda(khandaId);
+        setSelectedValaya('');
+        setSelectedMilan('');
+    };
+
+    const handleValayaChange = (valayaId: string) => {
+        setSelectedValaya(valayaId);
+        setSelectedMilan('');
+    };
+
+    const handleMilanChange = (milanId: string) => {
+        setSelectedMilan(milanId);
+    };
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
         const { name, value } = e.target;
@@ -173,26 +272,39 @@ export default function EditUserPage({ params }: { params: { id: string } }) {
             return;
         }
 
+        // Validate organization hierarchy for admin and referrer roles
         if (userData.role === 'admin' || userData.role === 'job_referrer') {
-            if (!userData.milanShakaBhaga?.trim() || !userData.valayaNagar?.trim() || !userData.khandaBhaga?.trim()) {
-                setError('Milan/Shaka, Valaya/Nagar, and Khanda/Bhaga are required for Admin and Referrer roles.');
+            if (!selectedVibhaaga || !selectedKhanda || !selectedValaya || !selectedMilan) {
+                setError('Organization hierarchy (Vibhaaga, Khanda, Valaya, Milan) is required for Admin and Referrer roles.');
                 setIsSaving(false);
                 return;
             }
         }
 
-        const dataToSend = {
+        // Prepare data to send
+        const dataToSend: any = {
             username: userData.username,
             role: userData.role,
             status: userData.status,
-            ...(userData.role !== 'job_poster' && {
-                milanShakaBhaga: userData.milanShakaBhaga,
-                valayaNagar: userData.valayaNagar,
-                khandaBhaga: userData.khandaBhaga,
-            }),
             candidateDetails: userData.candidateDetails,
             jobPosterDetails: userData.jobPosterDetails,
         };
+
+        // Include organization hierarchy fields for admin and referrer roles
+        if (userData.role === 'admin' || userData.role === 'job_referrer') {
+            dataToSend.vibhaaga = selectedVibhaaga;
+            dataToSend.khanda = selectedKhanda;
+            dataToSend.valaya = selectedValaya;
+            dataToSend.milan = selectedMilan;
+        } else {
+            // Clear organization fields for non-admin/referrer roles
+            dataToSend.vibhaaga = '';
+            dataToSend.khanda = '';
+            dataToSend.valaya = '';
+            dataToSend.milan = '';
+        }
+
+        console.log('🟡 Sending update data:', dataToSend);
 
         try {
             const response = await fetch(`/api/admin/users/${id}`, {
@@ -220,7 +332,6 @@ export default function EditUserPage({ params }: { params: { id: string } }) {
     };
 
     const isRequiredForAdminOrReferrer = userData && (userData.role === 'admin' || userData.role === 'job_referrer');
-    const areAdditionalFieldsVisible = userData && (userData.role === 'admin' || userData.role === 'job_referrer' || userData.role === 'job_seeker');
 
     if (authLoading || loading) {
         return (
@@ -445,76 +556,24 @@ export default function EditUserPage({ params }: { params: { id: string } }) {
                                     </div>
                                 </motion.div>
 
-                                {/* Conditional Additional Details fields */}
-                                {areAdditionalFieldsVisible && (
-                                    <motion.div variants={fadeIn} className="space-y-6 pt-4 border-t border-[#165BF8]/10 mt-6">
-                                        <h3 className="text-xl font-semibold text-[#1C3991]">
-                                            Additional Details {isRequiredForAdminOrReferrer ? '(Mandatory for Admin/Referrer)' : '(Optional for Job Seeker)'}
-                                        </h3>
-                                        
-                                        <motion.div variants={fadeIn}>
-                                            <label htmlFor="milanShakaBhaga" className="block text-sm font-semibold text-[#1C3991] mb-2">
-                                                Milan/Shaka
-                                            </label>
-                                            <div className="relative">
-                                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                                    <FiBookOpen className="h-5 w-5 text-[#165BF8]/70" />
-                                                </div>
-                                                <input
-                                                    type="text"
-                                                    name="milanShakaBhaga"
-                                                    id="milanShakaBhaga"
-                                                    value={userData.milanShakaBhaga || ''}
-                                                    onChange={handleChange}
-                                                    className="block w-full pl-10 pr-3 py-3 border border-[#165BF8]/20 rounded-xl shadow-sm placeholder-[#165BF8]/50 focus:outline-none focus:ring-2 focus:ring-[#165BF8]/30 focus:border-[#165BF8] text-[#1C3991] transition-all duration-200"
-                                                    placeholder="Enter Milan/Shaka"
-                                                    required={isRequiredForAdminOrReferrer}
-                                                />
-                                            </div>
-                                        </motion.div>
-
-                                        <motion.div variants={fadeIn}>
-                                            <label htmlFor="valayaNagar" className="block text-sm font-semibold text-[#1C3991] mb-2">
-                                                Valaya/Nagar
-                                            </label>
-                                            <div className="relative">
-                                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                                    <FiMapPin className="h-5 w-5 text-[#165BF8]/70" />
-                                                </div>
-                                                <input
-                                                    type="text"
-                                                    name="valayaNagar"
-                                                    id="valayaNagar"
-                                                    value={userData.valayaNagar || ''}
-                                                    onChange={handleChange}
-                                                    className="block w-full pl-10 pr-3 py-3 border border-[#165BF8]/20 rounded-xl shadow-sm placeholder-[#165BF8]/50 focus:outline-none focus:ring-2 focus:ring-[#165BF8]/30 focus:border-[#165BF8] text-[#1C3991] transition-all duration-200"
-                                                    placeholder="Enter Valaya/Nagar"
-                                                    required={isRequiredForAdminOrReferrer}
-                                                />
-                                            </div>
-                                        </motion.div>
-
-                                        <motion.div variants={fadeIn}>
-                                            <label htmlFor="khandaBhaga" className="block text-sm font-semibold text-[#1C3991] mb-2">
-                                                Khanda/Bhaga
-                                            </label>
-                                            <div className="relative">
-                                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                                    <FiGlobe className="h-5 w-5 text-[#165BF8]/70" />
-                                                </div>
-                                                <input
-                                                    type="text"
-                                                    name="khandaBhaga"
-                                                    id="khandaBhaga"
-                                                    value={userData.khandaBhaga || ''}
-                                                    onChange={handleChange}
-                                                    className="block w-full pl-10 pr-3 py-3 border border-[#165BF8]/20 rounded-xl shadow-sm placeholder-[#165BF8]/50 focus:outline-none focus:ring-2 focus:ring-[#165BF8]/30 focus:border-[#165BF8] text-[#1C3991] transition-all duration-200"
-                                                    placeholder="Enter Khanda/Bhaga"
-                                                    required={isRequiredForAdminOrReferrer}
-                                                />
-                                            </div>
-                                        </motion.div>
-                                    </motion.div>
+                                {/* Organization Hierarchy Component - Only for Admin and Referrer roles */}
+                                {isRequiredForAdminOrReferrer && (
+                                    <OrganizationHierarchy
+                                        organizations={organizations}
+                                        loadingHierarchy={loadingHierarchy}
+                                        hierarchyError={hierarchyError}
+                                        vibhaaga={selectedVibhaaga}
+                                        khanda={selectedKhanda}
+                                        valaya={selectedValaya}
+                                        milan={selectedMilan}
+                                        onVibhaagaChange={handleVibhaagaChange}
+                                        onKhandaChange={handleKhandaChange}
+                                        onValayaChange={handleValayaChange}
+                                        onMilanChange={handleMilanChange}
+                                        onRetry={fetchOrganizationHierarchy}
+                                        isLoading={isSaving}
+                                        isRequired={isRequiredForAdminOrReferrer}
+                                    />
                                 )}
 
                                 {/* Job Seeker details (only visible when role is 'job_seeker') */}

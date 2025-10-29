@@ -1,7 +1,7 @@
 'use client';
 import React from 'react';
 import { motion } from 'framer-motion';
-import { FiBookOpen, FiMapPin, FiGlobe, FiLoader, FiRefreshCw, FiXCircle, FiChevronDown, FiUsers, FiHome } from 'react-icons/fi';
+import { FiBookOpen, FiMapPin, FiGlobe, FiLoader, FiRefreshCw, FiXCircle, FiChevronDown, FiUsers } from 'react-icons/fi';
 
 // Types based on your API response
 interface Organization {
@@ -27,12 +27,6 @@ interface Valaya {
 interface Milan {
   _id: string;
   name: string;
-  ghatas?: Ghata[];
-}
-
-interface Ghata {
-  _id: string;
-  name: string;
 }
 
 interface OrganizationHierarchyProps {
@@ -43,12 +37,10 @@ interface OrganizationHierarchyProps {
   khanda: string;
   valaya: string;
   milan: string;
-  ghata: string;
   onVibhaagaChange: (vibhaagaId: string) => void;
   onKhandaChange: (khandaId: string) => void;
   onValayaChange: (valayaId: string) => void;
   onMilanChange: (milanId: string) => void;
-  onGhataChange: (ghataId: string) => void;
   onRetry: () => void;
   isLoading: boolean;
   isRequired: boolean;
@@ -62,12 +54,10 @@ export default function OrganizationHierarchy({
   khanda,
   valaya,
   milan,
-  ghata,
   onVibhaagaChange,
   onKhandaChange,
   onValayaChange,
   onMilanChange,
-  onGhataChange,
   onRetry,
   isLoading,
   isRequired
@@ -80,13 +70,11 @@ export default function OrganizationHierarchy({
       khanda,
       valaya,
       milan,
-      ghata,
       organizationsCount: organizations?.length || 0,
       vibhaagas: getVibhaagas().length,
       khandas: getKhandas().length,
       valayas: getValayas().length,
-      milans: getMilans().length,
-      ghatas: getGhatas().length
+      milans: getMilans().length
     });
   };
 
@@ -118,13 +106,6 @@ export default function OrganizationHierarchy({
     return valayaObj?.milans || [];
   };
 
-  // Get ghatas for selected milan
-  const getGhatas = () => {
-    if (!milan) return [];
-    const milanObj = getMilans().find(m => m._id === milan);
-    return milanObj?.ghatas || [];
-  };
-
   // Reset dependent fields when parent changes
   const handleVibhaagaChange = (vibhaagaId: string) => {
     console.log('🔄 Vibhaaga changed to:', vibhaagaId);
@@ -133,7 +114,6 @@ export default function OrganizationHierarchy({
     onKhandaChange('');
     onValayaChange('');
     onMilanChange('');
-    onGhataChange('');
   };
 
   const handleKhandaChange = (khandaId: string) => {
@@ -142,7 +122,6 @@ export default function OrganizationHierarchy({
     // Reset dependent fields
     onValayaChange('');
     onMilanChange('');
-    onGhataChange('');
   };
 
   const handleValayaChange = (valayaId: string) => {
@@ -150,19 +129,11 @@ export default function OrganizationHierarchy({
     onValayaChange(valayaId);
     // Reset dependent fields
     onMilanChange('');
-    onGhataChange('');
   };
 
   const handleMilanChange = (milanId: string) => {
     console.log('🔄 Milan changed to:', milanId);
     onMilanChange(milanId);
-    // Reset dependent field
-    onGhataChange('');
-  };
-
-  const handleGhataChange = (ghataId: string) => {
-    console.log('🔄 Ghata changed to:', ghataId);
-    onGhataChange(ghataId);
   };
 
   // Get display names for current selections
@@ -182,16 +153,12 @@ export default function OrganizationHierarchy({
     return getMilans().find(m => m._id === milan)?.name || '';
   };
 
-  const getSelectedGhataName = () => {
-    return getGhatas().find(g => g._id === ghata)?.name || '';
-  };
-
   if (!isRequired) return null;
 
   // Log state on component render
   React.useEffect(() => {
     logCurrentState();
-  }, [vibhaaga, khanda, valaya, milan, ghata, organizations]);
+  }, [vibhaaga, khanda, valaya, milan, organizations]);
 
   return (
     <motion.div
@@ -263,9 +230,9 @@ export default function OrganizationHierarchy({
           <p className="text-sm mt-1">Please check if organization data is properly configured.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {/* Vibhaaga Dropdown */}
-          <motion.div className="md:col-span-2 lg:col-span-3 xl:col-span-1">
+          <motion.div>
             <label className="block text-sm font-semibold text-gray-900 mb-2 flex items-center space-x-2">
               <FiGlobe className="h-4 w-4 text-blue-600" />
               <span>Vibhaaga</span>
@@ -296,7 +263,7 @@ export default function OrganizationHierarchy({
           </motion.div>
 
           {/* Khanda Dropdown */}
-          <motion.div className="md:col-span-2 lg:col-span-3 xl:col-span-1">
+          <motion.div>
             <label className="block text-sm font-semibold text-gray-900 mb-2 flex items-center space-x-2">
               <FiUsers className="h-4 w-4 text-blue-600" />
               <span>Khanda</span>
@@ -327,7 +294,7 @@ export default function OrganizationHierarchy({
           </motion.div>
 
           {/* Valaya Dropdown */}
-          <motion.div className="md:col-span-2 lg:col-span-3 xl:col-span-1">
+          <motion.div>
             <label className="block text-sm font-semibold text-gray-900 mb-2 flex items-center space-x-2">
               <FiMapPin className="h-4 w-4 text-blue-600" />
               <span>Valaya</span>
@@ -358,7 +325,7 @@ export default function OrganizationHierarchy({
           </motion.div>
 
           {/* Milan Dropdown */}
-          <motion.div className="md:col-span-2 lg:col-span-3 xl:col-span-1">
+          <motion.div>
             <label className="block text-sm font-semibold text-gray-900 mb-2 flex items-center space-x-2">
               <FiBookOpen className="h-4 w-4 text-blue-600" />
               <span>Milan</span>
@@ -387,41 +354,11 @@ export default function OrganizationHierarchy({
               {valaya ? `${getMilans().length} milans available` : 'Select valaya first'}
             </p>
           </motion.div>
-
-          {/* Ghata Dropdown */}
-          <motion.div className="md:col-span-2 lg:col-span-3 xl:col-span-1">
-            <label className="block text-sm font-semibold text-gray-900 mb-2 flex items-center space-x-2">
-              <FiHome className="h-4 w-4 text-blue-600" />
-              <span>Ghata</span>
-              <span className="text-gray-400 ml-1">(Optional)</span>
-            </label>
-            <div className="relative">
-              <select
-                className="block w-full px-4 py-3 border-2 border-blue-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 text-gray-900 transition-all duration-200 hover:border-blue-300 appearance-none bg-white cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                value={ghata}
-                onChange={(e) => handleGhataChange(e.target.value)}
-                disabled={isLoading || !milan || getGhatas().length === 0}
-              >
-                <option value="">Select Ghata (Optional)</option>
-                {getGhatas().map((ghata) => (
-                  <option key={ghata._id} value={ghata._id}>
-                    {ghata.name}
-                  </option>
-                ))}
-              </select>
-              <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                <FiChevronDown className="h-5 w-5 text-blue-600" />
-              </div>
-            </div>
-            <p className="text-xs text-gray-500 mt-1">
-              {milan ? `${getGhatas().length} ghatas available` : 'Select milan first'}
-            </p>
-          </motion.div>
         </div>
       )}
 
       {/* Current Selection Display */}
-      {(vibhaaga || khanda || valaya || milan || ghata) && (
+      {(vibhaaga || khanda || valaya || milan) && (
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
@@ -447,11 +384,6 @@ export default function OrganizationHierarchy({
             {milan && (
               <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
                 Milan: {getSelectedMilanName()}
-              </span>
-            )}
-            {ghata && (
-              <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
-                Ghata: {getSelectedGhataName()}
               </span>
             )}
           </div>

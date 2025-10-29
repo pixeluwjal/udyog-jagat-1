@@ -18,8 +18,6 @@ import {
   FiPaperclip,
   FiSmile,
   FiSend,
-  FiVideo,
-  FiPhone,
   FiInfo,
   FiEdit3,
   FiTrash2,
@@ -27,7 +25,12 @@ import {
   FiFile,
   FiMic,
   FiArrowLeft,
-  FiSettings
+  FiSettings,
+  FiHome,
+  FiBriefcase,
+  FiUsers,
+  FiAward,
+  FiDollarSign
 } from 'react-icons/fi';
 import {
   Chat,
@@ -40,6 +43,7 @@ import {
 } from 'stream-chat-react';
 import 'stream-chat-react/dist/css/v2/index.css';
 import { useStreamChat } from '@/hooks/useStreamChat';
+import Sidebar from '@/app/components/Sidebar';
 
 interface JobSeeker {
   _id: string;
@@ -66,21 +70,21 @@ interface ChatChannel {
   isOnline?: boolean;
 }
 
-// Custom Message Component for WhatsApp-like styling
+// Custom Message Component with attractive styling
 const CustomMessage = (props: any) => {
   const { message, isMyMessage } = useMessageContext();
   
   return (
-    <div className={`flex ${isMyMessage ? 'justify-end' : 'justify-start'} mb-3`}>
+    <div className={`flex ${isMyMessage ? 'justify-end' : 'justify-start'} mb-4`}>
       <div
-        className={`max-w-xs lg:max-w-md px-4 py-2 rounded-2xl shadow-sm ${
+        className={`max-w-xs lg:max-w-md px-4 py-3 rounded-2xl shadow-sm ${
           isMyMessage
-            ? 'bg-[#005c4b] text-white rounded-tr-none'
-            : 'bg-white text-gray-800 rounded-tl-none border border-gray-200'
+            ? 'bg-[#1e40a7] text-white rounded-br-none'
+            : 'bg-white text-gray-800 rounded-bl-none border border-gray-200'
         }`}
       >
         <p className="text-sm whitespace-pre-wrap">{message.text}</p>
-        <div className={`flex justify-end mt-1 ${isMyMessage ? 'text-[#99b8b1]' : 'text-gray-500'}`}>
+        <div className={`flex justify-end mt-1 ${isMyMessage ? 'text-blue-100' : 'text-gray-500'}`}>
           <span className="text-xs">
             {new Date(message.created_at).toLocaleTimeString('en-US', {
               hour: 'numeric',
@@ -105,7 +109,6 @@ export default function ReferrerDashboard() {
   const [mobileView, setMobileView] = useState<'list' | 'chat'>('list');
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [seekerInfoOpen, setSeekerInfoOpen] = useState(false);
-  const [editProfileOpen, setEditProfileOpen] = useState(false);
   
   const { user, logout, loading: authLoading, refreshUser } = useAuth();
   const router = useRouter();
@@ -150,7 +153,7 @@ export default function ReferrerDashboard() {
     }
   };
 
-  // Get real channels and update recent chats with previous messages
+  // Get real channels and update recent chats
   const updateRecentChats = async () => {
     if (!chatClient || !user) return;
 
@@ -299,78 +302,6 @@ export default function ReferrerDashboard() {
     return `Last seen ${date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
   };
 
-  // Profile Edit Form State
-  const [profileForm, setProfileForm] = useState({
-    fullName: user?.referrerDetails?.fullName || '',
-    mobileNumber: user?.referrerDetails?.mobileNumber || '',
-    personalEmail: user?.referrerDetails?.personalEmail || '',
-    residentialAddress: user?.referrerDetails?.residentialAddress || '',
-    companyName: user?.workDetails?.companyName || '',
-    workLocation: user?.workDetails?.workLocation || '',
-    designation: user?.workDetails?.designation || '',
-  });
-
-  // Update profile form when user data changes
-  useEffect(() => {
-    if (user) {
-      setProfileForm({
-        fullName: user.referrerDetails?.fullName || '',
-        mobileNumber: user.referrerDetails?.mobileNumber || '',
-        personalEmail: user.referrerDetails?.personalEmail || '',
-        residentialAddress: user.referrerDetails?.residentialAddress || '',
-        companyName: user.workDetails?.companyName || '',
-        workLocation: user.workDetails?.workLocation || '',
-        designation: user.workDetails?.designation || '',
-      });
-    }
-  }, [user]);
-
-  // Handle profile update
-// In your referrer dashboard component, update the handleProfileUpdate function:
-
-// Handle profile update
-const handleProfileUpdate = async (e: React.FormEvent) => {
-  e.preventDefault();
-  try {
-    console.log('🔄 Updating profile...');
-    
-    // Get token from localStorage or your auth context
-    const token = localStorage.getItem('token');
-    
-    if (!token) {
-      throw new Error('No authentication token found. Please log in again.');
-    }
-
-    const response = await fetch('/api/referrer/profile', {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-      },
-      body: JSON.stringify(profileForm),
-    });
-
-    const data = await response.json();
-
-    if (!response.ok) {
-      throw new Error(data.error || 'Failed to update profile');
-    }
-
-    console.log('✅ Profile updated successfully:', data);
-    
-    // Refresh user data
-    await refreshUser();
-    setEditProfileOpen(false);
-    
-    // Show success message
-    alert('Profile updated successfully!');
-    
-  } catch (error: any) {
-    console.error('❌ Error updating profile:', error);
-    alert(error.message || 'Failed to update profile');
-  }
-};
-
   // Scroll to bottom of messages
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -445,7 +376,7 @@ const handleProfileUpdate = async (e: React.FormEvent) => {
 
   if (authLoading || loading) {
     return (
-      <div className="flex h-screen bg-[#00a884] justify-center items-center">
+      <div className="flex h-screen bg-gradient-to-br from-[#1e40a7] to-[#3b82f6] justify-center items-center">
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -474,9 +405,20 @@ const handleProfileUpdate = async (e: React.FormEvent) => {
   }
 
   return (
-    <div className="flex h-screen bg-[#f0f2f5] font-inter overflow-hidden">
+    <div className="flex h-screen bg-[#f8fafc] font-inter overflow-hidden">
+      {/* Sidebar */}
+      <Sidebar
+        userRole="job_referrer"
+        onLogout={handleLogout}
+        userDisplayName={user?.referrerDetails?.fullName || user?.username}
+        userEmail={user?.email}
+        unreadCount={totalUnread}
+        isOpen={sidebarOpen}
+        setIsOpen={setSidebarOpen}
+      />
+
       {/* Mobile Header */}
-      <div className="md:hidden fixed top-0 left-0 right-0 bg-[#00a884] z-50 p-3 text-white">
+      <div className="md:hidden fixed top-0 left-0 right-0 bg-gradient-to-r from-[#1e40a7] to-[#3b82f6] z-40 p-4 text-white shadow-lg">
         <div className="flex items-center justify-between">
           {mobileView === 'chat' ? (
             <button 
@@ -485,269 +427,80 @@ const handleProfileUpdate = async (e: React.FormEvent) => {
                 setSelectedSeeker(null);
                 setCurrentChannel(null);
               }}
-              className="p-2"
+              className="p-2 hover:bg-white/10 rounded-lg transition-colors"
             >
               <FiArrowLeft className="h-5 w-5" />
             </button>
           ) : (
             <button 
               onClick={() => setSidebarOpen(true)}
-              className="p-2"
+              className="p-2 hover:bg-white/10 rounded-lg transition-colors"
             >
               <FiMenu className="h-5 w-5" />
             </button>
           )}
           
-          <h1 className="text-lg font-semibold">
-            {mobileView === 'chat' ? selectedSeeker?.candidateDetails?.fullName : 'Chats'}
+          <h1 className="text-lg font-bold">
+            {mobileView === 'chat' ? selectedSeeker?.candidateDetails?.fullName : 'Referrer Dashboard'}
           </h1>
           
           <button 
             onClick={handleLogout}
-            className="p-2"
+            className="p-2 hover:bg-white/10 rounded-lg transition-colors"
           >
             <FiLogOut className="h-5 w-5" />
           </button>
         </div>
       </div>
 
-      {/* Profile Sidebar for mobile */}
-      <AnimatePresence>
-        {sidebarOpen && (
-          <>
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-black/50 z-40 md:hidden"
-              onClick={() => setSidebarOpen(false)}
-            />
-            <motion.div
-              initial={{ x: -300 }}
-              animate={{ x: 0 }}
-              exit={{ x: -300 }}
-              className="fixed left-0 top-0 bottom-0 w-80 bg-white z-50 md:hidden"
-            >
-              <div className="p-6 bg-[#00a884] text-white">
-                <div className="flex items-center justify-between mb-6">
-                  <h2 className="text-lg font-semibold">Profile</h2>
-                  <button onClick={() => setSidebarOpen(false)}>
-                    <FiX className="h-6 w-6" />
-                  </button>
-                </div>
-                <div className="flex items-center space-x-4">
-                  <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center text-white font-bold text-xl">
-                    {user?.referrerDetails?.fullName?.charAt(0) || user?.username?.charAt(0)}
-                  </div>
-                  <div>
-                    <p className="font-semibold text-lg">{user?.referrerDetails?.fullName || user?.username}</p>
-                    <p className="text-white/80 text-sm">{user?.email}</p>
-                  </div>
-                </div>
-              </div>
-              <div className="p-4">
-                <button 
-                  onClick={() => setEditProfileOpen(true)}
-                  className="w-full text-left p-3 hover:bg-gray-100 rounded-lg transition-colors flex items-center space-x-3"
-                >
-                  <FiEdit3 className="h-5 w-5 text-gray-600" />
-                  <span>Edit Profile</span>
-                </button>
-                <button className="w-full text-left p-3 hover:bg-gray-100 rounded-lg transition-colors flex items-center space-x-3">
-                  <FiSettings className="h-5 w-5 text-gray-600" />
-                  <span>Settings</span>
-                </button>
-                <button 
-                  onClick={handleLogout}
-                  className="w-full text-left p-3 text-red-600 hover:bg-red-50 rounded-lg transition-colors flex items-center space-x-3"
-                >
-                  <FiLogOut className="h-5 w-5" />
-                  <span>Logout</span>
-                </button>
-              </div>
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
-
-      {/* Edit Profile Modal */}
-      <AnimatePresence>
-        {editProfileOpen && (
-          <>
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
-              onClick={() => setEditProfileOpen(false)}
-            >
-              <motion.div
-                initial={{ scale: 0.9, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                exit={{ scale: 0.9, opacity: 0 }}
-                className="bg-white rounded-2xl w-full max-w-md p-6"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <div className="flex items-center justify-between mb-6">
-                  <h3 className="text-xl font-bold text-gray-900">Edit Profile</h3>
-                  <button onClick={() => setEditProfileOpen(false)}>
-                    <FiX className="h-6 w-6 text-gray-500" />
-                  </button>
-                </div>
-                
-                <form onSubmit={handleProfileUpdate} className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
-                    <input
-                      type="text"
-                      value={profileForm.fullName}
-                      onChange={(e) => setProfileForm(prev => ({ ...prev, fullName: e.target.value }))}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#00a884] focus:border-transparent"
-                    />
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Mobile Number</label>
-                    <input
-                      type="tel"
-                      value={profileForm.mobileNumber}
-                      onChange={(e) => setProfileForm(prev => ({ ...prev, mobileNumber: e.target.value }))}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#00a884] focus:border-transparent"
-                    />
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Personal Email</label>
-                    <input
-                      type="email"
-                      value={profileForm.personalEmail}
-                      onChange={(e) => setProfileForm(prev => ({ ...prev, personalEmail: e.target.value }))}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#00a884] focus:border-transparent"
-                    />
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Company Name</label>
-                    <input
-                      type="text"
-                      value={profileForm.companyName}
-                      onChange={(e) => setProfileForm(prev => ({ ...prev, companyName: e.target.value }))}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#00a884] focus:border-transparent"
-                    />
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Designation</label>
-                    <input
-                      type="text"
-                      value={profileForm.designation}
-                      onChange={(e) => setProfileForm(prev => ({ ...prev, designation: e.target.value }))}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#00a884] focus:border-transparent"
-                    />
-                  </div>
-                  
-                  <div className="flex space-x-3 pt-4">
-                    <button
-                      type="button"
-                      onClick={() => setEditProfileOpen(false)}
-                      className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="submit"
-                      className="flex-1 px-4 py-2 bg-[#00a884] text-white rounded-lg hover:bg-[#008c6d] transition-colors"
-                    >
-                      Save Changes
-                    </button>
-                  </div>
-                </form>
-              </motion.div>
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
-
-      {/* Main Chat Interface */}
-      <div className="flex-1 flex w-full h-full pt-12 md:pt-0">
-        {/* Left Sidebar - Recent Chats List */}
+      {/* Main Content Area */}
+      <div className="flex-1 flex flex-col md:flex-row h-full pt-16 md:pt-0 md:ml-0">
+        {/* Chats List Panel */}
         <motion.div
           initial={{ opacity: 0, x: -20 }}
           animate={{ opacity: 1, x: 0 }}
           className={`${
             mobileView === 'list' ? 'flex' : 'hidden'
-          } md:flex flex-col w-full md:w-96 bg-white border-r border-gray-300 h-full`}
+          } md:flex flex-col w-full md:w-96 bg-white border-r border-gray-200 h-full shadow-lg`}
         >
-          {/* Header */}
-          <div className="p-4 bg-[#f0f2f5] border-b border-gray-300">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center space-x-3">
-                <div className="relative">
-                  <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-sm">
-                    <div 
-                      className="w-10 h-10 bg-[#00a884] rounded-full flex items-center justify-center text-white font-bold cursor-pointer"
-                      onClick={() => setProfileMenuOpen(!profileMenuOpen)}
-                    >
-                      {user?.referrerDetails?.fullName?.charAt(0) || user?.username?.charAt(0)}
-                    </div>
-                  </div>
-                  {profileMenuOpen && (
-                    <div className="absolute top-14 left-0 w-48 bg-white rounded-lg shadow-2xl border border-gray-200 z-10">
-                      <div className="p-3 border-b border-gray-200">
-                        <p className="font-semibold">{user?.referrerDetails?.fullName || user?.username}</p>
-                        <p className="text-sm text-gray-600">{user?.email}</p>
-                      </div>
-                      <button 
-                        onClick={() => setEditProfileOpen(true)}
-                        className="w-full text-left p-3 hover:bg-gray-50 transition-colors flex items-center space-x-2"
-                      >
-                        <FiEdit3 className="h-4 w-4" />
-                        <span>Edit Profile</span>
-                      </button>
-                      <button className="w-full text-left p-3 hover:bg-gray-50 transition-colors flex items-center space-x-2">
-                        <FiSettings className="h-4 w-4" />
-                        <span>Settings</span>
-                      </button>
-                      <button 
-                        onClick={handleLogout}
-                        className="w-full text-left p-3 text-red-600 hover:bg-red-50 transition-colors border-t border-gray-200 flex items-center space-x-2"
-                      >
-                        <FiLogOut className="h-4 w-4" />
-                        <span>Logout</span>
-                      </button>
-                    </div>
-                  )}
-                </div>
-                <div>
-                  <h1 className="text-lg font-semibold text-gray-900">Chats</h1>
-                  <p className="text-gray-600 text-sm">
-                    {totalUnread > 0 ? `${totalUnread} unread messages` : 'All caught up'}
-                  </p>
-                </div>
+          {/* Chats Header */}
+          <div className="p-6 bg-gradient-to-r from-[#1e40a7] to-[#3b82f6] text-white">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h1 className="text-2xl font-bold">Messages</h1>
+                <p className="text-white/80">
+                  {totalUnread > 0 ? `${totalUnread} unread messages` : 'All caught up'}
+                </p>
               </div>
+              <button 
+                onClick={() => setProfileMenuOpen(!profileMenuOpen)}
+                className="p-2 hover:bg-white/10 rounded-xl transition-colors"
+              >
+                <FiMoreVertical className="h-5 w-5" />
+              </button>
             </div>
 
             {/* Search Bar */}
             <div className="relative">
-              <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-500" />
+              <FiSearch className="absolute left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-500" />
               <input
                 type="text"
-                placeholder="Search or start new chat"
+                placeholder="Search conversations..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-3 bg-white rounded-lg border border-gray-300 focus:outline-none focus:border-[#00a884] text-gray-900 placeholder-gray-500 transition-all duration-200"
+                className="w-full pl-12 pr-4 py-3 bg-white/10 backdrop-blur-lg rounded-xl border border-white/20 focus:outline-none focus:border-white/40 text-white placeholder-white/60 transition-all duration-200"
               />
             </div>
           </div>
           
-          {/* Recent Chats List */}
+          {/* Chats List */}
           <div className="flex-1 overflow-y-auto bg-white">
             <div className="divide-y divide-gray-100">
               {filteredChats.length === 0 ? (
                 <div className="text-center py-12 text-gray-500">
                   <FiMessageCircle className="h-16 w-16 mx-auto mb-4 opacity-50" />
-                  <p className="text-lg font-medium">No conversations yet</p>
-                  <p className="text-sm mt-1">Start chatting with job seekers</p>
+                  <p className="text-lg font-medium text-gray-900">No conversations yet</p>
+                  <p className="text-sm mt-1 text-gray-600">Start chatting with job seekers</p>
                 </div>
               ) : (
                 filteredChats.map((chat, index) => (
@@ -757,17 +510,17 @@ const handleProfileUpdate = async (e: React.FormEvent) => {
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: index * 0.05 }}
                     onClick={() => startChatWithSeeker(chat.seeker)}
-                    className={`w-full text-left p-3 transition-all duration-200 hover:bg-gray-50 ${
-                      selectedSeeker?._id === chat.seeker._id ? 'bg-[#f0f2f5]' : 'bg-white'
+                    className={`w-full text-left p-4 transition-all duration-200 hover:bg-gray-50 ${
+                      selectedSeeker?._id === chat.seeker._id ? 'bg-blue-50 border-r-4 border-[#1e40a7]' : 'bg-white'
                     }`}
                   >
                     <div className="flex items-start space-x-3">
                       <div className="relative">
-                        <div className="w-12 h-12 bg-gradient-to-br from-[#00a884] to-[#008c6d] rounded-full flex items-center justify-center text-white font-bold text-sm">
+                        <div className="w-12 h-12 bg-gradient-to-br from-[#1e40a7] to-[#3b82f6] rounded-2xl flex items-center justify-center text-white font-bold text-sm shadow-lg">
                           {chat.seeker.candidateDetails?.fullName?.charAt(0) || chat.seeker.username.charAt(0)}
                         </div>
                         {chat.isOnline && (
-                          <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></div>
+                          <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white shadow-sm"></div>
                         )}
                       </div>
                       <div className="flex-1 min-w-0">
@@ -775,7 +528,7 @@ const handleProfileUpdate = async (e: React.FormEvent) => {
                           <h4 className="font-semibold text-gray-900 truncate">
                             {chat.seeker.candidateDetails?.fullName || chat.seeker.username}
                           </h4>
-                          <span className="text-xs text-gray-500">
+                          <span className="text-xs text-gray-500 whitespace-nowrap">
                             {formatTime(chat.timestamp)}
                           </span>
                         </div>
@@ -785,7 +538,7 @@ const handleProfileUpdate = async (e: React.FormEvent) => {
                             {chat.lastMessage}
                           </p>
                           {chat.unreadCount > 0 && (
-                            <span className="bg-[#00a884] text-white text-xs px-2 py-1 rounded-full min-w-5 text-center">
+                            <span className="bg-[#1e40a7] text-white text-xs px-2 py-1 rounded-full min-w-5 text-center shadow-sm">
                               {chat.unreadCount}
                             </span>
                           )}
@@ -799,13 +552,13 @@ const handleProfileUpdate = async (e: React.FormEvent) => {
           </div>
         </motion.div>
 
-        {/* Right Side - Chat Area */}
+        {/* Chat Area */}
         <motion.div
           initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}
           className={`${
             mobileView === 'chat' ? 'flex' : 'hidden'
-          } md:flex flex-1 flex-col bg-[#efeae2] h-full relative`}
+          } md:flex flex-1 flex-col bg-gradient-to-br from-gray-50 to-blue-50 h-full relative`}
         >
           <AnimatePresence mode="wait">
             {/* Active Chat View */}
@@ -818,8 +571,8 @@ const handleProfileUpdate = async (e: React.FormEvent) => {
                 className="flex-1 flex flex-col h-full"
               >
                 {/* Chat Header */}
-                <div className="bg-[#f0f2f5] px-4 py-3 border-b border-gray-300 flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
+                <div className="bg-white px-6 py-4 border-b border-gray-200 flex items-center justify-between shadow-sm">
+                  <div className="flex items-center space-x-4">
                     <button 
                       onClick={() => {
                         setSelectedSeeker(null);
@@ -834,20 +587,20 @@ const handleProfileUpdate = async (e: React.FormEvent) => {
                     </button>
                     <div className="relative">
                       <div 
-                        className="w-10 h-10 bg-gradient-to-br from-[#00a884] to-[#008c6d] rounded-full flex items-center justify-center text-white font-bold cursor-pointer"
+                        className="w-12 h-12 bg-gradient-to-br from-[#1e40a7] to-[#3b82f6] rounded-2xl flex items-center justify-center text-white font-bold cursor-pointer shadow-lg"
                         onClick={() => setSeekerInfoOpen(!seekerInfoOpen)}
                       >
                         {selectedSeeker.candidateDetails?.fullName?.charAt(0) || selectedSeeker.username.charAt(0)}
                       </div>
                       {selectedSeeker.isOnline && (
-                        <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></div>
+                        <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white shadow-sm"></div>
                       )}
                     </div>
                     <div 
                       className="cursor-pointer"
                       onClick={() => setSeekerInfoOpen(!seekerInfoOpen)}
                     >
-                      <h3 className="font-semibold text-gray-900">
+                      <h3 className="font-bold text-gray-900 text-lg">
                         {selectedSeeker.candidateDetails?.fullName || selectedSeeker.username}
                       </h3>
                       <p className="text-gray-600 text-sm">
@@ -857,14 +610,8 @@ const handleProfileUpdate = async (e: React.FormEvent) => {
                   </div>
                   
                   <div className="flex items-center space-x-2">
-                    <button className="p-2 text-gray-600 hover:text-gray-800 transition-colors">
-                      <FiVideo className="h-5 w-5" />
-                    </button>
-                    <button className="p-2 text-gray-600 hover:text-gray-800 transition-colors">
-                      <FiPhone className="h-5 w-5" />
-                    </button>
                     <button 
-                      className="p-2 text-gray-600 hover:text-gray-800 transition-colors"
+                      className="p-3 text-gray-600 hover:text-[#1e40a7] hover:bg-gray-100 rounded-xl transition-colors"
                       onClick={() => setSeekerInfoOpen(!seekerInfoOpen)}
                     >
                       <FiInfo className="h-5 w-5" />
@@ -873,7 +620,7 @@ const handleProfileUpdate = async (e: React.FormEvent) => {
                 </div>
 
                 {/* Chat Messages Area */}
-                <div className="flex-1 overflow-y-auto bg-[#efeae2]">
+                <div className="flex-1 overflow-y-auto bg-gradient-to-b from-gray-50 to-blue-50 p-4">
                   {chatClient && (
                     <Chat client={chatClient} theme="messaging light">
                       <Channel channel={currentChannel} Message={CustomMessage}>
@@ -905,38 +652,38 @@ const handleProfileUpdate = async (e: React.FormEvent) => {
                         exit={{ x: '100%' }}
                         className="absolute right-0 top-0 bottom-0 w-80 bg-white z-20 shadow-2xl"
                       >
-                        <div className="p-6 bg-gradient-to-b from-[#00a884] to-[#008c6d] text-white">
+                        <div className="p-6 bg-gradient-to-r from-[#1e40a7] to-[#3b82f6] text-white">
                           <div className="flex items-center justify-between mb-6">
-                            <h2 className="text-lg font-semibold">Contact Info</h2>
+                            <h2 className="text-lg font-bold">Candidate Info</h2>
                             <button onClick={() => setSeekerInfoOpen(false)}>
                               <FiX className="h-6 w-6" />
                             </button>
                           </div>
                           <div className="text-center">
-                            <div className="w-20 h-20 bg-white/20 rounded-full flex items-center justify-center text-white font-bold text-2xl mx-auto mb-3">
+                            <div className="w-20 h-20 bg-white/20 rounded-2xl flex items-center justify-center text-white font-bold text-2xl mx-auto mb-4 border-2 border-white/30">
                               {selectedSeeker.candidateDetails?.fullName?.charAt(0) || selectedSeeker.username.charAt(0)}
                             </div>
-                            <h3 className="font-semibold text-lg">
+                            <h3 className="font-bold text-xl mb-1">
                               {selectedSeeker.candidateDetails?.fullName || selectedSeeker.username}
                             </h3>
                             <p className="text-white/80 text-sm">{selectedSeeker.email}</p>
                           </div>
                         </div>
                         
-                        <div className="p-4 space-y-4">
+                        <div className="p-6 space-y-6">
                           {selectedSeeker.candidateDetails?.phone && (
                             <div>
-                              <p className="text-sm text-gray-600 mb-1">Phone</p>
-                              <p className="font-medium">{selectedSeeker.candidateDetails.phone}</p>
+                              <p className="text-sm text-gray-600 mb-2 font-medium">Phone</p>
+                              <p className="font-semibold text-gray-900">{selectedSeeker.candidateDetails.phone}</p>
                             </div>
                           )}
                           
                           {selectedSeeker.candidateDetails?.skills && selectedSeeker.candidateDetails.skills.length > 0 && (
                             <div>
-                              <p className="text-sm text-gray-600 mb-2">Skills</p>
+                              <p className="text-sm text-gray-600 mb-3 font-medium">Skills</p>
                               <div className="flex flex-wrap gap-2">
-                                {selectedSeeker.candidateDetails.skills.slice(0, 4).map((skill, idx) => (
-                                  <span key={idx} className="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded-full">
+                                {selectedSeeker.candidateDetails.skills.slice(0, 6).map((skill, idx) => (
+                                  <span key={idx} className="text-xs bg-blue-50 text-[#1e40a7] px-3 py-2 rounded-lg font-medium">
                                     {skill}
                                   </span>
                                 ))}
@@ -946,17 +693,10 @@ const handleProfileUpdate = async (e: React.FormEvent) => {
                           
                           {selectedSeeker.candidateDetails?.experience && (
                             <div>
-                              <p className="text-sm text-gray-600 mb-1">Experience</p>
-                              <p className="font-medium">{selectedSeeker.candidateDetails.experience}</p>
+                              <p className="text-sm text-gray-600 mb-2 font-medium">Experience</p>
+                              <p className="font-semibold text-gray-900">{selectedSeeker.candidateDetails.experience}</p>
                             </div>
                           )}
-                          
-                          <div className="border-t border-gray-200 pt-4">
-                            <button className="flex items-center space-x-3 text-red-600 hover:text-red-700 transition-colors">
-                              <FiTrash2 className="h-5 w-5" />
-                              <span>Clear Chat</span>
-                            </button>
-                          </div>
                         </div>
                       </motion.div>
                     </>
@@ -964,48 +704,45 @@ const handleProfileUpdate = async (e: React.FormEvent) => {
                 </AnimatePresence>
               </motion.div>
             ) : (
-              /* Empty State */
+              /* Welcome State */
               <motion.div
-                key="empty-state"
+                key="welcome-state"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-[#f0f2f5] h-full"
+                className="flex-1 flex flex-col items-center justify-center p-8 text-center h-full"
               >
-                <div className="w-32 h-32 bg-[#00a884] rounded-full flex items-center justify-center mb-8 shadow-2xl">
-                  <FiMessageCircle className="h-16 w-16 text-white" />
+                <div className="w-48 h-48 bg-gradient-to-br from-[#1e40a7] to-[#3b82f6] rounded-3xl flex items-center justify-center mb-8 shadow-2xl">
+                  <FiMessageCircle className="h-20 w-20 text-white" />
                 </div>
-                <h3 className="text-3xl font-black text-gray-800 mb-4">
-                  Start Connnecting with Job Seekers
+                <h3 className="text-4xl font-black bg-gradient-to-r from-[#1e40a7] to-[#3b82f6] bg-clip-text text-transparent mb-6">
+                  Welcome to Your Dashboard
                 </h3>
-                <p className="text-gray-600 text-lg mb-2 max-w-md">
+                <p className="text-gray-600 text-xl mb-8 max-w-2xl">
                   {filteredChats.length === 0 
-                    ? 'Start your first conversation with a job seeker' 
-                    : 'Select a conversation to start messaging'
+                    ? 'Start your journey by connecting with talented job seekers' 
+                    : 'Select a conversation to start messaging and help candidates find their dream jobs'
                   }
                 </p>
-                <p className="text-gray-500 text-sm max-w-sm">
-                  Send messages, share files, and communicate seamlessly with job seekers
-                </p>
                 
-                <div className="mt-12 grid grid-cols-1 md:grid-cols-3 gap-8 max-w-2xl">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-4xl mt-12">
                   {[
-                    { icon: FiMessageCircle, text: 'Instant Messaging', desc: 'Real-time chat' },
-                    { icon: FiPaperclip, text: 'File Sharing', desc: 'Share documents' },
-                    { icon: FiVideo, text: 'Video Call', desc: 'Face-to-face meetings' }
+                    { icon: FiMessageCircle, text: 'Instant Chat', desc: 'Real-time messaging with candidates' },
+                    { icon: FiUsers, text: 'Smart Matching', desc: 'Connect with relevant job seekers' },
+                    { icon: FiAward, text: 'Track Referrals', desc: 'Monitor your referral success' }
                   ].map((item, index) => (
                     <motion.div
                       key={item.text}
                       initial={{ opacity: 0, y: 20 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: 0.5 + index * 0.1 }}
-                      className="text-center p-6 bg-white rounded-2xl shadow-lg"
+                      className="text-center p-8 bg-white rounded-2xl shadow-lg border border-gray-100 hover:shadow-xl transition-all duration-300"
                     >
-                      <div className="w-16 h-16 bg-gradient-to-br from-[#00a884] to-[#008c6d] rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
-                        <item.icon className="h-8 w-8 text-white" />
+                      <div className="w-20 h-20 bg-gradient-to-br from-[#1e40a7] to-[#3b82f6] rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg">
+                        <item.icon className="h-10 w-10 text-white" />
                       </div>
-                      <div className="font-bold text-gray-900 text-lg mb-2">{item.text}</div>
-                      <div className="text-sm text-gray-600">{item.desc}</div>
+                      <div className="font-bold text-gray-900 text-xl mb-3">{item.text}</div>
+                      <div className="text-gray-600 leading-relaxed">{item.desc}</div>
                     </motion.div>
                   ))}
                 </div>
