@@ -149,7 +149,6 @@ export default function Sidebar({
                 { href: "/poster/new-job", icon: <FiPlusSquare className="w-5 h-5" />, text: "Post New Job" },
                 { href: "/poster/posted-jobs", icon: <FiBriefcase className="w-5 h-5" />, text: "Posted Jobs" },
                 { href: "/poster/applications", icon: <FiFileText className="w-5 h-5" />, text: "Applications" },
-                { href: "/poster/messages", icon: <FiTrendingUp className="w-5 h-5" />, text: "Messages", badge: unreadCount },
             ]
             : []),
         ...(userRole === "job_seeker"
@@ -165,7 +164,7 @@ export default function Sidebar({
             ? [
                 { href: "/admin/dashboard", icon: <FiHome className="h-5 w-5" />, text: "Dashboard" },
                 { href: "/admin/create-user", icon: <FiUser className="h-5 w-5" />, text: "Create User" },
-                { href: "/admin/generate-referral", icon: <FiLink className="h-5 w-5" />, text: "Generate Referral" },
+                { href: "/admin/generate-referral", icon: <FiLink className="h-5 w-5" />, text: "Generate Access Code" },
                 { href: "/admin/my-created-users", icon: <FiUsers className="h-5 w-5" />, text: "My Created Users" },
             ]
             : []),
@@ -173,7 +172,7 @@ export default function Sidebar({
             ? [
                 { href: "/admin/dashboard", icon: <FiHome className="h-5 w-5" />, text: "Dashboard" },
                 { href: "/admin/create-user", icon: <FiUser className="h-5 w-5" />, text: "Create User" },
-                { href: "/admin/generate-referral", icon: <FiLink className="h-5 w-5" />, text: "Generate Referral" },
+                { href: "/admin/generate-referral", icon: <FiLink className="h-5 w-5" />, text: "Generate Access Code" },
                 { href: "/admin/my-created-users", icon: <FiUsers className="h-5 w-5" />, text: "My Created Users" },
             ]
             : []),

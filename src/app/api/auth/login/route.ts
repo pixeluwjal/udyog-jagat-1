@@ -32,6 +32,66 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
     }
 
+    console.log('🔍 DEBUG LOGIN - User found:', {
+      email: user.email,
+      role: user.role,
+      status: (user as any).status,
+      userData: user
+    });
+
+    // 🔴 CRITICAL: Check if job seeker is inactive
+    if (user.role === 'job_seeker') {
+      const jobSeeker = user as IUser;
+      
+      // Check if seeker is inactive
+      if (jobSeeker.status === 'inactive') {
+        console.log('🚫 BLOCKED: Inactive job seeker trying to login:', user.email);
+        return NextResponse.json({ 
+          error: 'Your account has been deactivated. Please contact support.' 
+        }, { status: 403 });
+      }
+
+      // 🔴 CRITICAL: Check ALL access codes for this email - if ANY are valid, allow login
+      const accessCodes = await ReferralCodeModel.find({
+        candidateEmail: email
+      });
+
+      if (accessCodes.length > 0) {
+        const now = new Date();
+        
+        // Check if ANY access code is still valid (not expired)
+        const hasValidAccessCode = accessCodes.some(code => 
+          new Date(code.expiresAt) >= now
+        );
+
+        console.log('🔍 ACCESS CODE STATUS CHECK:', {
+          email: user.email,
+          totalAccessCodes: accessCodes.length,
+          accessCodes: accessCodes.map(code => ({
+            code: code.code,
+            isUsed: code.isUsed,
+            expiresAt: code.expiresAt,
+            isExpired: new Date(code.expiresAt) < now,
+            status: new Date(code.expiresAt) >= now ? 'active' : 'expired'
+          })),
+          hasValidAccessCode: hasValidAccessCode,
+          currentTime: now
+        });
+
+        // 🚫 BLOCK LOGIN only if ALL access codes are expired
+        if (!hasValidAccessCode) {
+          console.log('🚫 BLOCKED: Job seeker with ALL expired access codes trying to login:', user.email);
+          return NextResponse.json({ 
+            error: 'All your access codes have expired. Your account is no longer accessible. Please contact support for a new access code.' 
+          }, { status: 403 });
+        } else {
+          console.log('✅ ALLOWED: Job seeker has at least one valid access code:', user.email);
+        }
+      } else {
+        console.log('🔍 ACCESS CODE STATUS CHECK: No access codes found for:', user.email);
+      }
+    }
+
     let isAuthenticated = false;
 
     // 2️⃣ Check password first
@@ -41,18 +101,33 @@ export async function POST(request: NextRequest) {
     }
 
     // 3️⃣ If password failed, check referral code (only for regular users, not referrers)
-    if (!isAuthenticated && 'role' in user && user.role !== 'job_referrer') {
+    if (!isAuthenticated && user.role !== 'job_referrer') {
       const referral: IReferralCode | null = await ReferralCodeModel.findOne({
         candidateEmail: email,
         code: rawPassword
       });
+      
       if (referral) {
+        // Check if access code is expired
+        const now = new Date();
+        if (new Date(referral.expiresAt) < now) {
+          return NextResponse.json({ 
+            error: 'This access code has expired. Please request a new one.' 
+          }, { status: 401 });
+        }
+
+        // Mark the access code as used
+        referral.isUsed = true;
+        referral.usedAt = new Date();
+        await referral.save();
+
         isAuthenticated = true;
+        console.log('✅ Access code used successfully:', referral.code);
       }
     }
 
     if (!isAuthenticated) {
-      return NextResponse.json({ error: 'Invalid credentials or referral code' }, { status: 401 });
+      return NextResponse.json({ error: 'Invalid credentials or access code' }, { status: 401 });
     }
 
     // 4️⃣ Generate JWT - include additional fields for referrers
@@ -64,6 +139,7 @@ export async function POST(request: NextRequest) {
       role: user.role,
       firstLogin: user.firstLogin,
       onboardingStatus: user.onboardingStatus,
+      status: (user as any).status,
     };
 
     // Add referrer-specific fields if the user is a referrer
@@ -84,6 +160,39 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // 🔍 Add access code status info for job seekers
+    if (user.role === 'job_seeker') {
+      const accessCodes = await ReferralCodeModel.find({
+        candidateEmail: email
+      });
+      
+      if (accessCodes.length > 0) {
+        const now = new Date();
+        const validAccessCodes = accessCodes.filter(code => 
+          new Date(code.expiresAt) >= now
+        );
+        const hasValidAccessCode = validAccessCodes.length > 0;
+        
+        tokenPayload.accessCodesCount = accessCodes.length;
+        tokenPayload.validAccessCodesCount = validAccessCodes.length;
+        tokenPayload.hasValidAccessCode = hasValidAccessCode;
+        tokenPayload.accessCodeStatus = hasValidAccessCode ? 'active' : 'expired';
+        
+        // Include the first valid access code info (if any)
+        if (validAccessCodes.length > 0) {
+          const firstValidCode = validAccessCodes[0];
+          tokenPayload.accessCode = firstValidCode.code;
+          tokenPayload.accessCodeGeneratedBy = firstValidCode.generatedByAdminUsername;
+          tokenPayload.accessCodeExpiresAt = firstValidCode.expiresAt;
+        }
+      } else {
+        tokenPayload.accessCodesCount = 0;
+        tokenPayload.validAccessCodesCount = 0;
+        tokenPayload.hasValidAccessCode = false;
+        tokenPayload.accessCodeStatus = 'no_access_code';
+      }
+    }
+
     const token = jwt.sign(tokenPayload, process.env.JWT_SECRET, { expiresIn: '1d' });
 
     // 5️⃣ Response - include referrer-specific fields
@@ -94,6 +203,7 @@ export async function POST(request: NextRequest) {
       role: user.role,
       firstLogin: user.firstLogin,
       onboardingStatus: user.onboardingStatus,
+      status: (user as any).status,
     };
 
     // Add referrer-specific fields to response
@@ -113,6 +223,39 @@ export async function POST(request: NextRequest) {
       }
       if (referrerUser.jobReferrerDetails) {
         userResponse.jobReferrerDetails = referrerUser.jobReferrerDetails;
+      }
+    }
+
+    // 🔍 Add access code status info to response for job seekers
+    if (user.role === 'job_seeker') {
+      const accessCodes = await ReferralCodeModel.find({
+        candidateEmail: email
+      });
+      
+      if (accessCodes.length > 0) {
+        const now = new Date();
+        const validAccessCodes = accessCodes.filter(code => 
+          new Date(code.expiresAt) >= now
+        );
+        const hasValidAccessCode = validAccessCodes.length > 0;
+        
+        userResponse.accessCodesCount = accessCodes.length;
+        userResponse.validAccessCodesCount = validAccessCodes.length;
+        userResponse.hasValidAccessCode = hasValidAccessCode;
+        userResponse.accessCodeStatus = hasValidAccessCode ? 'active' : 'expired';
+        
+        // Include the first valid access code info (if any)
+        if (validAccessCodes.length > 0) {
+          const firstValidCode = validAccessCodes[0];
+          userResponse.accessCode = firstValidCode.code;
+          userResponse.accessCodeGeneratedBy = firstValidCode.generatedByAdminUsername;
+          userResponse.accessCodeExpiresAt = firstValidCode.expiresAt;
+        }
+      } else {
+        userResponse.accessCodesCount = 0;
+        userResponse.validAccessCodesCount = 0;
+        userResponse.hasValidAccessCode = false;
+        userResponse.accessCodeStatus = 'no_access_code';
       }
     }
 

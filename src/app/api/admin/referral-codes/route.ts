@@ -8,8 +8,6 @@ const JWT_SECRET = process.env.JWT_SECRET;
 
 /**
  * Verifies the JWT from the request headers and checks if the user is an admin.
- * @param requestHeaders The headers object from the incoming request.
- * @returns An object containing the decoded user payload or an error message.
  */
 async function verifyAdmin(requestHeaders: Headers): Promise<{ user: any | null, error: string | null }> {
     const authorization = requestHeaders.get('authorization');
@@ -41,48 +39,59 @@ export async function GET(request: Request) {
     await dbConnect();
     console.log('\n--- API: /api/admin/referral-codes GET - Request received ---');
 
-    const { error: authError } = await verifyAdmin(headers());
-    if (authError) {
-        return NextResponse.json({ error: authError }, { status: 401 });
-    }
-
     try {
+        const { user, error: authError } = await verifyAdmin(headers());
+        if (authError) {
+            console.error('Authentication error:', authError);
+            return NextResponse.json({ error: authError }, { status: 401 });
+        }
+
         const { searchParams } = new URL(request.url);
         const statusFilter = searchParams.get('status');
         const generatedByAdminIdFilter = searchParams.get('generatedByAdminId');
         
+        console.log('Query parameters:', { statusFilter, generatedByAdminIdFilter });
+        
         const query: any = {};
         const now = new Date();
 
+        // Filter by admin who generated the code
         if (generatedByAdminIdFilter && generatedByAdminIdFilter !== 'all') {
             query.generatedByAdminId = generatedByAdminIdFilter;
         }
 
-        // CORRECTED: Apply status filter logic to the Mongoose query
-        if (statusFilter === 'used and valid') {
-            query.isUsed = true;
-            query.expiresAt = { $gte: now };
-        } else if (statusFilter === 'used and expired') {
-            query.isUsed = true;
-            query.expiresAt = { $lt: now };
-        } else if (statusFilter === 'unused and expired') {
-            query.isUsed = false;
-            query.expiresAt = { $lt: now };
-        } else if (statusFilter === 'unused and valid') {
-            query.isUsed = false;
-            query.expiresAt = { $gte: now };
+        // Apply status filter logic
+        if (statusFilter && statusFilter !== 'all') {
+            if (statusFilter === 'used and valid') {
+                query.isUsed = true;
+                query.expiresAt = { $gte: now };
+            } else if (statusFilter === 'used and expired') {
+                query.isUsed = true;
+                query.expiresAt = { $lt: now };
+            } else if (statusFilter === 'unused and expired') {
+                query.isUsed = false;
+                query.expiresAt = { $lt: now };
+            } else if (statusFilter === 'unused and valid') {
+                query.isUsed = false;
+                query.expiresAt = { $gte: now };
+            }
         }
+
+        console.log('MongoDB query:', JSON.stringify(query, null, 2));
 
         const referralCodes = await ReferralCodeModel.find(query)
             .populate({
                 path: 'generatedByAdminId',
-                select: 'username'
+                select: 'username email'
             })
             .sort({ createdAt: -1 })
             .lean();
 
+        console.log(`Found ${referralCodes.length} referral codes`);
+
         const transformedCodes = referralCodes.map(code => {
-            const referrerUsername = (code.generatedByAdminId as any)?.username || 'Unknown Admin';
+            const adminData = code.generatedByAdminId as any;
+            const referrerUsername = adminData?.username || adminData?.email || 'Unknown Admin';
             const isExpired = new Date(code.expiresAt) < now;
             let status = '';
 
@@ -99,9 +108,16 @@ export async function GET(request: Request) {
             };
         });
 
-        return NextResponse.json({ referralCodes: transformedCodes }, { status: 200 });
+        return NextResponse.json({ 
+            success: true,
+            referralCodes: transformedCodes 
+        }, { status: 200 });
+        
     } catch (error: any) {
         console.error('Error fetching referral codes:', error);
-        return NextResponse.json({ error: 'Failed to fetch referral codes', details: error.message }, { status: 500 });
+        return NextResponse.json({ 
+            error: 'Failed to fetch referral codes', 
+            details: error.message 
+        }, { status: 500 });
     }
 }

@@ -637,7 +637,7 @@ export default function FindReferrerPage() {
                   </h1>
                   <p className="text-base lg:text-lg text-gray-600 max-w-2xl mx-auto px-4">
                     Connect with experienced professionals who can refer you to top companies. 
-                    Search by name, company, position, or username.
+                    Search by name, company, position, or location.
                   </p>
                 </div>
 

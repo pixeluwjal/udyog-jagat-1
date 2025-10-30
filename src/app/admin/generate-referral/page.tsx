@@ -163,7 +163,7 @@ const SearchableDropdown: React.FC<{
                 className="px-4 py-3 cursor-pointer hover:bg-[#165BF8]/5 flex items-center text-[#165BF8] font-bold transition-all duration-200 hover:pl-6 group"
               >
                 <FiUsers className="mr-3 h-5 w-5" />
-                All Admins/Referrers
+                All Admins
               </motion.li>
               {filteredOptions.map((option, index) => (
                 <motion.li
@@ -180,7 +180,7 @@ const SearchableDropdown: React.FC<{
               ))}
             </ul>
             {filteredOptions.length === 0 && searchTerm && (
-              <div className="px-4 py-3 text-sm text-[#1C3991]/70 font-medium text-center">No matching users found</div>
+              <div className="px-4 py-3 text-sm text-[#1C3991]/70 font-medium text-center">No matching admins found</div>
             )}
           </motion.div>
         )}
@@ -224,51 +224,67 @@ export default function GenerateReferralPage() {
   const fetchAdminUsers = useCallback(async () => {
     if (!token) return;
     try {
-      const response = await fetch('/api/admin/users?roles=admin,job_referrer', {
+      const response = await fetch('/api/admin/users?roles=admin', {
         headers: { Authorization: `Bearer ${token}` },
       });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch admin users: ${response.status}`);
+      }
+      
       const data = await response.json();
       if (response.ok && Array.isArray(data.users)) {
-        setAdminUsers(data.users.map((u: any) => ({ _id: u._id, username: u.username || u.email })));
+        setAdminUsers(data.users.map((u: any) => ({ 
+          _id: u._id, 
+          username: u.username || u.email 
+        })));
       }
     } catch (err) {
       console.error('Error fetching admin users:', err);
     }
   }, [token]);
 
-  const fetchReferralCodes = useCallback(async () => {
-    setLoadingReferrals(true);
-    setReferralsError(null);
+const fetchReferralCodes = useCallback(async () => {
+  setLoadingReferrals(true);
+  setReferralsError(null);
 
-    if (!token) {
-      setReferralsError("Authentication token missing.");
-      setLoadingReferrals(false);
-      return;
+  if (!token) {
+    setReferralsError("Authentication token missing.");
+    setLoadingReferrals(false);
+    return;
+  }
+
+  try {
+    const params = new URLSearchParams();
+    if (filterStatus !== 'all') {
+      params.append('status', filterStatus); 
+    }
+    if (filterGeneratedBy !== 'all') {
+      params.append('generatedByAdminId', filterGeneratedBy);
     }
 
-    try {
-      const params = new URLSearchParams();
-      if (filterStatus !== 'all') {
-        params.append('status', filterStatus); 
-      }
-      if (filterGeneratedBy !== 'all') {
-        params.append('generatedByAdminId', filterGeneratedBy);
-      }
+    const response = await fetch(`/api/admin/referral-codes?${params.toString()}`, {
+      headers: { 
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+    });
 
-      const response = await fetch(`/api/admin/referral-codes?${params.toString()}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+    const data = await response.json();
 
-      const data = await response.json();
-
-      if (!response.ok) throw new Error(data.error || "Failed to fetch Access codes.");
-      setGeneratedReferrals(data.referralCodes);
-    } catch (err: any) {
-      setReferralsError(err.message || "An error occurred while fetching codes.");
-    } finally {
-      setLoadingReferrals(false);
+    if (!response.ok) {
+      throw new Error(data.error || `HTTP error! status: ${response.status}`);
     }
-  }, [token, filterStatus, filterGeneratedBy]);
+
+    // FIX: Remove success check here too
+    setGeneratedReferrals(data.referralCodes || []);
+  } catch (err: any) {
+    console.error('Error fetching referral codes:', err);
+    setReferralsError(err.message || "An error occurred while fetching codes.");
+  } finally {
+    setLoadingReferrals(false);
+  }
+}, [token, filterStatus, filterGeneratedBy]);;
 
   useEffect(() => {
     if (authLoading) return;
@@ -291,69 +307,73 @@ export default function GenerateReferralPage() {
     fetchReferralCodes();
   }, [authLoading, isAuthenticated, currentUser, router, fetchReferralCodes, fetchAdminUsers]);
 
-  const handleSubmit = async (e: FormEvent) => {
-    e.preventDefault();
-    setError(null);
-    setMessage(null);
-    setGeneratedCode(null);
-    setExpiresAt(null);
-    setLoading(true);
+const handleSubmit = async (e: FormEvent) => {
+  e.preventDefault();
+  setError(null);
+  setMessage(null);
+  setGeneratedCode(null);
+  setExpiresAt(null);
+  setLoading(true);
 
-    if (!token) {
-      setError("Authentication token missing. Please log in again.");
-      setLoading(false);
-      return;
+  if (!token) {
+    setError("Authentication token missing. Please log in again.");
+    setLoading(false);
+    return;
+  }
+
+  if (!email) {
+    setError("Please provide an email address.");
+    setLoading(false);
+    return;
+  }
+
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    setError("Invalid email format.");
+    setLoading(false);
+    return;
+  }
+
+  if (durationValue <= 0) {
+    setError("Please enter a valid duration greater than 0.");
+    setLoading(false);
+    return;
+  }
+
+  try {
+    const response = await fetch("/api/admin/generate-referral-code", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ 
+        candidateEmail: email, 
+        durationValue: durationValue,
+        durationUnit: durationUnit
+      }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || `HTTP error! status: ${response.status}`);
     }
 
-    if (!email) {
-      setError("Please provide an email address.");
-      setLoading(false);
-      return;
-    }
-
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      setError("Invalid email format.");
-      setLoading(false);
-      return;
-    }
-
-    if (durationValue <= 0) {
-      setError("Please enter a valid duration greater than 0.");
-      setLoading(false);
-      return;
-    }
-
-    try {
-      const response = await fetch("/api/admin/generate-referral-code", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ 
-            candidateEmail: email, 
-            durationValue: durationValue,
-            durationUnit: durationUnit
-        }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) throw new Error(data.error || "Failed to generate Access code");
-
-      setMessage(data.message || "Access code generated successfully!");
-      setGeneratedCode(data.code);
-      setExpiresAt(data.expiresAt);
-      setEmail("");
-      setDurationValue(60);
-      setDurationUnit('days');
-      fetchReferralCodes();
-    } catch (err: any) {
-      setError(err.message || "An unexpected error occurred.");
-    } finally {
-      setLoading(false);
-    }
-  };
+    // FIX: Remove the success check since your backend doesn't return it
+    // Your backend returns the data directly on success
+    setMessage(data.message || "Access code generated successfully!");
+    setGeneratedCode(data.code);
+    setExpiresAt(data.expiresAt);
+    setEmail("");
+    setDurationValue(60);
+    setDurationUnit('days');
+    fetchReferralCodes();
+  } catch (err: any) {
+    setError(err.message || "An unexpected error occurred.");
+  } finally {
+    setLoading(false);
+  }
+};
 
   const handleCopyCode = (code: string) => {
     navigator.clipboard.writeText(code)
@@ -476,7 +496,8 @@ export default function GenerateReferralPage() {
                       </div>
                       <button 
                         onClick={fetchReferralCodes}
-                        className="p-3 rounded-2xl bg-[#165BF8]/10 text-[#165BF8] hover:bg-[#165BF8]/20 transition-all duration-300 shadow-sm"
+                        disabled={loadingReferrals}
+                        className="p-3 rounded-2xl bg-[#165BF8]/10 text-[#165BF8] hover:bg-[#165BF8]/20 transition-all duration-300 shadow-sm disabled:opacity-50"
                         title="Refresh codes"
                       >
                         <FiRefreshCw className={`h-5 w-5 ${loadingReferrals ? 'animate-spin' : ''}`} />
@@ -687,12 +708,12 @@ export default function GenerateReferralPage() {
                       </select>
                     </div>
                     
-                    {/* Referrer Filter */}
+                    {/* Admin Filter */}
                     <SearchableDropdown
-                      options={[{ _id: 'all', username: 'All Admins/Referrers' }, ...adminUsers]}
+                      options={adminUsers}
                       value={filterGeneratedBy}
                       onChange={setFilterGeneratedBy}
-                      placeholder="Filter by Referrer"
+                      placeholder="Filter by Admin"
                       icon={FiUser}
                     />
                   </div>
@@ -717,6 +738,12 @@ export default function GenerateReferralPage() {
                   >
                     <FiXCircle className="h-6 w-6 text-red-500 flex-shrink-0" />
                     <span className="font-semibold">{referralsError}</span>
+                    <button 
+                      onClick={fetchReferralCodes}
+                      className="ml-auto px-3 py-1 bg-red-100 text-red-700 rounded-lg text-sm font-medium hover:bg-red-200 transition-colors"
+                    >
+                      Retry
+                    </button>
                   </motion.div>
                 ) : generatedReferrals.length === 0 ? (
                   <motion.div
@@ -795,7 +822,7 @@ export default function GenerateReferralPage() {
                             <div className="flex gap-3">
                               <FiUser className="h-5 w-5 text-[#165BF8] shrink-0 mt-0.5" />
                               <div>
-                                <p className="text-[#165BF8] font-bold">Referrer</p>
+                                <p className="text-[#165BF8] font-bold">Admin</p>
                                 <p className="text-[#1C3991] font-semibold">
                                   {referral.generatedByAdminUsername}
                                 </p>
