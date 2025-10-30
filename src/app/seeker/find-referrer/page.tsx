@@ -681,7 +681,7 @@ export default function FindReferrerPage() {
                       <FiSearch className="absolute left-4 lg:left-6 top-1/2 transform -translate-y-1/2 h-5 lg:h-6 w-5 lg:w-6 text-[#2042AA] z-10" />
                       <input
                         type="text"
-                        placeholder="Search referrers by name, company, position, or username..."
+                        placeholder="Search referrers by name, company, position, or location..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                         onFocus={() => setSearchFocused(true)}
